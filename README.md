@@ -226,4 +226,3 @@ Released under the [MIT License](LICENSE).
 - evidence chunk 接线
 - calibration 实验脚手架
 
-如果你想把它继续推进成论文或完整开源项目，下一步最值得做的是：扩正式 benchmark、增加人工标注、补更严格的 ablation 和 error analysis。
