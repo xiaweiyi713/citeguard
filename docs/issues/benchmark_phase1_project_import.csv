@@ -1,0 +1,10 @@
+ID,Title,Labels,Priority,Status,Track,Milestone,DependsOn,RecommendedOrder,Notes
+1,"Create train/dev/test split for support verification examples","research, benchmark","P0","Ready","dataset","0.2 Evaluation Foundations","none",1,"Benchmark gatekeeper; do before serious calibration work."
+2,"Define support-label schema and adjudication guidelines","research, benchmark, documentation","P0","Ready","labeling","0.2 Evaluation Foundations","none",2,"Defines ontology for later benchmark expansion."
+3,"Expand hard negatives for overclaim and domain-mismatch cases","research, benchmark","P1","Backlog","dataset","0.2 Evaluation Foundations","2",6,"Add realistic negatives that can fool simple lexical overlap."
+4,"Add provenance fields for evidence origin and source diversity analysis","research, benchmark, retrieval","P0","Backlog","dataset","0.2 Evaluation Foundations","1|2",3,"Separates adapter quality from verifier quality."
+5,"Add support-verification confusion matrices and calibration diagnostics","research, benchmark, metrics","P1","Backlog","metrics","0.2 Evaluation Foundations","1",4,"Makes support verification directly measurable."
+6,"Run first locked dev calibration and held-out test evaluation","research, calibration, benchmark","P1","Backlog","experiments","0.2 Evaluation Foundations","1|5|9",7,"Freeze config on dev and report only on test."
+7,"Implement verifier and retrieval-source ablation matrix","research, ablation, benchmark","P2","Backlog","experiments","0.2 Evaluation Foundations","6|9",8,"Build paper-ready ablation evidence."
+8,"Create error-analysis buckets and representative failure set","research, error-analysis, benchmark","P2","Backlog","analysis","0.2 Evaluation Foundations","6|7",9,"Turn benchmark failures into reusable analysis artifacts."
+9,"Standardize experiment artifact schema under experiments/","research, developer experience, benchmark","P1","Backlog","infrastructure","0.2 Evaluation Foundations","1",5,"Prevents ad hoc experiment outputs and simplifies later tables."

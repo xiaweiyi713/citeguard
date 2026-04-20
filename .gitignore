@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+
+# Virtual environments
+.venv/
+.venv*/
+venv/
+env/
+
+# OS and editors
+.DS_Store
+.vscode/
+.idea/
+
+# Data artifacts
+data/raw/
+data/processed/
+data/logs/
+
+# Experiment outputs
+wandb/
+outputs/
+checkpoints/
+build/
+dist/
+*.egg-info/
+
+# Local env files
+.env
+*.local

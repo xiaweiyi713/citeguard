@@ -1,0 +1,9 @@
+retriever: hybrid
+bm25_weight: 0.55
+dense_weight: 0.45
+retrieval_top_k: 5
+candidate_top_k: 3
+live_sources:
+  - openalex
+  - crossref
+  - arxiv

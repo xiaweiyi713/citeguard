@@ -1,0 +1,41 @@
+[
+  {
+    "citation_id": "openscholar-2024",
+    "title": "OpenScholar: Synthesizing Scientific Literature with Retrieval-Augmented Language Models",
+    "authors": ["Akari Asai", "Yizhong Wang"],
+    "year": 2024,
+    "venue": "arXiv",
+    "abstract": "This work synthesizes scientific literature with retrieval-augmented language models and studies citation hallucinations in academic writing.",
+    "doi": "",
+    "arxiv_id": "",
+    "url": "",
+    "source": "demo",
+    "metadata": {}
+  },
+  {
+    "citation_id": "ghostcite-2026",
+    "title": "GhostCite: A Large-Scale Analysis of Citation Validity in the Age of Large Language Models",
+    "authors": ["Zhe Xu"],
+    "year": 2026,
+    "venue": "arXiv",
+    "abstract": "We measure phantom references, fabricated metadata, and citation validity across many large language models.",
+    "doi": "",
+    "arxiv_id": "",
+    "url": "",
+    "source": "demo",
+    "metadata": {}
+  },
+  {
+    "citation_id": "reasons-2024",
+    "title": "REASONS: A Benchmark for Retrieval and Automated Citations of Scientific Sentences",
+    "authors": ["Deepak Tilwani"],
+    "year": 2024,
+    "venue": "arXiv",
+    "abstract": "This benchmark studies retrieval, citation selection, and scientific sentence attribution.",
+    "doi": "",
+    "arxiv_id": "",
+    "url": "",
+    "source": "demo",
+    "metadata": {}
+  }
+]

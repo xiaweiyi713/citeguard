@@ -1,0 +1,8 @@
+# Optional model-backed support verification stack
+# Install with:
+#   python3 -m pip install -r requirements-optional.txt
+
+sentence-transformers==3.1.1
+transformers==4.45.2
+torch==2.3.1
+safetensors==0.7.0

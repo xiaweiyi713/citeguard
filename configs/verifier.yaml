@@ -1,0 +1,4 @@
+cite_threshold: 0.35
+rewrite_threshold: 0.55
+support_min_score: 0.14
+metadata_min_title_score: 0.90

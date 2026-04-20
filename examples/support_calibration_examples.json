@@ -1,0 +1,86 @@
+[
+  {
+    "example_id": "pos-ghostcite-core",
+    "claim_text": "Recent work analyzes phantom references and fabricated metadata in large language models.",
+    "evidence_text": "We analyze citation validity, phantom references, and fabricated bibliographic metadata across many large language models.",
+    "supported": true,
+    "note": "Direct support"
+  },
+  {
+    "example_id": "pos-openscholar-rag",
+    "claim_text": "Retrieval-augmented language models have been used to synthesize scientific literature.",
+    "evidence_text": "OpenScholar synthesizes scientific literature with retrieval-augmented language models and studies citation hallucinations in academic writing.",
+    "supported": true,
+    "note": "Strong paraphrase"
+  },
+  {
+    "example_id": "pos-reasons-benchmark",
+    "claim_text": "Benchmarks exist for retrieval and automated citations of scientific sentences.",
+    "evidence_text": "REASONS is a benchmark for retrieval and automated citations of scientific sentences.",
+    "supported": true,
+    "note": "Exact benchmark claim"
+  },
+  {
+    "example_id": "pos-sentence-attribution",
+    "claim_text": "Scientific sentence attribution is a target task in recent citation benchmarks.",
+    "evidence_text": "This benchmark studies retrieval, citation selection, and scientific sentence attribution.",
+    "supported": true,
+    "note": "Partial lexical overlap but true support"
+  },
+  {
+    "example_id": "pos-large-scale-validity",
+    "claim_text": "Citation validity has been measured at scale across many language models.",
+    "evidence_text": "We measure phantom references, fabricated metadata, and citation validity across many large language models.",
+    "supported": true,
+    "note": "Abstractive restatement"
+  },
+  {
+    "example_id": "pos-literature-synthesis",
+    "claim_text": "Recent systems study citation hallucinations during scientific literature synthesis.",
+    "evidence_text": "This work studies scientific literature synthesis and citation hallucinations.",
+    "supported": true,
+    "note": "Short evidence snippet"
+  },
+  {
+    "example_id": "neg-overclaim-eliminates",
+    "claim_text": "OpenScholar proves retrieval completely eliminates citation hallucinations.",
+    "evidence_text": "OpenScholar synthesizes scientific literature with retrieval-augmented language models and studies citation hallucinations in academic writing.",
+    "supported": false,
+    "note": "Overclaim from related evidence"
+  },
+  {
+    "example_id": "neg-domain-mismatch",
+    "claim_text": "GhostCite studies protein folding datasets.",
+    "evidence_text": "We analyze citation validity, phantom references, and fabricated bibliographic metadata across many large language models.",
+    "supported": false,
+    "note": "Off-domain mismatch"
+  },
+  {
+    "example_id": "neg-topic-mismatch",
+    "claim_text": "The benchmark focuses on multilingual translation quality.",
+    "evidence_text": "REASONS is a benchmark for retrieval and automated citations of scientific sentences.",
+    "supported": false,
+    "note": "Benchmark but wrong task"
+  },
+  {
+    "example_id": "neg-frequency-overclaim",
+    "claim_text": "Recent work shows phantom references are rare in large language models.",
+    "evidence_text": "We measure phantom references, fabricated metadata, and citation validity across many large language models.",
+    "supported": false,
+    "note": "Frequency claim unsupported by evidence"
+  },
+  {
+    "example_id": "neg-causal-overclaim",
+    "claim_text": "Citation hallucinations are mainly caused by tokenizer bugs.",
+    "evidence_text": "This work studies scientific literature synthesis and citation hallucinations.",
+    "supported": false,
+    "note": "Causal overclaim"
+  },
+  {
+    "example_id": "neg-method-overclaim",
+    "claim_text": "The citation validity paper introduces a theorem prover for mathematics competitions.",
+    "evidence_text": "We analyze citation validity, phantom references, and fabricated bibliographic metadata across many large language models.",
+    "supported": false,
+    "note": "Method mismatch"
+  }
+]

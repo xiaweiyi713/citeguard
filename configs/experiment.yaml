@@ -1,0 +1,3 @@
+default_topic: citation hallucination in scientific writing
+section_count: 3
+run_human_eval: false

@@ -1,0 +1,51 @@
+name: Feature request
+description: Propose a new capability, workflow, or integration for CiteGuard.
+title: "[Feature] "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this template for product or engineering improvements. If the request is mainly about experiments, datasets, or evaluation design, consider the benchmark or research template instead.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem statement
+      description: What user or research workflow is blocked today?
+      placeholder: The current system makes it hard to ...
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: Describe the capability you want to add.
+      placeholder: Add a new adapter / verifier / audit view / CLI workflow ...
+    validations:
+      required: true
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Scope
+      options:
+        - retrieval
+        - verification
+        - benchmark
+        - API
+        - developer experience
+        - documentation
+        - CI or packaging
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      placeholder: Any workaround or alternative design you already evaluated.
+  - type: textarea
+    id: success
+    attributes:
+      label: Success criteria
+      description: How would we know this feature is done and useful?
+      placeholder: Clear acceptance criteria, metrics, or usage scenarios.

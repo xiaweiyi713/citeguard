@@ -1,0 +1,59 @@
+name: Benchmark or research task
+description: Track a dataset, evaluation, calibration, or error-analysis task.
+title: "[Research] "
+labels:
+  - research
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this template for benchmark expansion, labeling work, calibration studies, ablations, or error-analysis tasks.
+  - type: dropdown
+    id: task_type
+    attributes:
+      label: Task type
+      options:
+        - dataset curation
+        - labeling or adjudication
+        - support calibration
+        - benchmark design
+        - ablation study
+        - error analysis
+        - cross-domain evaluation
+    validations:
+      required: true
+  - type: textarea
+    id: motivation
+    attributes:
+      label: Motivation
+      description: What research question or evaluation gap does this task address?
+    validations:
+      required: true
+  - type: textarea
+    id: deliverables
+    attributes:
+      label: Deliverables
+      description: Expected artifacts such as JSON examples, plots, tables, scripts, or docs updates.
+      placeholder: |
+        - Add 100 labeled support examples
+        - Save calibration results under experiments/...
+        - Update benchmark documentation
+    validations:
+      required: true
+  - type: textarea
+    id: protocol
+    attributes:
+      label: Proposed protocol
+      description: Describe the experimental setup or labeling procedure.
+    validations:
+      required: true
+  - type: textarea
+    id: risks
+    attributes:
+      label: Risks or confounders
+      description: Note likely failure modes, domain bias, leakage, or labeling ambiguity.
+  - type: textarea
+    id: done
+    attributes:
+      label: Definition of done
+      placeholder: What outputs must exist before this task can be closed?

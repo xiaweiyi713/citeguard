@@ -1,0 +1,75 @@
+name: Bug report
+description: Report a reproducible defect in retrieval, verification, writing, or infrastructure.
+title: "[Bug] "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug. Please include enough detail for us to reproduce the behavior and understand whether it affects citation integrity, evidence provenance, or developer tooling.
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What went wrong?
+      placeholder: A short description of the failure.
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Affected area
+      options:
+        - retrieval
+        - scholarly adapters
+        - support verification
+        - metadata or existence verification
+        - writing or audit output
+        - calibration or benchmark tooling
+        - packaging or CI
+        - documentation
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Reproduction steps
+      description: Include exact commands, input files, or claim/evidence examples.
+      placeholder: |
+        1. Create a virtual environment
+        2. Run ...
+        3. Observe ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      placeholder: What did you expect to happen instead?
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      placeholder: Include error traces, incorrect citations, or wrong verifier decisions.
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      placeholder: |
+        OS:
+        Python:
+        Install method:
+        Support mode:
+        Live sources used:
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: Extra context
+      description: Add anything that may help diagnose rate limits, source-specific quirks, or model-download issues.

@@ -1,0 +1,99 @@
+{
+  "profile": "quick",
+  "dataset_size": 12,
+  "top_results": [
+    {
+      "config": {
+        "heuristic_threshold": 0.16,
+        "reranker_threshold": 0.45,
+        "nli_threshold": 0.5,
+        "nli_margin": 0.03,
+        "ensemble_policy": {
+          "weights": {
+            "transformers_nli": 0.45,
+            "sentence_transformer_reranker": 0.35,
+            "heuristic_support": 0.2
+          },
+          "pair_nli_floor": 0.25,
+          "pair_combined_threshold": 0.24,
+          "contradiction_max": 0.08,
+          "fallback_combined_threshold": 0.42
+        }
+      },
+      "metrics": {
+        "accuracy": 1.0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "false_support_rate": 0.0,
+        "false_reject_rate": 0.0,
+        "true_positive": 6,
+        "true_negative": 6,
+        "false_positive": 0,
+        "false_negative": 0
+      }
+    },
+    {
+      "config": {
+        "heuristic_threshold": 0.16,
+        "reranker_threshold": 0.45,
+        "nli_threshold": 0.5,
+        "nli_margin": 0.03,
+        "ensemble_policy": {
+          "weights": {
+            "transformers_nli": 0.55,
+            "sentence_transformer_reranker": 0.3,
+            "heuristic_support": 0.15
+          },
+          "pair_nli_floor": 0.25,
+          "pair_combined_threshold": 0.24,
+          "contradiction_max": 0.08,
+          "fallback_combined_threshold": 0.42
+        }
+      },
+      "metrics": {
+        "accuracy": 1.0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "false_support_rate": 0.0,
+        "false_reject_rate": 0.0,
+        "true_positive": 6,
+        "true_negative": 6,
+        "false_positive": 0,
+        "false_negative": 0
+      }
+    },
+    {
+      "config": {
+        "heuristic_threshold": 0.16,
+        "reranker_threshold": 0.45,
+        "nli_threshold": 0.5,
+        "nli_margin": 0.03,
+        "ensemble_policy": {
+          "weights": {
+            "transformers_nli": 0.65,
+            "sentence_transformer_reranker": 0.2,
+            "heuristic_support": 0.15
+          },
+          "pair_nli_floor": 0.25,
+          "pair_combined_threshold": 0.24,
+          "contradiction_max": 0.08,
+          "fallback_combined_threshold": 0.42
+        }
+      },
+      "metrics": {
+        "accuracy": 1.0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "false_support_rate": 0.0,
+        "false_reject_rate": 0.0,
+        "true_positive": 6,
+        "true_negative": 6,
+        "false_positive": 0,
+        "false_negative": 0
+      }
+    }
+  ]
+}

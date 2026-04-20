@@ -1,0 +1,20 @@
+cff-version: 1.2.0
+message: "If you use CiteGuard in research, please cite the software record below."
+title: "CiteGuard"
+version: "0.1.0"
+type: software
+date-released: 2026-04-21
+license: "MIT"
+authors:
+  - family-names: "Xu"
+    given-names: "Wenyao"
+abstract: >-
+  CiteGuard is a falsification-first research agent prototype for trustworthy
+  scientific writing. It verifies claim-citation-evidence links before allowing
+  citations into generated text.
+keywords:
+  - scientific writing
+  - citation verification
+  - hallucination mitigation
+  - research agents
+  - evidence attribution

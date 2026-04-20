@@ -1,0 +1,6 @@
+main_writer_model: heuristic-prototype
+lightweight_verifier_model: lexical-verifier
+api_enabled: false
+support_backend: ensemble
+support_reranker_model: cross-encoder/ms-marco-MiniLM-L-6-v2
+support_nli_model: cross-encoder/nli-distilroberta-base
