@@ -63,16 +63,19 @@ class OpenAlexMetadataSource(MetadataSource):
             for authorship in item.get("authorships", [])
             if authorship.get("author", {}).get("display_name")
         ]
-        venue = (
-            item.get("primary_location", {}).get("source", {}).get("display_name")
-            or item.get("host_venue", {}).get("display_name", "")
-        )
+        # OpenAlex may return these as JSON null; coerce to {} so nested .get is safe.
+        primary_location = item.get("primary_location") or {}
+        best_oa_location = item.get("best_oa_location") or {}
+        host_venue = item.get("host_venue") or {}
+        location_source = primary_location.get("source") or {}
+        landing_page_url = primary_location.get("landing_page_url", "")
+        venue = location_source.get("display_name") or host_venue.get("display_name", "")
         doi = normalize_doi(item.get("doi", "") or item.get("ids", {}).get("doi", ""))
         evidence_chunks = harvest_remote_evidence(
             self.http_client,
             urls=[
-                item.get("primary_location", {}).get("landing_page_url", ""),
-                item.get("best_oa_location", {}).get("landing_page_url", ""),
+                landing_page_url,
+                best_oa_location.get("landing_page_url", ""),
             ],
             source_name=self.name,
         )
@@ -84,7 +87,7 @@ class OpenAlexMetadataSource(MetadataSource):
             venue=venue,
             abstract=openalex_abstract_to_text(item.get("abstract_inverted_index", {})),
             doi=doi,
-            url=item.get("primary_location", {}).get("landing_page_url", "") or item.get("id", ""),
+            url=landing_page_url or item.get("id", ""),
             source=self.name,
             metadata=attach_evidence_chunks(
                 {

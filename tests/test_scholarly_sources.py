@@ -48,6 +48,27 @@ class FakeHTTPClient:
         return ""
 
 
+class NullLocationHTTPClient:
+    def get_json(self, url, params=None, headers=None, use_cache=True, timeout=None):
+        return {
+            "results": [
+                {
+                    "id": "https://openalex.org/W999",
+                    "display_name": "A Paper With No Location Metadata",
+                    "authorships": [{"author": {"display_name": "Jane Doe"}}],
+                    "publication_year": 2025,
+                    "primary_location": None,
+                    "best_oa_location": None,
+                    "host_venue": None,
+                    "abstract_inverted_index": {},
+                }
+            ]
+        }
+
+    def get_text(self, url, params=None, headers=None, use_cache=True, timeout=None):
+        return ""
+
+
 class ScholarlySourceTests(unittest.TestCase):
     def test_multi_source_search_deduplicates_and_merges_records(self):
         left = InMemoryMetadataSource(
@@ -166,6 +187,15 @@ class ScholarlySourceTests(unittest.TestCase):
         chunks = results[0].metadata.get("evidence_chunks", [])
         self.assertTrue(chunks)
         self.assertTrue(any("phantom references" in chunk["text"].lower() for chunk in chunks))
+
+    def test_openalex_handles_null_primary_location_and_source(self):
+        # OpenAlex routinely returns primary_location or its nested source as JSON
+        # null; the adapter must not crash on those records.
+        source = OpenAlexMetadataSource(http_client=NullLocationHTTPClient())
+        results = source.search("anything", top_k=1)
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0].venue, "")
+        self.assertEqual(results[0].url, "https://openalex.org/W999")
 
 
 if __name__ == "__main__":
