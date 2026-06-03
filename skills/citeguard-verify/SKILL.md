@@ -22,8 +22,12 @@ You verify citations against real scholarly sources before trusting them. You do
 2. For a list, call `audit_citations_tool` with an array of citation objects.
 3. Read the `verdict` for each result:
    - `verified` — exists and metadata matches. Safe to keep.
-   - `metadata_mismatch` — the paper exists but a field is wrong. Show the wrong
-     fields (`field_diffs`) and offer the `suggested_citation` as a fix.
+   - `metadata_mismatch` — the paper exists but a field disagrees with the matched
+     record. Show the wrong fields (`field_diffs`) and offer the `suggested_citation`.
+     Caveat: when the citation had NO DOI/arXiv id and the only mismatch is `year`
+     or `venue`, the matched record may be a same-title reprint/re-index and the
+     user could be right. Present such cases as "possible mismatch — confirm or add
+     a DOI/arXiv id", not as a definitive error.
    - `not_found` — could not be verified. Flag it clearly as high-risk and ask the
      user to confirm; do NOT assert it is fabricated.
    - `ambiguous` — multiple plausible matches; ask the user to provide a DOI/arXiv id.

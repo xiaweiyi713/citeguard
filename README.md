@@ -192,6 +192,20 @@ Exposed tools:
 A `not_found` verdict means "could not be verified", not a definitive proof of
 fabrication. Source outages lower confidence rather than producing false accusations.
 
+### Known limitations (v1)
+
+- **Identifiers are the reliable path.** When a citation includes a DOI or arXiv id,
+  resolution is definitive. Provide one whenever possible.
+- **Title-only matching is best-effort.** A title can map to several records in a
+  source (e.g. an original paper plus a later reprint or re-index with a different
+  `publication_year`). Without an identifier, a real, correctly-cited paper can
+  resolve to a same-title record and be reported as a `metadata_mismatch` on `year`
+  or `venue`. Treat title-only year/venue mismatches as "needs confirmation", not as
+  proof the citation is wrong. Smarter same-title/year disambiguation is planned for
+  v2.
+- v1 verifies existence and metadata only; claim-support (does the paper actually
+  back the sentence) and contradiction checks are out of scope and planned for v2.
+
 ### Claude Code skill
 
 `skills/citeguard-verify/SKILL.md` makes Claude Code proactively verify citations
