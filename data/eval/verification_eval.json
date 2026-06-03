@@ -1,0 +1,23 @@
+{
+  "corpus": [
+    {"citation_id": "openscholar", "title": "OpenScholar: Synthesizing Scientific Literature with Retrieval-augmented Language Models", "authors": ["Akari Asai", "Jacqueline He"], "year": 2024, "venue": "arXiv", "doi": "10.48550/arxiv.2411.14199", "arxiv_id": "2411.14199", "abstract": "", "url": "", "source": "eval", "metadata": {}},
+    {"citation_id": "ghostcite", "title": "GhostCite: A Large-Scale Analysis of Citation Validity in the Age of Large Language Models", "authors": ["Zhe Xu"], "year": 2026, "venue": "arXiv", "doi": "10.48550/arxiv.2602.06718", "arxiv_id": "2602.06718", "abstract": "", "url": "", "source": "eval", "metadata": {}},
+    {"citation_id": "aiscientist2", "title": "The AI Scientist-v2: Workshop-Level Automated Scientific Discovery via Agentic Tree Search", "authors": ["Yutaro Yamada"], "year": 2025, "venue": "arXiv", "doi": "10.48550/arxiv.2504.08066", "arxiv_id": "2504.08066", "abstract": "", "url": "", "source": "eval", "metadata": {}},
+    {"citation_id": "reasons", "title": "REASONS: A Benchmark for Retrieval and Automated Citations of Scientific Sentences", "authors": ["Deepa Tilwani"], "year": 2024, "venue": "arXiv", "doi": "10.48550/arxiv.2405.02228", "arxiv_id": "2405.02228", "abstract": "", "url": "", "source": "eval", "metadata": {}},
+    {"citation_id": "attributionbench", "title": "AttributionBench: How Hard is Automatic Attribution Evaluation", "authors": ["Yifei Li"], "year": 2024, "venue": "arXiv", "doi": "10.48550/arxiv.2402.15089", "arxiv_id": "2402.15089", "abstract": "", "url": "", "source": "eval", "metadata": {}}
+  ],
+  "cases": [
+    {"id": "c01", "expected": "verified", "fields": {"title": "OpenScholar: Synthesizing Scientific Literature with Retrieval-augmented Language Models", "authors": ["Akari Asai"], "year": 2024}, "note": "exact title + correct year"},
+    {"id": "c02", "expected": "verified", "fields": {"title": "GhostCite: A Large-Scale Analysis of Citation Validity in the Age of Large Language Models", "year": 2026}, "note": "exact title, no authors"},
+    {"id": "c03", "expected": "verified", "fields": {"doi": "10.48550/arXiv.2504.08066"}, "note": "DOI-only, definitive identifier match"},
+    {"id": "c04", "expected": "metadata_mismatch", "fields": {"title": "OpenScholar: Synthesizing Scientific Literature with Retrieval-augmented Language Models", "authors": ["Akari Asai"], "year": 2019}, "note": "real paper, correct author, wrong year"},
+    {"id": "c05", "expected": "metadata_mismatch", "fields": {"title": "GhostCite: A Large-Scale Analysis of Citation Validity in the Age of Large Language Models", "authors": ["Jane Fabricated"], "year": 2026}, "note": "real paper, wrong author"},
+    {"id": "c06", "expected": "metadata_mismatch", "fields": {"title": "REASONS: A Benchmark for Retrieval and Automated Citations of Scientific Sentences", "authors": ["Deepa Tilwani"], "year": 2030}, "note": "real paper, correct author, impossible future year"},
+    {"id": "c07", "expected": "not_found", "fields": {"title": "Quantum Teleportation of Citation Hallucinations in Alpacas"}, "note": "fabricated"},
+    {"id": "c08", "expected": "not_found", "fields": {"title": "A Unified Theory of Phantom References That Was Never Written"}, "note": "fabricated"},
+    {"id": "c09", "expected": "not_found", "fields": {"raw_text": "Nonexistent, J. (2099). Imaginary Methods for Imaginary Problems. Journal of Nowhere."}, "note": "fabricated free-text"},
+    {"id": "c10", "expected": "verified", "fields": {"title": "AttributionBench: How Hard is Automatic Attribution Evaluation", "authors": ["Yifei Li"], "year": 2024}, "note": "exact"},
+    {"id": "c11", "expected": "metadata_mismatch", "fields": {"title": "The AI Scientist-v2: Workshop-Level Automated Scientific Discovery via Agentic Tree Search", "authors": ["Yutaro Yamada"], "year": 2022}, "note": "real paper, correct author, wrong year"},
+    {"id": "c12", "expected": "not_found", "fields": {"title": "Self-Falsifying Agents Achieve Zero Hallucination Forever"}, "note": "fabricated"}
+  ]
+}
