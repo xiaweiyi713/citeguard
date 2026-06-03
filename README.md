@@ -153,6 +153,51 @@ python3 scripts/calibrate_support.py \
   --output experiments/support_calibration/quick_results.json
 ```
 
+## Use as an Agent Tool (MCP / Skill)
+
+CiteGuard can act as a citation-verification tool that other agents (Claude Code,
+Codex, Cursor, Cline, …) call to check whether cited papers exist and whether their
+metadata is correct.
+
+### MCP server
+
+> The MCP server requires **Python ≥ 3.10** (the core library and tests run on
+> Python ≥ 3.9; only the `mcp` extra needs 3.10+).
+
+Install the optional MCP dependency and run the server (stdio transport):
+
+```bash
+python -m pip install -e ".[mcp]"
+citeguard-mcp
+```
+
+Configure it in any MCP-compatible client. Example (Claude Code `mcp` config):
+
+```json
+{
+  "mcpServers": {
+    "citeguard": { "command": "citeguard-mcp" }
+  }
+}
+```
+
+Environment variables: `CITEGUARD_SOURCES` (default `openalex,crossref,arxiv`),
+`CITEGUARD_MAILTO`, `SEMANTIC_SCHOLAR_API_KEY`, `CITEGUARD_CACHE`.
+
+Exposed tools:
+- `verify_citation_tool` — verify one citation; returns verdict + canonical record +
+  field diffs + suggested fix.
+- `audit_citations_tool` — verify a list; returns a per-item report and a summary.
+
+A `not_found` verdict means "could not be verified", not a definitive proof of
+fabrication. Source outages lower confidence rather than producing false accusations.
+
+### Claude Code skill
+
+`skills/citeguard-verify/SKILL.md` makes Claude Code proactively verify citations
+while you write. Copy it into your project's `.claude/skills/` (or a plugin) and keep
+the MCP server configured so the skill has tools to call.
+
 ## Real Scholarly Sources
 
 CiteGuard currently includes adapters for:
