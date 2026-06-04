@@ -82,6 +82,16 @@ Configure it in an MCP client (Claude Code example):
 | `SEMANTIC_SCHOLAR_API_KEY` | — | optional, improves Semantic Scholar access |
 | `CITEGUARD_CACHE` | `data/logs/verification_cache.sqlite` | local SQLite resolution cache |
 
+### Claim support (deep mode, v2)
+
+Beyond existence/metadata, `check_claim_support_tool` judges whether a paper actually
+**supports a claim sentence**, using a reranker + NLI ensemble over the abstract.
+Verdicts: `supported` / `weakly_supported` / `insufficient_evidence` / `contradicted`.
+It is abstain-leaning: when the abstract does not address the claim it returns
+`insufficient_evidence` (not "unsupported"). Deep models are downloaded on first use
+(`pip install -e ".[models]"`, Python >= 3.10); without them it falls back to a labelled
+`heuristic` engine. Pre-download with `python3 scripts/warmup_support_models.py`.
+
 ### Claude Code skill
 
 [`skills/citeguard-verify/SKILL.md`](skills/citeguard-verify/SKILL.md) makes Claude Code **proactively** verify citations while you write (and present results without silently editing your text). Copy it into your project's `.claude/skills/` and keep the MCP server configured so the skill has tools to call.
@@ -228,3 +238,5 @@ citeguard-mcp                        # 在 MCP 客户端里配置 "command": "ci
 或当作零依赖 Python 库使用(见上方 *Use it as a Python library* 一节)。核心库与测试在 Python ≥ 3.9 下运行;离线评测见 `python3 scripts/eval_verification.py`。
 
 **已知局限**:有 DOI/arXiv 时核验最可靠;仅凭标题时,同名再版记录可能导致年份/venue 误报,应视为"待确认"。详见上文 *Known limitations*。
+
+**中文支持**:文本匹配已支持中文(CJK 分词 + 字符二元组),可核验 OpenAlex/Crossref 中已收录的中文论文。支撑性深度模式判定中文 claim 时,建议用环境变量配置多语模型:`CITEGUARD_RERANKER_MODEL`、`CITEGUARD_NLI_MODEL`。知网/万方无开放免费 API,本项目不直连、不爬取受限内容。

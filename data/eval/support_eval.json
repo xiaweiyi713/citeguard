@@ -1,0 +1,10 @@
+{
+  "cases": [
+    {"id": "s01", "claim": "Method M improves task T accuracy.", "evidence": "We show method M improves task T accuracy by 5 points.", "gold": "supported", "lang": "en"},
+    {"id": "s02", "claim": "Retrieval-augmented models synthesize scientific literature.", "evidence": "OpenScholar synthesizes scientific literature with retrieval-augmented language models.", "gold": "supported", "lang": "en"},
+    {"id": "s03", "claim": "The method improves accuracy.", "evidence": "This paper surveys unrelated hardware power-management techniques.", "gold": "insufficient_evidence", "lang": "en"},
+    {"id": "s04", "claim": "Model M increases accuracy on task T.", "evidence": "We find that model M does not improve, and in fact reduces, accuracy on task T.", "gold": "contradicted", "lang": "en"},
+    {"id": "s05", "claim": "大语言模型存在引用幻觉问题。", "evidence": "本文分析了大语言模型在学术写作中的引用幻觉与伪造参考文献问题。", "gold": "supported", "lang": "zh"},
+    {"id": "s06", "claim": "该方法显著提升了检索准确率。", "evidence": "本文主要讨论了一种无关的图像压缩算法。", "gold": "insufficient_evidence", "lang": "zh"}
+  ]
+}

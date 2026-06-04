@@ -32,6 +32,22 @@ You verify citations against real scholarly sources before trusting them. You do
      user to confirm; do NOT assert it is fabricated.
    - `ambiguous` — multiple plausible matches; ask the user to provide a DOI/arXiv id.
 
+## Checking claim support (deep mode)
+
+After verifying a citation exists, you can check whether the paper actually supports
+the sentence: call `check_claim_support_tool` with the `claim` sentence plus the
+citation fields. Verdicts:
+- `supported` / `weakly_supported` — the abstract entails (or partially supports) the claim.
+- `insufficient_evidence` — the abstract does NOT address the claim. Present this as
+  "the abstract can't confirm this — check the full text or a human", NOT as "the paper
+  does not support it".
+- `contradicted` — the abstract actively contradicts the claim; highlight as high-risk.
+
+Notes: deep mode needs models (downloaded on first use; slow). If `engine` is
+`"heuristic"`, say the result is weak (deep models not loaded), and never report
+`contradicted` in that mode. For non-English claims, multilingual models can be
+configured via environment variables.
+
 ## How to present results
 
 - Use a compact table: `✓ verified` / `⚠ metadata` / `✗ not found` / `? ambiguous`.

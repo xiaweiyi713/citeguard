@@ -35,22 +35,37 @@ STOPWORDS: Set[str] = {
 }
 
 
+# CJK Unified Ideographs main block (covers common Chinese); extend later if needed.
+_CJK_PATTERN = "一-鿿"
+
+
 def normalize_text(text: str) -> str:
-    """Lowercase, strip punctuation, and collapse whitespace."""
+    """Lowercase, drop punctuation, collapse whitespace; keep latin and CJK."""
 
     text = text.lower()
-    text = re.sub(r"[^a-z0-9\s]", " ", text)
+    text = re.sub(rf"[^a-z0-9{_CJK_PATTERN}\s]", " ", text)
     return re.sub(r"\s+", " ", text).strip()
 
 
-def tokenize_text(text: str) -> List[str]:
-    """Tokenize text while removing low-value stopwords."""
+def _cjk_bigrams(run: str) -> List[str]:
+    """Character bigrams for a run of CJK characters (unigram if length 1)."""
 
-    return [
-        token
-        for token in normalize_text(text).split()
-        if token and token not in STOPWORDS
-    ]
+    if len(run) == 1:
+        return [run]
+    return [run[index : index + 2] for index in range(len(run) - 1)]
+
+
+def tokenize_text(text: str) -> List[str]:
+    """Tokenize text: latin words (minus stopwords) + CJK character bigrams."""
+
+    tokens: List[str] = []
+    for chunk in normalize_text(text).split():
+        for segment in re.findall(rf"[{_CJK_PATTERN}]+|[a-z0-9]+", chunk):
+            if re.match(rf"[{_CJK_PATTERN}]", segment):
+                tokens.extend(_cjk_bigrams(segment))
+            elif segment not in STOPWORDS:
+                tokens.append(segment)
+    return tokens
 
 
 def sequence_similarity(left: str, right: str) -> float:
