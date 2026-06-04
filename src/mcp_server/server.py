@@ -11,6 +11,7 @@ from src.retrieval.scholarly_clients import build_live_metadata_source
 from src.verification import (
     CachingMetadataSource,
     audit_citations,
+    check_claim_support,
     parse_citation,
     verify_citation,
 )
@@ -36,6 +37,26 @@ def _source():
     if _SOURCE is None:
         _SOURCE = _build_source()
     return _SOURCE
+
+
+_SUPPORT_BACKEND = None
+
+
+def _support_backend():
+    global _SUPPORT_BACKEND
+    if _SUPPORT_BACKEND is None:
+        from src.verifiers import (
+            DEFAULT_NLI_MODEL,
+            DEFAULT_RERANKER_MODEL,
+            build_production_support_backend,
+        )
+
+        reranker = os.environ.get("CITEGUARD_RERANKER_MODEL", DEFAULT_RERANKER_MODEL)
+        nli = os.environ.get("CITEGUARD_NLI_MODEL", DEFAULT_NLI_MODEL)
+        _SUPPORT_BACKEND = build_production_support_backend(
+            reranker_model_name=reranker, nli_model_name=nli
+        )
+    return _SUPPORT_BACKEND
 
 
 @mcp.tool()
@@ -90,6 +111,34 @@ def audit_citations_tool(citations: List[dict]) -> dict:
         for item in citations
     ]
     return audit_citations(candidates, _source()).to_dict()
+
+
+@mcp.tool()
+def check_claim_support_tool(
+    claim: str,
+    raw_text: str = "",
+    title: str = "",
+    authors: Optional[List[str]] = None,
+    year: Optional[int] = None,
+    venue: str = "",
+    doi: str = "",
+    arxiv_id: str = "",
+    lang: str = "",
+) -> dict:
+    """Judge whether a cited paper SUPPORTS a claim sentence (abstract-level).
+
+    Resolves the paper (existence), then assesses support with a reranker+NLI
+    ensemble. Verdicts: supported | weakly_supported | insufficient_evidence |
+    contradicted. `insufficient_evidence` means the abstract does not address the
+    claim - NOT that the paper is unsupportive. Deep models are downloaded on first
+    use; without them the engine falls back to "heuristic" (no supported/contradicted
+    verdicts) and says so. Set CITEGUARD_RERANKER_MODEL / CITEGUARD_NLI_MODEL to use
+    multilingual models for non-English claims.
+    """
+    candidate = parse_citation(
+        raw_text=raw_text, title=title, authors=authors, year=year, venue=venue, doi=doi, arxiv_id=arxiv_id
+    )
+    return check_claim_support(claim, candidate, _source(), backend=_support_backend(), lang=lang).to_dict()
 
 
 def main() -> None:
