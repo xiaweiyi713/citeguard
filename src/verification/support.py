@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
+
+from src.graph import CitationRecord
+from src.verifiers import SupportAssessment
+from src.verifiers.support_backends import split_evidence_text
 
 
 class SupportVerdict(str, Enum):
@@ -57,3 +61,43 @@ class SupportResult:
             "explanation": self.explanation,
             "lang": self.lang,
         }
+
+
+def build_evidence_spans(citation: CitationRecord) -> List[Dict[str, str]]:
+    """Candidate evidence spans: title + abstract sentences + metadata chunks."""
+
+    spans: List[Dict[str, str]] = []
+    seen = set()
+
+    def add(text: str, source_field: str, source_url: str = "") -> None:
+        cleaned = " ".join(str(text).split())
+        if not cleaned or cleaned in seen:
+            return
+        seen.add(cleaned)
+        spans.append({"text": cleaned, "source_field": source_field, "source_url": source_url})
+
+    if citation.title:
+        add(citation.title, "title")
+    if citation.abstract:
+        for index, sentence in enumerate(split_evidence_text(citation.abstract), start=1):
+            add(sentence, f"abstract_sentence_{index}")
+    for index, chunk in enumerate(citation.metadata.get("evidence_chunks", []), start=1):
+        if isinstance(chunk, dict):
+            add(chunk.get("text", ""), str(chunk.get("source_field", f"metadata_chunk_{index}")), str(chunk.get("source_url", "")))
+        else:
+            add(str(chunk), f"metadata_chunk_{index}")
+    return spans
+
+
+def _extract_nli(assessment: SupportAssessment) -> Optional[Dict[str, float]]:
+    """Pull NLI probabilities out of an ensemble or NLI assessment, if present."""
+
+    if assessment.backend_name == "transformers_nli":
+        probs = assessment.details.get("probabilities")
+        return dict(probs) if probs else None
+    if assessment.backend_name == "ensemble_support":
+        for component in assessment.details.get("components", []):
+            if component.get("backend") == "transformers_nli":
+                probs = component.get("details", {}).get("probabilities")
+                return dict(probs) if probs else None
+    return None
