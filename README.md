@@ -1,11 +1,14 @@
 # CiteGuard
 
-**Verify the citations an AI (or you) just wrote — does the paper actually exist, and is its metadata correct? — against live scholarly sources, from inside Claude Code, Codex, or Cursor.**
+[![CI](https://github.com/xiaweiyi713/citeguard/actions/workflows/ci.yml/badge.svg)](https://github.com/xiaweiyi713/citeguard/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Python](https://img.shields.io/badge/python-3.9%2B-blue.svg)](pyproject.toml)
 
-CiteGuard is a **falsification-first** toolkit for trustworthy scientific writing. Instead of trusting a draft and its reference list, it treats every citation as a `claim → citation → evidence` problem and tries to *disprove* it: resolve the paper, check the metadata, and (later) test whether it actually supports the sentence.
+**A falsification-first toolkit that checks citations — does the cited paper exist, is its metadata correct, and does it actually support the sentence? — against live scholarly sources, callable from Claude Code, Codex, Cursor, and any other MCP client.**
 
-- **Status:** Alpha. v1 ships claim-free **existence + metadata verification**, exposed as an MCP server and a Claude Code skill.
-- **Philosophy:** behave like a skeptical reviewer, not an eager autocomplete. When unsure, say "could not be verified" — never falsely accuse.
+LLM writing assistants hallucinate references: they invent papers, stitch together wrong metadata, and cite real papers that don't support the claim. CiteGuard is the skeptical reviewer that catches this — the check an agent can't reliably do on its own. It treats every citation as a `claim → citation → evidence` problem and tries to *disprove* it; when it can't be sure, it says so instead of guessing.
+
+> **Status:** Alpha (`v0.1.0`). The verification toolkit below is the actively developed core. An earlier end-to-end "writing agent" prototype also lives in the repo (see [Project layout](#project-layout)) but is no longer the focus.
 
 ---
 
@@ -13,7 +16,7 @@ CiteGuard is a **falsification-first** toolkit for trustworthy scientific writin
 
 ![CiteGuard verifying two citations against OpenAlex and arXiv](docs/assets/demo_verify.svg)
 
-Run the demo yourself (hits live OpenAlex + arXiv):
+Run it yourself (hits live OpenAlex + arXiv):
 
 ```bash
 python3 scripts/demo_verify.py
@@ -33,72 +36,59 @@ Verifying 2 citations against OpenAlex + arXiv ...
     Could not be verified in openalex, arxiv.
 ```
 
-Or call it from Python:
-
-```python
-from src.retrieval.scholarly_clients import build_live_metadata_source
-from src.verification import parse_citation, verify_citation
-
-source = build_live_metadata_source(["openalex", "arxiv"], mailto="you@example.com")
-result = verify_citation(parse_citation(title="Attention Is All You Need", arxiv_id="1706.03762"), source)
-print(result.verdict.value, result.confidence)   # -> verified 0.7
-```
-
-> Output is real, captured live. Confidence and the matched record reflect live source
-> data, so exact numbers can drift over time.
+> Output is captured live, so exact confidence and matched-record details can drift with source data.
 
 ---
 
-## Why this exists
+## What it does
 
-Citation hallucinations are dangerous because they look polished while being wrong in at least three different ways:
+CiteGuard answers two questions, against **OpenAlex, Crossref, arXiv, and Semantic Scholar**.
 
-1. **The paper does not exist** (fabricated reference).
-2. **The metadata is stitched together incorrectly** (real-looking but wrong author/year/venue/DOI).
-3. **The paper exists, but does not support the sentence it is cited for** (phantom support).
+### 1. Does the paper exist, and is the metadata right?
 
-LLM writing assistants commit all three. CiteGuard gives an agent the ability to *check* — the part it cannot do reliably on its own.
+`verify_citation` / `audit_citations` resolve a citation (identifier-first, else title) and compare each field you provided:
 
-## What it does today (v1)
+| verdict | meaning |
+|---|---|
+| `verified` | the paper exists and the provided metadata matches |
+| `metadata_mismatch` | the paper exists but a field disagrees — comes with a **suggested corrected citation** |
+| `not_found` | could not be verified in the queried sources (flagged high-risk, **not** declared fake) |
+| `ambiguous` | several plausible matches — asks for a DOI/arXiv id to disambiguate |
 
-- Resolve a citation against **OpenAlex, Crossref, arXiv, and Semantic Scholar**.
-- Return one of four verdicts, with a confidence score and which sources were checked:
+### 2. Does the paper support the claim? (deep mode)
 
-  | verdict | meaning |
-  |---|---|
-  | `verified` | the paper exists and the provided metadata matches |
-  | `metadata_mismatch` | the paper exists but a field disagrees — comes with a suggested corrected citation |
-  | `not_found` | could not be verified in the queried sources (flagged high-risk, **not** declared fake) |
-  | `ambiguous` | several plausible matches — asks for a DOI/arXiv id to disambiguate |
+`check_claim_support` resolves the paper, then judges its abstract against your claim sentence using a reranker + NLI ensemble:
 
-- **Suggest a fix** (the canonical reference) instead of silently rewriting your citation.
-- **Two entry points:** verify one citation, or audit a whole reference list and get a summary.
+| verdict | meaning |
+|---|---|
+| `supported` | the abstract entails the claim |
+| `weakly_supported` | partial / related evidence, but not strong enough |
+| `insufficient_evidence` | the abstract does not address the claim — **abstain**, not "unsupported" |
+| `contradicted` | the abstract actively contradicts the claim |
 
-> v1 is deliberately scoped to "phantom-citation defense". Claim-support (NLI) and contradiction detection are **not** in v1 — see [Status & roadmap](#status--roadmap).
-
-```mermaid
-flowchart LR
-    A["Citation (free text or fields)"] --> B["Parse: extract DOI / arXiv / year"]
-    B --> C["Resolve across OpenAlex / Crossref / arXiv / S2"]
-    C --> D["Match (identifier-first, else title-dominant)"]
-    D --> E["Compare metadata field-by-field"]
-    E --> F["Verdict + confidence + suggested fix + audit"]
-```
+Two guardrails keep it honest: a source being **unreachable is never escalated to "fabricated"** (it lowers confidence, and the output lists which sources were checked), and `insufficient_evidence` / `not_found` are phrased as "could not confirm", leaving the final judgment to a human or the host agent.
 
 ---
 
-## Use it as an agent tool (MCP) — the primary path
+## Quick start
 
-Lets Claude Code, Codex, Cursor, Cline, and any other MCP client call CiteGuard while writing.
+The **core library has zero third-party dependencies** and runs on Python ≥ 3.9.
 
-> Requires **Python ≥ 3.10** (the MCP SDK does not support 3.9; the core library and tests still run on 3.9).
+```bash
+python -m pip install -e .            # core library
+python -m pip install -e ".[mcp]"     # + MCP server (requires Python >= 3.10)
+python -m pip install -e ".[models]"  # + reranker/NLI stack for support deep mode (heavy)
+python -m pip install -e ".[api]"     # + FastAPI surface
+```
+
+### As an agent tool (MCP) — the primary path
 
 ```bash
 python -m pip install -e ".[mcp]"
 citeguard-mcp          # stdio transport
 ```
 
-Configure it in an MCP client (Claude Code example):
+Register it in any MCP-compatible client (Claude Code example):
 
 ```json
 {
@@ -108,12 +98,38 @@ Configure it in an MCP client (Claude Code example):
 }
 ```
 
-**Exposed tools**
+For Claude Code specifically, [`skills/citeguard-verify/SKILL.md`](skills/citeguard-verify/SKILL.md) makes it **proactively** verify citations while you write (and present results without silently editing your text) — copy it into your project's `.claude/skills/`.
 
-- `verify_citation_tool` — verify one citation (free-text `raw_text` or fields `title`/`authors`/`year`/`doi`/`arxiv_id`/`venue`). Returns verdict, canonical record, per-field diffs, suggested fix, and sources checked.
-- `audit_citations_tool` — verify a list; returns a per-item report plus a verdict-count summary.
+### As a Python library
 
-**Environment variables**
+```python
+from src.retrieval.scholarly_clients import build_live_metadata_source
+from src.verification import parse_citation, verify_citation, check_claim_support
+
+source = build_live_metadata_source(["openalex", "arxiv"], mailto="you@example.com")
+
+# Existence + metadata
+result = verify_citation(parse_citation(title="Attention Is All You Need", arxiv_id="1706.03762"), source)
+print(result.verdict.value, result.confidence)          # -> verified 0.7
+
+# Claim support (deep mode needs the [models] extra; otherwise falls back to a labelled heuristic)
+support = check_claim_support("The Transformer relies entirely on attention.",
+                              parse_citation(title="Attention Is All You Need", arxiv_id="1706.03762"),
+                              source)
+print(support.verdict.value, support.engine)
+```
+
+---
+
+## MCP tools
+
+| tool | what it does |
+|---|---|
+| `verify_citation_tool` | verify one citation; returns verdict, canonical record, per-field diffs, suggested fix, sources checked |
+| `audit_citations_tool` | verify a list of citations; returns a per-item report plus a verdict-count summary |
+| `check_claim_support_tool` | judge whether a cited paper supports a claim sentence (deep mode) |
+
+Configuration via environment variables:
 
 | variable | default | purpose |
 |---|---|---|
@@ -121,162 +137,99 @@ Configure it in an MCP client (Claude Code example):
 | `CITEGUARD_MAILTO` | `research@example.com` | polite-pool contact for OpenAlex/Crossref |
 | `SEMANTIC_SCHOLAR_API_KEY` | — | optional, improves Semantic Scholar access |
 | `CITEGUARD_CACHE` | `data/logs/verification_cache.sqlite` | local SQLite resolution cache |
+| `CITEGUARD_RERANKER_MODEL` | English cross-encoder | support reranker model — set a multilingual one for non-English claims |
+| `CITEGUARD_NLI_MODEL` | English NLI | support NLI model — set a multilingual one for non-English claims |
 
-### Claim support (deep mode, v2)
-
-Beyond existence/metadata, `check_claim_support_tool` judges whether a paper actually
-**supports a claim sentence**, using a reranker + NLI ensemble over the abstract.
-Verdicts: `supported` / `weakly_supported` / `insufficient_evidence` / `contradicted`.
-It is abstain-leaning: when the abstract does not address the claim it returns
-`insufficient_evidence` (not "unsupported"). Deep models are downloaded on first use
-(`pip install -e ".[models]"`, Python >= 3.10); without them it falls back to a labelled
-`heuristic` engine. Pre-download with `python3 scripts/warmup_support_models.py`.
-
-### Claude Code skill
-
-[`skills/citeguard-verify/SKILL.md`](skills/citeguard-verify/SKILL.md) makes Claude Code **proactively** verify citations while you write (and present results without silently editing your text). Copy it into your project's `.claude/skills/` and keep the MCP server configured so the skill has tools to call.
+Support deep mode downloads model weights on first use; pre-download with `python3 scripts/warmup_support_models.py`. Without the models installed, support runs a labelled `heuristic` engine (which never emits `supported` or `contradicted`).
 
 ---
 
-## Use it as a Python library / CLI
+## Chinese support
 
-The core library has **zero third-party dependencies** and runs on Python ≥ 3.9.
+Text matching is CJK-aware (Chinese characters are preserved and tokenized into character bigrams, with **no extra dependencies**), so Chinese titles and claims can be verified against the many Chinese papers already indexed in OpenAlex/Crossref. For judging Chinese claim support, point `CITEGUARD_RERANKER_MODEL` / `CITEGUARD_NLI_MODEL` at multilingual models.
 
-```bash
-python -m pip install -e .
-```
-
-```python
-from src.retrieval.scholarly_clients import build_live_metadata_source
-from src.verification import parse_citation, verify_citation
-
-source = build_live_metadata_source(["openalex", "crossref", "arxiv"], mailto="you@example.com")
-
-result = verify_citation(
-    parse_citation(title="Attention Is All You Need", arxiv_id="1706.03762"),
-    source,
-)
-print(result.verdict.value, "→", result.explanation)
-# verified → Citation resolves to a real record and the provided metadata matches.
-```
-
-For a fabricated citation you'll get `not_found`; for a real paper with a wrong year, `metadata_mismatch` plus a `suggested_citation`.
-
-### Offline, reproducible evaluation
-
-A small, network-free benchmark proves the tool's behavior on a fixed corpus of real papers plus correct / metadata-corrupted / fabricated cases:
-
-```bash
-python3 scripts/eval_verification.py
-```
-
-It reports fabrication precision/recall, metadata-error detection, and — importantly — the **false-accusation rate** (real papers wrongly flagged `not_found`). The seed set scores `false_accusation_rate = 0.0` and `fabrication_recall = 1.0`.
+CNKI (知网) and Wanfang (万方) are **not** integrated: they have no open/free API and we do not scrape gated content. A ChinaXiv feasibility spike concluded NO-GO (its OAI endpoint is access-gated) — see [`docs/chinaxiv_spike.md`](docs/chinaxiv_spike.md); the pluggable source interface remains so an adapter can be added if an open endpoint appears.
 
 ---
 
 ## How resolution works
 
 1. **Parse** the input; extract a DOI / arXiv id / year from free text when present.
-2. **Identifier-first:** if a DOI or arXiv id is given, resolve directly (definitive).
-3. **Otherwise search** by title across the selected sources and score candidates with a **title-dominant** match (title 0.70 / authors 0.18 / year 0.12); identifiers, when present, score 1.0.
+2. **Identifier-first:** a DOI or arXiv id resolves the paper definitively.
+3. **Otherwise search** by title across the selected sources and score candidates with a title-dominant match.
 4. **Compare** only the fields you actually provided, field by field.
-5. **Decide:** `verified` / `metadata_mismatch` (+ suggested fix) / `not_found` / `ambiguous`.
-
-Two guardrails keep it honest:
-
-- **A source being unreachable is never escalated to "fabricated."** Outages lower confidence; the output always lists which sources were checked and which responded.
-- **`not_found` is phrased as "could not be verified",** leaving the final judgment to the human or host agent.
+5. **Decide** the verdict (existence/metadata, or support over abstract-level evidence).
 
 ---
 
-## Status & roadmap
+## Status, scope & known limitations
 
-**Done (v1)** — existence + metadata verification, MCP server, Claude Code skill, offline eval, multi-source adapters, SQLite caching.
+**In scope today:** existence + metadata verification, abstract-level claim-support verification, multi-source adapters, SQLite caching, an MCP server, a Claude Code skill, and offline evals.
 
-**Planned (v2)**
+**Known limitations**
 
-- **Claim-support verification** (does the paper actually back the sentence?) via the reranker + NLI ensemble already wired in [`src/verifiers/`](src/verifiers/) — designed to run as an optional, slower "deep mode".
-- **Contradiction detection** (replacing the current keyword heuristic).
-- **Same-title / year disambiguation** (see limitations below).
-- A larger, human-reviewed benchmark with cross-domain slices and verifier ablations.
+- **Identifiers are the reliable path.** With a DOI or arXiv id, resolution is definitive — provide one when you can.
+- **Title-only matching is best-effort.** A title can map to several records (e.g. an original paper plus a later reprint with a different `publication_year`); without an identifier a correct citation can surface a same-title record and be reported as a `metadata_mismatch` on `year`/`venue`. Treat title-only year/venue mismatches as "needs confirmation".
+- **Support is abstract-level.** It judges the abstract (and any harvested snippets), not full text; abstain (`insufficient_evidence`) is common and intentional.
 
-### Known limitations (v1)
-
-- **Identifiers are the reliable path.** When a citation includes a DOI or arXiv id, resolution is definitive — provide one whenever possible.
-- **Title-only matching is best-effort.** A title can map to several records in a source (e.g. an original paper plus a later reprint/re-index with a different `publication_year`). Without an identifier, a correctly-cited paper can resolve to a same-title record and be reported as a `metadata_mismatch` on `year`/`venue`. Treat title-only year/venue mismatches as "needs confirmation", not proof the citation is wrong.
-- v1 verifies existence and metadata only; support and contradiction checks are v2.
-
-> **Note on the earlier prototype.** This repository also contains an end-to-end *falsification-first writing agent* (planner → claim decomposition → constrained writer → audit) under [`src/orchestrator/`](src/orchestrator/), [`src/planner/`](src/planner/), and [`src/writer/`](src/writer/). It was the project's original framing and is kept for research/reference, but the verification capability above is the actively developed direction.
+**Not yet done:** full-text support, multi-paper support for one claim, active counter-evidence retrieval, a large human-reviewed benchmark. See [ROADMAP.md](ROADMAP.md).
 
 ---
-
-## Installation options
-
-```bash
-python -m pip install -e .            # core library (no deps)
-python -m pip install -e ".[mcp]"     # + MCP server (Python >= 3.10)
-python -m pip install -e ".[models]"  # + reranker/NLI stack for v2 support (heavy)
-python -m pip install -e ".[api]"     # + FastAPI surface
-```
 
 ## Tests & reproducibility
 
 ```bash
-python3 -m unittest discover -s tests -v   # full suite
-python3 scripts/eval_verification.py       # offline verification eval
+python3 -m unittest discover -s tests -v   # full unit suite (63 tests; standard library only)
+python3 scripts/eval_verification.py       # offline, deterministic existence/metadata eval
+python3 scripts/eval_support.py            # claim-support eval (needs the [models] extra)
 ```
 
-GitHub Actions CI runs the unit-test suite plus a lightweight heuristic demo evaluation on every push.
+The unit suite and the verification eval are network-free and run in CI. Eval datasets live in [`data/eval/`](data/eval/).
 
-## Repository layout
+---
+
+## Project layout
 
 ```text
-CiteGuard/
-├── src/
-│   ├── verification/        # v1 core: parse, resolve, verify, audit, cache, eval
-│   ├── mcp_server/          # FastMCP server exposing the verification tools
-│   ├── retrieval/           # scholarly source adapters (OpenAlex/Crossref/arXiv/S2) + retrievers
-│   ├── verifiers/           # existence/metadata + reranker+NLI support stack (v2)
-│   ├── orchestrator/ planner/ writer/ graph/ citation/ audit/   # earlier writing-agent prototype
-│   └── benchmark/ api/
-├── skills/citeguard-verify/ # Claude Code skill
-├── data/eval/               # offline verification benchmark
-├── scripts/                 # runnable entry points (eval, agent demo, corpus tools)
-├── configs/  docs/  tests/  experiments/
-└── pyproject.toml
+src/
+  verification/   # the core: parse, resolve, verify, audit, cache, claim-support, evals
+  mcp_server/     # FastMCP server exposing the three tools
+  retrieval/      # scholarly source adapters (OpenAlex/Crossref/arXiv/Semantic Scholar) + retrievers
+  verifiers/      # existence/metadata + the reranker+NLI support ensemble
+  citation/ graph/ audit/                 # shared models and helpers
+  orchestrator/ planner/ writer/ benchmark/ api/   # earlier "writing agent" prototype (legacy)
+skills/citeguard-verify/   # Claude Code skill
+scripts/                   # demo + eval + corpus/model utilities
+data/eval/                 # offline benchmarks
+docs/                      # design specs, plans, architecture, spike notes
+tests/                     # unittest suite
 ```
+
+---
 
 ## Documents
 
-- Design spec: [docs/superpowers/specs/2026-06-03-citeguard-verification-mcp-design.md](docs/superpowers/specs/2026-06-03-citeguard-verification-mcp-design.md)
-- Implementation plan: [docs/superpowers/plans/2026-06-03-citeguard-verification-mcp.md](docs/superpowers/plans/2026-06-03-citeguard-verification-mcp.md)
-- Research proposal: [docs/proposal.md](docs/proposal.md) · Architecture: [docs/architecture.md](docs/architecture.md) · Roadmap: [ROADMAP.md](ROADMAP.md)
+- Design specs & implementation plans: [`docs/superpowers/`](docs/superpowers/)
+- Architecture: [`docs/architecture.md`](docs/architecture.md) · Roadmap: [`ROADMAP.md`](ROADMAP.md) · ChinaXiv spike: [`docs/chinaxiv_spike.md`](docs/chinaxiv_spike.md)
+- Research framing / proposal: [`docs/proposal.md`](docs/proposal.md)
 
 ## Citation
 
-If you use this repository in research, please cite the software record in [CITATION.cff](CITATION.cff).
+If you use this repository in research, please cite the software record in [`CITATION.cff`](CITATION.cff).
 
-## License
+## Contributing
 
-Released under the [MIT License](LICENSE).
+See [`CONTRIBUTING.md`](CONTRIBUTING.md). Released under the [MIT License](LICENSE).
 
 ---
 
 ## 中文说明
 
-**CiteGuard 是一个"证伪优先"的引用核验工具**:在你(或 AI)写完综述、参考文献后,它去**真实学术库**里逐条核对——这篇论文到底**存不存在**、**元数据(标题/作者/年份/venue/DOI)对不对**——并能作为 **MCP server / Claude Code skill** 被主流 agent(Claude Code、Codex、Cursor 等)直接调用。
+**CiteGuard 是一个"证伪优先"的引用核验工具**:在你或 AI 写完综述、参考文献后,它去 **OpenAlex / Crossref / arXiv / Semantic Scholar** 等真实学术库里核对三件事——这篇论文**存不存在**、**元数据(标题/作者/年份/venue/DOI)对不对**、以及**到底支不支持你这句话**。可作为 **MCP 工具**被 Claude Code、Codex、Cursor 等主流 agent 直接调用。
 
-当前为 Alpha。**v1 只做"防幻觉"**:存在性 + 元数据核验,返回四种裁定 `verified / metadata_mismatch / not_found / ambiguous`,发现问题给出**改正建议**,且坚持"宁可说查不准,也不乱指控"。支撑性(NLI)与矛盾检测属于 v2。
+- **存在性 / 元数据**:返回 `verified` / `metadata_mismatch`(附改正建议) / `not_found` / `ambiguous`。
+- **支撑性(深度模式)**:返回 `supported` / `weakly_supported` / `insufficient_evidence`(弃权,不等于"不支持") / `contradicted`,复用 reranker + NLI 集成。
+- **核心原则**:宁可说"查不准",也不乱指控;源不可达只降置信度,绝不升级成"伪造"。
+- **中文**:文本匹配已支持中文(CJK 分词,零依赖);判定中文支撑性时用环境变量配置多语模型。知网/万方无开放 API,不直连、不爬取受限内容。
 
-最快上手:
-
-```bash
-python -m pip install -e ".[mcp]"   # 需 Python ≥ 3.10
-citeguard-mcp                        # 在 MCP 客户端里配置 "command": "citeguard-mcp"
-```
-
-或当作零依赖 Python 库使用(见上方 *Use it as a Python library* 一节)。核心库与测试在 Python ≥ 3.9 下运行;离线评测见 `python3 scripts/eval_verification.py`。
-
-**已知局限**:有 DOI/arXiv 时核验最可靠;仅凭标题时,同名再版记录可能导致年份/venue 误报,应视为"待确认"。详见上文 *Known limitations*。
-
-**中文支持**:文本匹配已支持中文(CJK 分词 + 字符二元组),可核验 OpenAlex/Crossref 中已收录的中文论文。支撑性深度模式判定中文 claim 时,建议用环境变量配置多语模型:`CITEGUARD_RERANKER_MODEL`、`CITEGUARD_NLI_MODEL`。知网/万方无开放免费 API,本项目不直连、不爬取受限内容。
+最快上手:`python -m pip install -e ".[mcp]"`(需 Python ≥ 3.10)后运行 `citeguard-mcp`,在 MCP 客户端里配置 `"command": "citeguard-mcp"`;或直接 `python3 scripts/demo_verify.py` 看实时效果。核心库与测试在 Python ≥ 3.9 下零依赖运行。
