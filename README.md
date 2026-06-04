@@ -9,6 +9,46 @@ CiteGuard is a **falsification-first** toolkit for trustworthy scientific writin
 
 ---
 
+## See it work
+
+![CiteGuard verifying two citations against OpenAlex and arXiv](docs/assets/demo_verify.svg)
+
+Run the demo yourself (hits live OpenAlex + arXiv):
+
+```bash
+python3 scripts/demo_verify.py
+```
+
+```text
+Verifying 2 citations against OpenAlex + arXiv ...
+
+[OK] VERIFIED           (confidence 0.7)
+    Vaswani et al., "Attention Is All You Need", arXiv:1706.03762
+    sources checked: openalex, arxiv
+    Citation resolves to a real record and the provided metadata matches.
+
+[X] NOT_FOUND          (confidence 0.8419)
+    (LLM-fabricated) "Quantum Teleportation of Citation Hallucinations in Alpacas"
+    sources checked: openalex, arxiv
+    Could not be verified in openalex, arxiv.
+```
+
+Or call it from Python:
+
+```python
+from src.retrieval.scholarly_clients import build_live_metadata_source
+from src.verification import parse_citation, verify_citation
+
+source = build_live_metadata_source(["openalex", "arxiv"], mailto="you@example.com")
+result = verify_citation(parse_citation(title="Attention Is All You Need", arxiv_id="1706.03762"), source)
+print(result.verdict.value, result.confidence)   # -> verified 0.7
+```
+
+> Output is real, captured live. Confidence and the matched record reflect live source
+> data, so exact numbers can drift over time.
+
+---
+
 ## Why this exists
 
 Citation hallucinations are dangerous because they look polished while being wrong in at least three different ways:

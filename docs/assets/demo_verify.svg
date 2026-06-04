@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="780" height="324" viewBox="0 0 780 324" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="13">
+  <rect x="0" y="0" width="780" height="324" rx="8" fill="#0d1117"/>
+  <circle cx="22" cy="18" r="6" fill="#f85149"/>
+  <circle cx="42" cy="18" r="6" fill="#f0b72f"/>
+  <circle cx="62" cy="18" r="6" fill="#3fb950"/>
+  <text x="390" y="22" text-anchor="middle" fill="#8b949e">citeguard — citation verification demo</text>
+  <line x1="0" y1="36" x2="780" y2="36" stroke="#21262d" stroke-width="1"/>
+
+  <text x="20" y="62" fill="#3fb950">$ python3 scripts/demo_verify.py</text>
+  <text x="20" y="84" fill="#8b949e">Verifying 2 citations against OpenAlex + arXiv ...</text>
+
+  <text x="20" y="128"><tspan fill="#3fb950">[OK] VERIFIED</tspan><tspan fill="#e6edf3">           (confidence 0.7)</tspan></text>
+  <text x="20" y="150" fill="#8b949e">    Vaswani et al., "Attention Is All You Need", arXiv:1706.03762</text>
+  <text x="20" y="172" fill="#8b949e">    sources checked: openalex, arxiv</text>
+  <text x="20" y="194" fill="#8b949e">    Citation resolves to a real record and the provided metadata matches.</text>
+
+  <text x="20" y="238"><tspan fill="#f85149">[X] NOT_FOUND</tspan><tspan fill="#e6edf3">          (confidence 0.8419)</tspan></text>
+  <text x="20" y="260" fill="#8b949e">    (LLM-fabricated) "Quantum Teleportation of Citation Hallucinations in Alpacas"</text>
+  <text x="20" y="282" fill="#8b949e">    sources checked: openalex, arxiv</text>
+  <text x="20" y="304" fill="#8b949e">    Could not be verified in openalex, arxiv.</text>
+</svg>
