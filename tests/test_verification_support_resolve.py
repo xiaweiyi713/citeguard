@@ -39,5 +39,22 @@ class CheckClaimSupportTests(unittest.TestCase):
         self.assertEqual(result.resolution["verdict"], "not_found")
 
 
+class SupportExportTests(unittest.TestCase):
+    def test_support_api_exported_from_package(self):
+        from src.verification import (
+            DEFAULT_SUPPORT_POLICY,
+            SupportDecisionPolicy,
+            SupportResult,
+            SupportVerdict,
+            assess_support,
+            check_claim_support,
+        )
+        self.assertTrue(callable(check_claim_support))
+        self.assertTrue(callable(assess_support))
+        self.assertEqual(SupportVerdict.SUPPORTED.value, "supported")
+        self.assertIsInstance(DEFAULT_SUPPORT_POLICY, SupportDecisionPolicy)
+        self.assertTrue(hasattr(SupportResult, "to_dict"))
+
+
 if __name__ == "__main__":
     unittest.main()
