@@ -18,7 +18,7 @@ agent skill bundle.
 - Run the consolidated release package gate:
 
   ```bash
-  python scripts/release_package_gate.py --require-build-tools
+  python scripts/release_package_gate.py --require-build-tools --min-high-risk-reviewed-by-language zh=0
   python scripts/release_package_gate.py --skip-install-smoke --include-mcp-extra-smoke --require-mcp-extra-smoke
   python scripts/release_package_gate.py --skip-install-smoke --include-mcp-stdio-smoke --require-mcp-stdio-smoke
   python scripts/release_package_gate.py --skip-install-smoke --include-published-smoke-plan --include-published-mcp-smoke-plan
@@ -26,7 +26,9 @@ agent skill bundle.
 
   This runs fresh-venv wheel and source-distribution install smokes, checks
   package archive cleanliness, verifies expected release files, runs the
-  `project_metadata_contract` source-file gate, checks the built artifact
+  `project_metadata_contract` source-file gate, runs the
+  `support_label_sidecar_gate` provenance check, records its structured
+  `thresholds`, `metrics`, and `failures`, checks the built artifact
   distribution metadata contract, and runs PEP 517 `python -m build` plus
   `python -m twine check` when release tools are installed. The MCP extra gate
   records `mcp_extra_wheel_install_smoke` in the release summary and should be
@@ -88,11 +90,11 @@ agent skill bundle.
   python scripts/eval_support.py
   python scripts/eval_support.py --report --split test --quality-gate
   python scripts/eval_support.py --report --split test --quality-gate --output-dir experiments --run-id support-release-smoke
-  python scripts/compare_support_baselines.py --split test --output-dir experiments --run-id support-baselines-release
+  python scripts/compare_support_baselines.py --split test --min-high-risk-reviewed-by-language zh=0 --output-dir experiments --run-id support-baselines-release
   python scripts/prepare_support_label_sidecar.py --existing-sidecar data/eval/support_eval_label_sidecar.json --annotation-packet --priority high --split test --limit 3 --output experiments/support-label-packet-high-risk-test-batch1.json --instructions-output experiments/support-label-packet-high-risk-test-batch1-instructions.md
   python scripts/prepare_support_label_sidecar.py --existing-sidecar data/eval/support_eval_label_sidecar.json --merge-annotation-packet experiments/completed-support-label-packet-high-risk-test-batch1.json --output data/eval/support_eval_label_sidecar.merged.json
   python scripts/prepare_support_label_sidecar.py --existing-sidecar data/eval/support_eval_label_sidecar.merged.json --apply-adjudications experiments/resolved-support-label-adjudications.json --output data/eval/support_eval_label_sidecar.adjudicated.json
-  python scripts/eval_support.py --validate-only --label-sidecar data/eval/support_eval_label_sidecar.json --min-sidecar-coverage 1.0 --min-human-reviewed 0 --min-high-risk-reviewed 0 --min-dual-annotated 0 --max-unresolved-disagreements 0 --max-supported-disagreements 0
+  python scripts/eval_support.py --validate-only --label-sidecar data/eval/support_eval_label_sidecar.json --min-sidecar-coverage 1.0 --min-human-reviewed 0 --min-high-risk-reviewed 0 --min-high-risk-reviewed-by-language zh=0 --min-dual-annotated 0 --max-unresolved-disagreements 0 --max-supported-disagreements 0
   ```
 
   The quality gate should stay conservative for release candidates: false
@@ -104,8 +106,14 @@ agent skill bundle.
   visible in the diagnostics. The label-sidecar gate should report coverage
   `1.0`; keep `--min-human-reviewed`, `--min-high-risk-reviewed`, and
   `--min-dual-annotated` at `0` for the synthetic seed set, then raise them when
-  a human-reviewed subset exists. Raise `--min-high-risk-reviewed` first for
-  contradiction, hard-negative, full-text-required, and contradiction-set cases.
+  a human-reviewed subset exists. Keep language-specific placeholders such as
+  `--min-high-risk-reviewed-by-language zh=0` in CI/release commands, then raise
+  them when claiming language-specific benchmark readiness. The gate metrics
+  expose `high_risk_case_count_by_language`,
+  `high_risk_reviewed_by_language`, and
+  `high_risk_unreviewed_by_language` for release triage. Raise
+  `--min-high-risk-reviewed` first for contradiction, hard-negative,
+  full-text-required, and contradiction-set cases.
   Keep `--max-unresolved-disagreements 0`; add `--min-raw-dual-agreement-rate` for
   release evidence once dual annotation exists. Use
   `--max-supported-disagreements 0` for release-grade benchmark claims and inspect
@@ -135,12 +143,12 @@ agent skill bundle.
   python scripts/prepare_support_label_sidecar.py --existing-sidecar data/eval/support_eval_label_sidecar.json --annotation-packet --priority high --split test --limit 3 --output experiments/support-label-packet-high-risk-test-batch1.json --instructions-output experiments/support-label-packet-high-risk-test-batch1-instructions.md
   python scripts/prepare_support_label_sidecar.py --existing-sidecar data/eval/support_eval_label_sidecar.json --merge-annotation-packet experiments/completed-support-label-packet-high-risk-test-batch1.json --output data/eval/support_eval_label_sidecar.merged.json
   python scripts/prepare_support_label_sidecar.py --existing-sidecar data/eval/support_eval_label_sidecar.merged.json --apply-adjudications experiments/resolved-support-label-adjudications.json --output data/eval/support_eval_label_sidecar.adjudicated.json
-  python scripts/prepare_support_label_sidecar.py --existing-sidecar data/eval/support_eval_label_sidecar.json --audit --fail-on-high-risk-unreviewed
+  python scripts/prepare_support_label_sidecar.py --existing-sidecar data/eval/support_eval_label_sidecar.json --audit --fail-on-high-risk-unreviewed --fail-on-high-risk-unreviewed-language zh
   ```
 
   The seed set is allowed to report `human_reviewed: 0`, but release notes
   should not call it a human-reviewed benchmark until this audit shows reviewed
-  cases, the high-risk unreviewed gate passes, a filtered high-risk test
+  cases, the global and language-specific high-risk unreviewed gates pass, a filtered high-risk test
   annotation packet plus any limited reviewer batches have been archived or
   intentionally skipped, and the sidecar gate is raised accordingly.
 

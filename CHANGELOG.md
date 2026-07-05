@@ -69,6 +69,21 @@
 - Added language coverage and `by_language` support-eval reporting so English
   and Chinese false-support or missed-contradiction risks can be triaged
   separately.
+- Added language breakdowns to support-label `high_risk_review` sidecar
+  validation so reviewed and unreviewed high-risk benchmark cases can be
+  audited by language before release claims.
+- Added `--min-high-risk-reviewed-by-language` sidecar gates for release checks
+  that require human review coverage for specific benchmark languages.
+- Added a default `support_label_sidecar_gate` step to the consolidated release
+  package gate so package releases also validate support-label provenance.
+- Made the release gate record structured support-label gate thresholds,
+  metrics, and failures instead of requiring agents to parse stdout tails.
+- Added high-risk case-count-by-language metrics to support-label gates so
+  release checks can report reviewed and unreviewed language coverage in one
+  place.
+- Added language-specific high-risk audit failures for support-label sidecar
+  readiness checks, so reviewer assignment can block on unreviewed Chinese or
+  other language-specific high-risk cases.
 - Expanded the synthetic support eval seed set to 36 evidence-level cases with
   additional high-risk hard-negative, contradiction, and full-text-required
   boundaries for benchmark-provenance overclaims, source-outage fabrication

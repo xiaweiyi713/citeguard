@@ -163,6 +163,7 @@ python3 scripts/eval_support.py \
   --label-sidecar data/eval/support_eval_label_sidecar.json \
   --min-human-reviewed 10 \
   --min-high-risk-reviewed 5 \
+  --min-high-risk-reviewed-by-language zh=2 \
   --min-dual-annotated 10 \
   --max-unresolved-disagreements 0 \
   --min-raw-dual-agreement-rate 0.8 \
@@ -178,17 +179,23 @@ sidecar 用于保存不适合塞进 compact seed case 的标注元数据,例如
 `dual_label_pair_counts`、`dual_disagreement_label_pair_counts` 和
 `supported_disagreement_case_ids`,用于判断人工标注成熟度而不只看 coverage。
 validation 同时输出 `high_risk_review`,统计 contradiction、hard_negative、
-full_text_required 和 contradiction_set 的 reviewed/unreviewed 覆盖情况。
+full_text_required 和 contradiction_set 的 reviewed/unreviewed 覆盖情况,并包含
+`case_count_by_language`、`reviewed_by_language` 和
+`unreviewed_by_language`,以及 `reviewed_case_ids_by_language` 和
+`unreviewed_case_ids_by_language`,用于发现中文/英文高风险样本是否仍缺人工复核。
 dataset validation 也输出 `languages` 和 `test_split`,列出测试集中的
 case type、evidence scope、language、gold label 覆盖及 required coverage,用于确认最终测试集不是只在
 train/dev 中覆盖高风险样本。
 任何 supported-label disagreement 都应优先复核,因为把不充分证据误标成
 `supported` 是最危险的 benchmark 误差。`label_sidecar_gate` 可显式要求
-`--min-high-risk-reviewed`、`--min-dual-annotated`、
+`--min-high-risk-reviewed`、`--min-high-risk-reviewed-by-language`、
+`--min-dual-annotated`、
 `--max-unresolved-disagreements`、`--min-raw-dual-agreement-rate` 和
-`--max-supported-disagreements`,让发布报告在高风险样本评审不足、双标不足、
-分歧未解决、一致率过低或 supported-label 分歧未清零时以机器可读 failure code
-失败。validation 还会检查 status consistency:
+`--max-supported-disagreements`,让发布报告在高风险样本评审不足、语言高风险样本评审不足、
+双标不足、分歧未解决、一致率过低或 supported-label 分歧未清零时以机器可读
+failure code 失败。gate metrics 还包括 `high_risk_case_count_by_language`、
+`high_risk_reviewed_by_language` 和 `high_risk_unreviewed_by_language`,便于
+agent 不展开 sidecar summary 也能判断语言覆盖缺口。validation 还会检查 status consistency:
 `not_human_reviewed` 不能携带 annotator label,`dual_annotator_agreed` 的
 annotator labels 必须一致,`dual_annotator_adjudicated` 必须记录 resolved
 disagreement 和 adjudicator,`published_benchmark` 必须有 source locator,避免
@@ -284,6 +291,9 @@ hard_negative 和 full_text_required 的 `high_risk_unreviewed` /
 `high_risk_unreviewed_count` / `high_risk_unreviewed_by_language`。优先审阅
 contradiction、hard_negative 和 full_text_required 样本,因为这些最能暴露
 false support、过度支撑和 abstract/full-text 边界问题。
+需要在分配标注前阻断某个语言的高风险缺口时,使用
+`--fail-on-high-risk-unreviewed-language zh`;audit 输出的 `audit_gate.failures`
+会列出 `high_risk_unreviewed_by_language` 的 failure code 和 case ids。
 
 为第一轮人工标注生成更小的盲标 high-risk test packet:
 
@@ -325,7 +335,8 @@ python3 scripts/prepare_support_label_sidecar.py \
   --dataset data/eval/support_eval.json \
   --existing-sidecar data/eval/support_eval_label_sidecar.json \
   --audit \
-  --fail-on-high-risk-unreviewed
+  --fail-on-high-risk-unreviewed \
+  --fail-on-high-risk-unreviewed-language zh
 ```
 
 当前 synthetic seed set 会因为高风险样本未人工审阅而失败；这是有意设计,

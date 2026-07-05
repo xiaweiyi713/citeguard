@@ -40,6 +40,27 @@ def main(argv: Optional[List[str]] = None) -> int:
         help="Skip fresh-venv wheel/sdist install smoke checks. Intended only for local debugging.",
     )
     parser.add_argument(
+        "--skip-support-label-gate",
+        action="store_true",
+        help="Skip support label sidecar provenance validation. Intended only for local debugging.",
+    )
+    parser.add_argument("--support-eval-dataset", default="data/eval/support_eval.json")
+    parser.add_argument("--support-label-sidecar", default="data/eval/support_eval_label_sidecar.json")
+    parser.add_argument("--min-sidecar-coverage", type=float, default=1.0)
+    parser.add_argument("--min-human-reviewed", type=int, default=0)
+    parser.add_argument("--min-high-risk-reviewed", type=int, default=0)
+    parser.add_argument(
+        "--min-high-risk-reviewed-by-language",
+        action="append",
+        default=[],
+        metavar="LANG=N",
+        help="Minimum required human-reviewed high-risk labels for one language; repeat for multiple languages.",
+    )
+    parser.add_argument("--min-dual-annotated", type=int, default=0)
+    parser.add_argument("--max-unresolved-disagreements", type=int, default=0)
+    parser.add_argument("--min-raw-dual-agreement-rate", type=float, default=None)
+    parser.add_argument("--max-supported-disagreements", type=int, default=None)
+    parser.add_argument(
         "--include-mcp-extra-smoke",
         action="store_true",
         help="Run a fresh-venv wheel install smoke for the mcp extra and its dependencies.",
@@ -80,6 +101,23 @@ def main(argv: Optional[List[str]] = None) -> int:
     }
 
     _record_project_metadata_contract(summary, project_root)
+
+    if not args.skip_support_label_gate:
+        _record_support_label_sidecar_gate(
+            summary,
+            python=args.python,
+            project_root=project_root,
+            dataset=args.support_eval_dataset,
+            label_sidecar=args.support_label_sidecar,
+            min_sidecar_coverage=args.min_sidecar_coverage,
+            min_human_reviewed=args.min_human_reviewed,
+            min_high_risk_reviewed=args.min_high_risk_reviewed,
+            min_high_risk_reviewed_by_language=args.min_high_risk_reviewed_by_language,
+            min_dual_annotated=args.min_dual_annotated,
+            max_unresolved_disagreements=args.max_unresolved_disagreements,
+            min_raw_dual_agreement_rate=args.min_raw_dual_agreement_rate,
+            max_supported_disagreements=args.max_supported_disagreements,
+        )
 
     if not args.skip_install_smoke:
         _record_subprocess_step(
@@ -327,6 +365,97 @@ def _record_official_build_and_twine_check(
         )
 
 
+def _record_support_label_sidecar_gate(
+    summary: Dict[str, Any],
+    *,
+    python: str,
+    project_root: Path,
+    dataset: str,
+    label_sidecar: str,
+    min_sidecar_coverage: float,
+    min_human_reviewed: int,
+    min_high_risk_reviewed: int,
+    min_high_risk_reviewed_by_language: List[str],
+    min_dual_annotated: int,
+    max_unresolved_disagreements: int,
+    min_raw_dual_agreement_rate: Optional[float],
+    max_supported_disagreements: Optional[int],
+) -> None:
+    cmd = [
+        python,
+        "scripts/eval_support.py",
+        "--validate-only",
+        "--dataset",
+        dataset,
+        "--label-sidecar",
+        label_sidecar,
+        "--min-sidecar-coverage",
+        str(min_sidecar_coverage),
+        "--min-human-reviewed",
+        str(min_human_reviewed),
+        "--min-high-risk-reviewed",
+        str(min_high_risk_reviewed),
+        "--min-dual-annotated",
+        str(min_dual_annotated),
+        "--max-unresolved-disagreements",
+        str(max_unresolved_disagreements),
+    ]
+    for threshold in min_high_risk_reviewed_by_language:
+        cmd.extend(["--min-high-risk-reviewed-by-language", threshold])
+    if min_raw_dual_agreement_rate is not None:
+        cmd.extend(["--min-raw-dual-agreement-rate", str(min_raw_dual_agreement_rate)])
+    if max_supported_disagreements is not None:
+        cmd.extend(["--max-supported-disagreements", str(max_supported_disagreements)])
+    try:
+        completed = _run(cmd, cwd=project_root)
+        payload = json.loads(completed.stdout)
+    except subprocess.CalledProcessError as exc:
+        payload = _json_payload_or_empty(exc.stdout or "")
+        gate = payload.get("label_sidecar_gate", {}) if isinstance(payload, dict) else {}
+        summary["steps"].append(
+            {
+                "name": "support_label_sidecar_gate",
+                "status": "failed",
+                "command": cmd,
+                "thresholds": gate.get("thresholds", {}),
+                "metrics": gate.get("metrics", {}),
+                "failures": gate.get("failures", []),
+                "stdout_tail": _tail(exc.stdout or ""),
+                "stderr_tail": _tail(exc.stderr or ""),
+            }
+        )
+        summary["ok"] = False
+        return
+    except json.JSONDecodeError as exc:
+        summary["steps"].append(
+            {
+                "name": "support_label_sidecar_gate",
+                "status": "failed",
+                "command": cmd,
+                "message": f"Could not parse eval_support.py JSON output: {exc}",
+                "stdout_tail": _tail(completed.stdout),
+            }
+        )
+        summary["ok"] = False
+        return
+
+    gate = payload.get("label_sidecar_gate", {}) if isinstance(payload, dict) else {}
+    passed = bool(gate.get("ok"))
+    summary["steps"].append(
+        {
+            "name": "support_label_sidecar_gate",
+            "status": "passed" if passed else "failed",
+            "command": cmd,
+            "thresholds": gate.get("thresholds", {}),
+            "metrics": gate.get("metrics", {}),
+            "failures": gate.get("failures", []),
+            "stdout_tail": _tail(completed.stdout),
+        }
+    )
+    if not passed:
+        summary["ok"] = False
+
+
 def _record_mcp_extra_smoke(
     summary: Dict[str, Any],
     *,
@@ -531,6 +660,14 @@ def _run(cmd: List[str], *, cwd: Path) -> subprocess.CompletedProcess:
             sys.stderr.write(completed.stderr)
         raise subprocess.CalledProcessError(completed.returncode, completed.args, completed.stdout, completed.stderr)
     return completed
+
+
+def _json_payload_or_empty(text: str) -> Dict[str, Any]:
+    try:
+        payload = json.loads(text)
+    except json.JSONDecodeError:
+        return {}
+    return payload if isinstance(payload, dict) else {}
 
 
 def _tail(text: str, max_lines: int = 12) -> List[str]:

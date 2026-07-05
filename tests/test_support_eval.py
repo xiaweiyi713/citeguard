@@ -240,14 +240,15 @@ class SupportEvalTests(unittest.TestCase):
 
     def test_support_label_sidecar_summarizes_high_risk_review_coverage(self):
         cases = [
-            SupportCase("a", "claim", "evidence", "contradicted", case_type="contradiction"),
-            SupportCase("b", "claim", "evidence", "insufficient_evidence", case_type="hard_negative"),
-            SupportCase("c", "claim", "evidence", "supported", case_type="direct_support"),
+            SupportCase("a", "claim", "evidence", "contradicted", lang="en", case_type="contradiction"),
+            SupportCase("b", "claim", "evidence", "insufficient_evidence", lang="zh", case_type="hard_negative"),
+            SupportCase("c", "claim", "evidence", "supported", lang="en", case_type="direct_support"),
             SupportCase(
                 "d",
                 "claim",
                 "citation_verdicts: supported, contradicted",
                 "contradicted",
+                lang="zh",
                 case_type="contradiction_set",
             ),
         ]
@@ -286,8 +287,13 @@ class SupportEvalTests(unittest.TestCase):
         self.assertEqual(summary["high_risk_review"]["case_count"], 3)
         self.assertEqual(summary["high_risk_review"]["reviewed_count"], 1)
         self.assertEqual(summary["high_risk_review"]["unreviewed_count"], 2)
+        self.assertEqual(summary["high_risk_review"]["case_count_by_language"], {"en": 1, "zh": 2})
+        self.assertEqual(summary["high_risk_review"]["reviewed_by_language"], {"en": 1})
+        self.assertEqual(summary["high_risk_review"]["unreviewed_by_language"], {"zh": 2})
         self.assertEqual(summary["high_risk_review"]["reviewed_case_ids"], ["a"])
         self.assertEqual(summary["high_risk_review"]["unreviewed_case_ids"], ["b", "d"])
+        self.assertEqual(summary["high_risk_review"]["reviewed_case_ids_by_language"], {"en": ["a"]})
+        self.assertEqual(summary["high_risk_review"]["unreviewed_case_ids_by_language"], {"zh": ["b", "d"]})
         self.assertEqual(
             summary["high_risk_review"]["unreviewed_by_case_type"],
             {"contradiction_set": 1, "hard_negative": 1},
@@ -304,6 +310,8 @@ class SupportEvalTests(unittest.TestCase):
                     "case_count": 2,
                     "reviewed_count": 1,
                     "unreviewed_count": 1,
+                    "case_count_by_language": {"zh": 1},
+                    "reviewed_by_language": {"zh": 1},
                 },
                 "label_maturity": {
                     "dual_annotated_count": 1,
@@ -314,6 +322,7 @@ class SupportEvalTests(unittest.TestCase):
             min_coverage=1.0,
             min_human_reviewed=2,
             min_high_risk_reviewed=1,
+            min_high_risk_reviewed_by_language={"zh": 1},
             min_dual_annotated=1,
             max_unresolved_disagreements=0,
             min_raw_dual_agreement_rate=0.8,
@@ -328,24 +337,43 @@ class SupportEvalTests(unittest.TestCase):
                     "case_count": 2,
                     "reviewed_count": 0,
                     "unreviewed_count": 2,
+                    "case_count_by_language": {"en": 1, "zh": 1},
+                    "reviewed_by_language": {},
                     "unreviewed_case_ids": ["b", "d"],
+                    "unreviewed_case_ids_by_language": {"zh": ["b"], "en": ["d"]},
                 },
             },
             min_coverage=1.0,
             min_human_reviewed=1,
             min_high_risk_reviewed=1,
+            min_high_risk_reviewed_by_language={"zh": 1},
         )
 
         self.assertTrue(passing["ok"])
+        self.assertEqual(passing["thresholds"]["min_high_risk_reviewed_by_language"], {"zh": 1})
+        self.assertEqual(passing["metrics"]["high_risk_case_count_by_language"], {"zh": 1})
+        self.assertEqual(passing["metrics"]["high_risk_reviewed_by_language"], {"zh": 1})
         self.assertFalse(failing["ok"])
         self.assertEqual(
             {failure["code"] for failure in failing["failures"]},
-            {"sidecar_coverage", "sidecar_human_reviewed", "sidecar_high_risk_reviewed"},
+            {
+                "sidecar_coverage",
+                "sidecar_human_reviewed",
+                "sidecar_high_risk_reviewed",
+                "sidecar_high_risk_reviewed_by_language",
+            },
         )
         high_risk = next(
             failure for failure in failing["failures"] if failure["code"] == "sidecar_high_risk_reviewed"
         )
         self.assertEqual(high_risk["unreviewed_case_ids"], ["b", "d"])
+        by_language = next(
+            failure
+            for failure in failing["failures"]
+            if failure["code"] == "sidecar_high_risk_reviewed_by_language"
+        )
+        self.assertEqual(by_language["language"], "zh")
+        self.assertEqual(by_language["unreviewed_case_ids"], ["b"])
 
     def test_support_label_sidecar_gate_checks_maturity_thresholds(self):
         gate = compute_support_label_sidecar_gate(
@@ -503,6 +531,19 @@ class SupportEvalTests(unittest.TestCase):
         self.assertIsNone(payload["label_maturity"]["raw_dual_agreement_rate"])
         self.assertEqual(payload["label_maturity"]["dual_label_pair_counts"], {})
         self.assertEqual(payload["label_maturity"]["supported_disagreement_case_ids"], [])
+        self.assertTrue(payload["audit_gate"]["ok"])
+        self.assertFalse(payload["audit_gate"]["thresholds"]["fail_on_high_risk_unreviewed"])
+        self.assertEqual(payload["audit_gate"]["thresholds"]["fail_on_high_risk_unreviewed_languages"], [])
+        self.assertEqual(payload["audit_gate"]["metrics"]["unreviewed_count"], len(cases))
+        self.assertEqual(
+            payload["audit_gate"]["metrics"]["high_risk_unreviewed_count"],
+            payload["high_risk_unreviewed_count"],
+        )
+        self.assertEqual(
+            payload["audit_gate"]["metrics"]["high_risk_unreviewed_by_language"],
+            payload["high_risk_unreviewed_by_language"],
+        )
+        self.assertEqual(payload["audit_gate"]["failures"], [])
         self.assertEqual(payload["unreviewed_count"], len(cases))
         self.assertGreater(payload["high_risk_unreviewed_count"], 0)
         self.assertLess(payload["high_risk_unreviewed_count"], payload["unreviewed_count"])
@@ -1050,6 +1091,46 @@ class SupportEvalTests(unittest.TestCase):
         self.assertEqual(completed.returncode, 1)
         self.assertGreater(payload["high_risk_unreviewed_count"], 0)
         self.assertTrue(payload["ok"])
+        self.assertFalse(payload["audit_gate"]["ok"])
+        self.assertTrue(payload["audit_gate"]["thresholds"]["fail_on_high_risk_unreviewed"])
+        self.assertEqual(
+            payload["audit_gate"]["metrics"]["high_risk_unreviewed_count"],
+            payload["high_risk_unreviewed_count"],
+        )
+        self.assertEqual(payload["audit_gate"]["failures"][0]["code"], "high_risk_unreviewed")
+
+    def test_prepare_support_label_sidecar_audit_can_fail_on_language_high_risk_cases(self):
+        completed = subprocess.run(
+            [
+                sys.executable,
+                "scripts/prepare_support_label_sidecar.py",
+                "--dataset",
+                os.path.join("data", "eval", "support_eval.json"),
+                "--existing-sidecar",
+                os.path.join("data", "eval", "support_eval_label_sidecar.json"),
+                "--audit",
+                "--fail-on-high-risk-unreviewed-language",
+                "zh",
+            ],
+            cwd=os.getcwd(),
+            capture_output=True,
+            text=True,
+        )
+        payload = json.loads(completed.stdout)
+
+        self.assertEqual(completed.returncode, 1)
+        self.assertTrue(payload["ok"])
+        self.assertFalse(payload["audit_gate"]["ok"])
+        self.assertEqual(payload["audit_gate"]["thresholds"]["fail_on_high_risk_unreviewed_languages"], ["zh"])
+        self.assertEqual(
+            payload["audit_gate"]["metrics"]["high_risk_unreviewed_by_language"]["zh"],
+            payload["high_risk_unreviewed_by_language"]["zh"],
+        )
+        failure = payload["audit_gate"]["failures"][0]
+        self.assertEqual(failure["code"], "high_risk_unreviewed_by_language")
+        self.assertEqual(failure["language"], "zh")
+        self.assertEqual(failure["actual"], payload["high_risk_unreviewed_by_language"]["zh"])
+        self.assertIn("s34", failure["case_ids"])
 
     def test_validate_support_label_sidecar_rejects_gold_mismatch(self):
         cases = [SupportCase("a", "claim", "evidence", "supported")]
@@ -1622,6 +1703,8 @@ class SupportEvalTests(unittest.TestCase):
                 "1",
                 "--min-high-risk-reviewed",
                 "1",
+                "--min-high-risk-reviewed-by-language",
+                "zh=1",
                 "--min-dual-annotated",
                 "1",
                 "--min-raw-dual-agreement-rate",
@@ -1641,10 +1724,20 @@ class SupportEvalTests(unittest.TestCase):
             {
                 "sidecar_human_reviewed",
                 "sidecar_high_risk_reviewed",
+                "sidecar_high_risk_reviewed_by_language",
                 "sidecar_dual_annotated",
                 "sidecar_raw_dual_agreement_rate",
             },
         )
+        by_language_failure = next(
+            failure
+            for failure in payload["label_sidecar_gate"]["failures"]
+            if failure["code"] == "sidecar_high_risk_reviewed_by_language"
+        )
+        self.assertEqual(by_language_failure["language"], "zh")
+        self.assertEqual(by_language_failure["actual"], 0)
+        self.assertEqual(by_language_failure["threshold"], 1)
+        self.assertIn("s34", by_language_failure["unreviewed_case_ids"])
 
     def test_eval_support_cli_sidecar_gate_can_block_supported_disagreements(self):
         with tempfile.TemporaryDirectory() as tmpdir:

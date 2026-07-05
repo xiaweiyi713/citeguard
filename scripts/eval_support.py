@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from typing import Dict
 
 from _bootstrap import ensure_project_root
 
@@ -29,6 +30,22 @@ from citeguard.verification.support_eval import (
     validate_support_label_sidecar,
     validate_support_eval_dataset,
 )
+
+
+def _parse_language_threshold(value: str) -> tuple[str, int]:
+    if "=" not in value:
+        raise argparse.ArgumentTypeError("expected LANG=N, for example zh=5")
+    language, raw_threshold = value.split("=", 1)
+    language = language.strip().lower()
+    if not language:
+        raise argparse.ArgumentTypeError("language code is required before '='")
+    try:
+        threshold = int(raw_threshold)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("threshold must be a non-negative integer") from exc
+    if threshold < 0:
+        raise argparse.ArgumentTypeError("threshold must be a non-negative integer")
+    return language, threshold
 
 
 def main() -> None:
@@ -97,6 +114,17 @@ def main() -> None:
         ),
     )
     parser.add_argument(
+        "--min-high-risk-reviewed-by-language",
+        action="append",
+        default=[],
+        metavar="LANG=N",
+        type=_parse_language_threshold,
+        help=(
+            "Minimum required human-reviewed high-risk labels for one language, e.g. zh=5. "
+            "Repeat for multiple languages."
+        ),
+    )
+    parser.add_argument(
         "--min-dual-annotated",
         type=int,
         default=0,
@@ -129,6 +157,11 @@ def main() -> None:
     )
     parser.add_argument("--run-id", help="Optional stable run id for the experiment artifact folder.")
     args = parser.parse_args()
+    min_high_risk_reviewed_by_language: Dict[str, int] = {}
+    for language, threshold in args.min_high_risk_reviewed_by_language:
+        if language in min_high_risk_reviewed_by_language:
+            parser.error(f"--min-high-risk-reviewed-by-language was provided more than once for {language!r}")
+        min_high_risk_reviewed_by_language[language] = threshold
     sidecar_summary = None
     sidecar_data = None
     if args.label_sidecar:
@@ -146,6 +179,7 @@ def main() -> None:
                 min_coverage=args.min_sidecar_coverage,
                 min_human_reviewed=args.min_human_reviewed,
                 min_high_risk_reviewed=args.min_high_risk_reviewed,
+                min_high_risk_reviewed_by_language=min_high_risk_reviewed_by_language,
                 min_dual_annotated=args.min_dual_annotated,
                 max_unresolved_disagreements=args.max_unresolved_disagreements,
                 min_raw_dual_agreement_rate=args.min_raw_dual_agreement_rate,
@@ -179,6 +213,7 @@ def main() -> None:
             min_coverage=args.min_sidecar_coverage,
             min_human_reviewed=args.min_human_reviewed,
             min_high_risk_reviewed=args.min_high_risk_reviewed,
+            min_high_risk_reviewed_by_language=min_high_risk_reviewed_by_language,
             min_dual_annotated=args.min_dual_annotated,
             max_unresolved_disagreements=args.max_unresolved_disagreements,
             min_raw_dual_agreement_rate=args.min_raw_dual_agreement_rate,
@@ -214,6 +249,7 @@ def main() -> None:
                     "min_sidecar_coverage": args.min_sidecar_coverage,
                     "min_human_reviewed": args.min_human_reviewed,
                     "min_high_risk_reviewed": args.min_high_risk_reviewed,
+                    "min_high_risk_reviewed_by_language": min_high_risk_reviewed_by_language,
                     "min_dual_annotated": args.min_dual_annotated,
                     "max_unresolved_disagreements": args.max_unresolved_disagreements,
                     "min_raw_dual_agreement_rate": args.min_raw_dual_agreement_rate,

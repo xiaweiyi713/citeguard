@@ -108,6 +108,8 @@ class ExperimentArtifactTests(unittest.TestCase):
                     "scripts/compare_support_baselines.py",
                     "--split",
                     "test",
+                    "--min-high-risk-reviewed-by-language",
+                    "zh=0",
                     "--output-dir",
                     tmpdir,
                     "--run-id",
@@ -135,6 +137,7 @@ class ExperimentArtifactTests(unittest.TestCase):
         self.assertEqual(config["script"], "scripts/compare_support_baselines.py")
         self.assertEqual(config["backends"], ["fixture", "heuristic"])
         self.assertEqual(config["thresholds"]["min_dual_annotated"], 0)
+        self.assertEqual(config["thresholds"]["min_high_risk_reviewed_by_language"], {"zh": 0})
         self.assertEqual(config["thresholds"]["max_unresolved_disagreements"], 0)
         self.assertIsNone(config["thresholds"]["min_raw_dual_agreement_rate"])
 
@@ -145,6 +148,8 @@ class ExperimentArtifactTests(unittest.TestCase):
                 "scripts/compare_support_baselines.py",
                 "--split",
                 "test",
+                "--min-high-risk-reviewed-by-language",
+                "zh=1",
                 "--fail-on-gate",
             ],
             check=False,
@@ -157,6 +162,10 @@ class ExperimentArtifactTests(unittest.TestCase):
         self.assertEqual(completed.returncode, 1)
         self.assertFalse(payload["quality_gates_ok"])
         self.assertFalse(payload["comparison"][1]["quality_gate_ok"])
+        self.assertEqual(
+            payload["label_sidecar_gate"]["failures"][0]["code"],
+            "sidecar_high_risk_reviewed_by_language",
+        )
 
 
 if __name__ == "__main__":

@@ -2,6 +2,7 @@
 
 from pathlib import Path
 import re
+import subprocess
 import unittest
 from unittest import mock
 
@@ -9,7 +10,12 @@ from citeguard.errors import ERROR_CODE_NEXT_ACTION, ERROR_SCHEMA_VERSION, STABL
 from citeguard.retrieval.scholarly_clients.factory import DEFAULT_USER_AGENT
 from citeguard.verification import STABLE_NEXT_ACTIONS
 from citeguard.version import __version__
-from scripts.release_package_gate import _record_mcp_extra_smoke, _record_mcp_stdio_smoke, _record_published_smoke_plan
+from scripts.release_package_gate import (
+    _record_mcp_extra_smoke,
+    _record_mcp_stdio_smoke,
+    _record_published_smoke_plan,
+    _record_support_label_sidecar_gate,
+)
 from scripts.smoke_package import _assert_archive_excludes_generated_files, _assert_distribution_metadata_contract
 
 
@@ -275,6 +281,7 @@ License-File: LICENSE
         self.assertIn("--min-sidecar-coverage 1.0", workflow)
         self.assertIn("--min-human-reviewed 0", workflow)
         self.assertIn("--min-high-risk-reviewed 0", workflow)
+        self.assertIn("--min-high-risk-reviewed-by-language zh=0", workflow)
         self.assertIn("python scripts/smoke_package.py --install-mode wheel", workflow)
         self.assertIn("python scripts/smoke_package.py --install-mode sdist", workflow)
         self.assertIn(
@@ -309,8 +316,17 @@ License-File: LICENSE
             "--require-mcp-stdio-smoke",
             "--include-published-smoke-plan",
             "--include-published-mcp-smoke-plan",
+            "--skip-support-label-gate",
+            "--support-label-sidecar",
+            "--support-eval-dataset",
+            "--min-high-risk-reviewed-by-language",
             "--with-deps",
             "--extra mcp",
+            "support_label_sidecar_gate",
+            'gate.get("thresholds", {})',
+            'gate.get("metrics", {})',
+            'gate.get("failures", [])',
+            "structured",
             "_MCP_EXTRA_SMOKE",
             "mcp_extra_wheel_install_smoke",
             "mcp_stdio_smoke",
@@ -328,6 +344,7 @@ License-File: LICENSE
             "python scripts/release_package_gate.py --skip-install-smoke --include-mcp-extra-smoke --require-mcp-extra-smoke",
             "python scripts/release_package_gate.py --skip-install-smoke --include-mcp-stdio-smoke --require-mcp-stdio-smoke",
             "python scripts/release_package_gate.py --skip-install-smoke --include-published-smoke-plan --include-published-mcp-smoke-plan",
+            "python scripts/release_package_gate.py --require-build-tools --min-high-risk-reviewed-by-language zh=0",
             "python scripts/smoke_mcp.py --require-sdk",
             "python scripts/smoke_published_package.py --version 0.1.0",
             "--index-url https://test.pypi.org/simple/",
@@ -485,6 +502,108 @@ License-File: LICENSE
                 "mcp",
             ],
         )
+
+    def test_release_gate_records_support_label_sidecar_gate(self):
+        summary = {"ok": True, "steps": []}
+        completed = mock.Mock(
+            stdout=(
+                '{"label_sidecar_gate": {"ok": true, '
+                '"thresholds": {"min_high_risk_reviewed_by_language": {"zh": 1}}, '
+                '"metrics": {"high_risk_case_count_by_language": {"zh": 5}, '
+                '"high_risk_reviewed_by_language": {"zh": 1}}, '
+                '"failures": []}}'
+            )
+        )
+        with mock.patch("scripts.release_package_gate._run", return_value=completed) as run:
+            _record_support_label_sidecar_gate(
+                summary,
+                python="python3",
+                project_root=ROOT,
+                dataset="data/eval/support_eval.json",
+                label_sidecar="data/eval/support_eval_label_sidecar.json",
+                min_sidecar_coverage=1.0,
+                min_human_reviewed=2,
+                min_high_risk_reviewed=1,
+                min_high_risk_reviewed_by_language=["zh=1"],
+                min_dual_annotated=2,
+                max_unresolved_disagreements=0,
+                min_raw_dual_agreement_rate=0.8,
+                max_supported_disagreements=0,
+            )
+
+        run.assert_called_once()
+        self.assertEqual(
+            run.call_args.args[0],
+            [
+                "python3",
+                "scripts/eval_support.py",
+                "--validate-only",
+                "--dataset",
+                "data/eval/support_eval.json",
+                "--label-sidecar",
+                "data/eval/support_eval_label_sidecar.json",
+                "--min-sidecar-coverage",
+                "1.0",
+                "--min-human-reviewed",
+                "2",
+                "--min-high-risk-reviewed",
+                "1",
+                "--min-dual-annotated",
+                "2",
+                "--max-unresolved-disagreements",
+                "0",
+                "--min-high-risk-reviewed-by-language",
+                "zh=1",
+                "--min-raw-dual-agreement-rate",
+                "0.8",
+                "--max-supported-disagreements",
+                "0",
+            ],
+        )
+        self.assertEqual(run.call_args.kwargs["cwd"], ROOT)
+        self.assertTrue(summary["ok"])
+        self.assertEqual(summary["steps"][0]["status"], "passed")
+        self.assertEqual(summary["steps"][0]["thresholds"]["min_high_risk_reviewed_by_language"], {"zh": 1})
+        self.assertEqual(summary["steps"][0]["metrics"]["high_risk_case_count_by_language"], {"zh": 5})
+        self.assertEqual(summary["steps"][0]["failures"], [])
+
+    def test_release_gate_records_failed_support_label_sidecar_gate_payload(self):
+        summary = {"ok": True, "steps": []}
+        error = subprocess.CalledProcessError(
+            1,
+            ["python3", "scripts/eval_support.py"],
+            output=(
+                '{"label_sidecar_gate": {"ok": false, '
+                '"thresholds": {"min_high_risk_reviewed_by_language": {"zh": 1}}, '
+                '"metrics": {"high_risk_case_count_by_language": {"zh": 5}, '
+                '"high_risk_reviewed_by_language": {}}, '
+                '"failures": [{"code": "sidecar_high_risk_reviewed_by_language", '
+                '"language": "zh", "actual": 0, "threshold": 1}]}}'
+            ),
+            stderr="",
+        )
+        with mock.patch("scripts.release_package_gate._run", side_effect=error):
+            _record_support_label_sidecar_gate(
+                summary,
+                python="python3",
+                project_root=ROOT,
+                dataset="data/eval/support_eval.json",
+                label_sidecar="data/eval/support_eval_label_sidecar.json",
+                min_sidecar_coverage=1.0,
+                min_human_reviewed=0,
+                min_high_risk_reviewed=0,
+                min_high_risk_reviewed_by_language=["zh=1"],
+                min_dual_annotated=0,
+                max_unresolved_disagreements=0,
+                min_raw_dual_agreement_rate=None,
+                max_supported_disagreements=None,
+            )
+
+        self.assertFalse(summary["ok"])
+        self.assertEqual(summary["steps"][0]["status"], "failed")
+        self.assertEqual(summary["steps"][0]["failures"][0]["code"], "sidecar_high_risk_reviewed_by_language")
+        self.assertEqual(summary["steps"][0]["failures"][0]["language"], "zh")
+        self.assertEqual(summary["steps"][0]["metrics"]["high_risk_case_count_by_language"], {"zh": 5})
 
     def test_mcp_smoke_checks_structured_errors(self):
         smoke = (ROOT / "scripts" / "smoke_mcp.py").read_text(encoding="utf-8")
@@ -826,8 +945,11 @@ License-File: LICENSE
         self.assertIn('python -m pip install -e ".[pdf]"', checklist)
         self.assertIn("local PDF full-text evidence support", checklist)
         self.assertIn("--fail-on-high-risk-unreviewed", checklist)
+        self.assertIn("--fail-on-high-risk-unreviewed-language", checklist)
         self.assertIn("high-risk unreviewed gate", checklist)
         self.assertIn("--fail-on-high-risk-unreviewed", benchmark_design)
+        self.assertIn("--fail-on-high-risk-unreviewed-language", benchmark_design)
+        self.assertIn("audit_gate", benchmark_design)
         self.assertIn("high-risk test packet", benchmark_design)
         self.assertIn("--case-type", benchmark_design)
         self.assertIn("--case-id", benchmark_design)
@@ -841,9 +963,18 @@ License-File: LICENSE
         self.assertIn("dual_disagreement_label_pair_counts", combined)
         self.assertIn("supported_disagreement_case_ids", combined)
         self.assertIn("high_risk_review", combined)
+        self.assertIn("case_count_by_language", combined)
+        self.assertIn("reviewed_by_language", combined)
+        self.assertIn("unreviewed_by_language", combined)
+        self.assertIn("high_risk_case_count_by_language", combined)
+        self.assertIn("high_risk_reviewed_by_language", combined)
+        self.assertIn("high_risk_unreviewed_by_language", combined)
+        self.assertIn("reviewed_case_ids_by_language", combined)
+        self.assertIn("unreviewed_case_ids_by_language", combined)
         self.assertIn("test_split", combined)
         self.assertIn("weak support, hard negatives, contradictions, full-text-required cases", combined)
         self.assertIn("--min-high-risk-reviewed", combined)
+        self.assertIn("--min-high-risk-reviewed-by-language", combined)
         self.assertIn("--min-dual-annotated", combined)
         self.assertIn("--max-unresolved-disagreements", combined)
         self.assertIn("--min-raw-dual-agreement-rate", combined)

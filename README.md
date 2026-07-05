@@ -410,15 +410,15 @@ python3 scripts/eval_support.py --report --split test --quality-gate
 python3 scripts/eval_support.py --backend heuristic --report --split test
 python3 scripts/eval_support.py --backend production --report --split test  # requires [models] and cached/downloadable weights
 python3 scripts/eval_support.py --validate-only  # dataset schema/provenance/coverage gate only
-python3 scripts/eval_support.py --validate-only --label-sidecar data/eval/support_eval_label_sidecar.json
+python3 scripts/eval_support.py --validate-only --label-sidecar data/eval/support_eval_label_sidecar.json --min-high-risk-reviewed-by-language zh=0
 python3 scripts/eval_verification.py --output-dir experiments --run-id verification-smoke
 python3 scripts/eval_support.py --report --split test --quality-gate --output-dir experiments --run-id support-smoke
-python3 scripts/compare_support_baselines.py --split test --output-dir experiments --run-id support-baselines-smoke
+python3 scripts/compare_support_baselines.py --split test --min-high-risk-reviewed-by-language zh=0 --output-dir experiments --run-id support-baselines-smoke
 python3 scripts/smoke_package.py           # fresh-venv source install smoke, including python -m citeguard
 python3 scripts/smoke_package.py --install-mode wheel  # fresh-venv wheel install smoke
 python3 scripts/smoke_package.py --install-mode sdist  # fresh-venv source distribution smoke
 python3 scripts/smoke_package.py --install-mode wheel --extra mcp --with-deps  # verifies MCP extra deps
-python3 scripts/release_package_gate.py    # package release gate; add --require-build-tools before publishing
+python3 scripts/release_package_gate.py    # package + support-label release gate; add --require-build-tools before publishing
 python3 scripts/release_package_gate.py --skip-install-smoke --include-mcp-extra-smoke --require-mcp-extra-smoke
 python3 scripts/release_package_gate.py --skip-install-smoke --include-mcp-stdio-smoke --require-mcp-stdio-smoke
 python3 scripts/release_package_gate.py --skip-install-smoke --include-published-smoke-plan --include-published-mcp-smoke-plan
@@ -449,9 +449,13 @@ is `fixture`, which checks deterministic report plumbing rather than model
 quality; use `--backend production` for model-backed metrics. Optional
 label-provenance sidecars can record annotator counts, adjudication status,
 disagreements, and source locators separately from the compact seed cases.
-Sidecar gates can also require high-risk cases to be human-reviewed, require
-dual annotation, cap unresolved disagreements, and enforce a minimum raw
+Sidecar gates can also require high-risk cases to be human-reviewed globally or
+by language with `--min-high-risk-reviewed-by-language LANG=N`, require dual
+annotation, cap unresolved disagreements, and enforce a minimum raw
 dual-annotator agreement rate before a report is treated as benchmark-grade.
+The gate metrics include `high_risk_case_count_by_language`,
+`high_risk_reviewed_by_language`, and `high_risk_unreviewed_by_language` so
+agents can judge language coverage without re-parsing the sidecar summary.
 Pass `--output-dir experiments --run-id <name>` to either eval script to save a
 standardized experiment folder with `result.json`, `config.json`, and
 `manifest.json` for reproducible tables and release evidence.

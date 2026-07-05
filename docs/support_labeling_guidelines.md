@@ -145,6 +145,7 @@ python3 scripts/eval_support.py --validate-only \
   --min-sidecar-coverage 1.0 \
   --min-human-reviewed 10 \
   --min-high-risk-reviewed 5 \
+  --min-high-risk-reviewed-by-language zh=2 \
   --min-dual-annotated 10 \
   --max-unresolved-disagreements 0 \
   --min-raw-dual-agreement-rate 0.8 \
@@ -153,11 +154,21 @@ python3 scripts/eval_support.py --validate-only \
 
 Use `--min-high-risk-reviewed` to require human review for contradiction,
 hard-negative, full-text-required, and contradiction-set cases before making
-benchmark maturity claims. Use `--max-supported-disagreements 0` for
-release-grade benchmark claims. It fails with
+benchmark maturity claims. The sidecar validation `high_risk_review` block
+reports `case_count_by_language`, `reviewed_by_language`, and
+`unreviewed_by_language` so language-specific review gaps, such as unreviewed
+Chinese high-risk cases, are visible before release. It also reports
+`reviewed_case_ids_by_language` and `unreviewed_case_ids_by_language` so
+annotation packets can target the exact remaining cases. Use repeated
+`--min-high-risk-reviewed-by-language LANG=N` gates when a release claim depends
+on language-specific coverage. Use
+`--max-supported-disagreements 0` for release-grade benchmark claims. It fails with
 `sidecar_supported_disagreements` when any dual-annotation disagreement includes
 a `supported` label, forcing explicit adjudication before the benchmark can be
 described as mature.
+The corresponding `label_sidecar_gate.metrics` block includes
+`high_risk_case_count_by_language`, `high_risk_reviewed_by_language`, and
+`high_risk_unreviewed_by_language` for release triage.
 
 Generate a complete sidecar template before an annotation pass:
 
@@ -256,9 +267,11 @@ python3 scripts/prepare_support_label_sidecar.py \
 
 The audit reports coverage, human-reviewed count, unreviewed cases by split,
 language, and case type, plus a risk-sorted `high_risk_unreviewed` list and
-`high_risk_unreviewed_by_language`. Review contradiction, hard-negative, and
-full-text-required cases first because those most directly test false support
-and overclaiming.
+`high_risk_unreviewed_by_language`. Use
+`--fail-on-high-risk-unreviewed-language LANG` when a language-specific review
+batch, such as Chinese high-risk cases, must block release readiness. Review
+contradiction, hard-negative, and full-text-required cases first because those
+most directly test false support and overclaiming.
 
 ## Disagreement Handling
 

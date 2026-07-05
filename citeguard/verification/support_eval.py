@@ -656,14 +656,25 @@ def summarize_support_high_risk_review(raw_items: List[Any], cases: List[Support
     }
     reviewed_case_ids: List[str] = []
     unreviewed_case_ids: List[str] = []
+    case_count_by_language: Dict[str, int] = {}
+    reviewed_by_language: Dict[str, int] = {}
+    unreviewed_by_language: Dict[str, int] = {}
+    reviewed_case_ids_by_language: Dict[str, List[str]] = {}
+    unreviewed_case_ids_by_language: Dict[str, List[str]] = {}
     unreviewed_by_case_type: Dict[str, int] = {}
     high_risk_cases = [case for case in cases if case.case_type in HIGH_RISK_SUPPORT_CASE_TYPES]
     for case in high_risk_cases:
+        language = case.lang.strip() or "unknown"
+        case_count_by_language[language] = case_count_by_language.get(language, 0) + 1
         item = sidecar_by_id.get(case.case_id, {})
         if item.get("adjudication_status") != "not_human_reviewed" and item:
             reviewed_case_ids.append(case.case_id)
+            reviewed_by_language[language] = reviewed_by_language.get(language, 0) + 1
+            reviewed_case_ids_by_language.setdefault(language, []).append(case.case_id)
             continue
         unreviewed_case_ids.append(case.case_id)
+        unreviewed_by_language[language] = unreviewed_by_language.get(language, 0) + 1
+        unreviewed_case_ids_by_language.setdefault(language, []).append(case.case_id)
         unreviewed_by_case_type[case.case_type] = unreviewed_by_case_type.get(case.case_type, 0) + 1
 
     return {
@@ -671,8 +682,13 @@ def summarize_support_high_risk_review(raw_items: List[Any], cases: List[Support
         "case_count": len(high_risk_cases),
         "reviewed_count": len(reviewed_case_ids),
         "unreviewed_count": len(unreviewed_case_ids),
+        "case_count_by_language": dict(sorted(case_count_by_language.items())),
+        "reviewed_by_language": dict(sorted(reviewed_by_language.items())),
+        "unreviewed_by_language": dict(sorted(unreviewed_by_language.items())),
         "reviewed_case_ids": reviewed_case_ids,
         "unreviewed_case_ids": unreviewed_case_ids,
+        "reviewed_case_ids_by_language": dict(sorted(reviewed_case_ids_by_language.items())),
+        "unreviewed_case_ids_by_language": dict(sorted(unreviewed_case_ids_by_language.items())),
         "unreviewed_by_case_type": dict(sorted(unreviewed_by_case_type.items())),
     }
 
@@ -836,6 +852,7 @@ def compute_support_label_sidecar_gate(
     min_coverage: float = 1.0,
     min_human_reviewed: int = 0,
     min_high_risk_reviewed: int = 0,
+    min_high_risk_reviewed_by_language: Optional[Dict[str, int]] = None,
     min_dual_annotated: int = 0,
     max_unresolved_disagreements: int = 0,
     min_raw_dual_agreement_rate: Optional[float] = None,
@@ -854,6 +871,9 @@ def compute_support_label_sidecar_gate(
     high_risk_reviewed = _safe_int(high_risk_review.get("reviewed_count", 0))
     high_risk_unreviewed = _safe_int(high_risk_review.get("unreviewed_count", 0))
     high_risk_case_count = _safe_int(high_risk_review.get("case_count", 0))
+    case_count_by_language = _int_mapping(high_risk_review.get("case_count_by_language", {}))
+    reviewed_by_language = _int_mapping(high_risk_review.get("reviewed_by_language", {}))
+    unreviewed_by_language = _int_mapping(high_risk_review.get("unreviewed_by_language", {}))
     dual_annotated = _safe_int(maturity.get("dual_annotated_count", 0))
     unresolved_disagreements = _safe_int(maturity.get("unresolved_disagreement_count", 0))
     supported_disagreements = _safe_int(maturity.get("supported_disagreement_count", 0))
@@ -887,6 +907,22 @@ def compute_support_label_sidecar_gate(
                 "unreviewed_case_ids": list(high_risk_review.get("unreviewed_case_ids", [])),
             }
         )
+    for language, threshold in sorted((min_high_risk_reviewed_by_language or {}).items()):
+        actual = reviewed_by_language.get(language, 0)
+        if actual < threshold:
+            unreviewed_case_ids_by_language = high_risk_review.get("unreviewed_case_ids_by_language", {})
+            if not isinstance(unreviewed_case_ids_by_language, dict):
+                unreviewed_case_ids_by_language = {}
+            failures.append(
+                {
+                    "code": "sidecar_high_risk_reviewed_by_language",
+                    "message": "Human-reviewed high-risk support label count for a language is below the configured threshold.",
+                    "language": language,
+                    "actual": actual,
+                    "threshold": threshold,
+                    "unreviewed_case_ids": list(unreviewed_case_ids_by_language.get(language, [])),
+                }
+            )
     if dual_annotated < min_dual_annotated:
         failures.append(
             {
@@ -941,6 +977,7 @@ def compute_support_label_sidecar_gate(
             "min_coverage": min_coverage,
             "min_human_reviewed": min_human_reviewed,
             "min_high_risk_reviewed": min_high_risk_reviewed,
+            "min_high_risk_reviewed_by_language": dict(sorted((min_high_risk_reviewed_by_language or {}).items())),
             "min_dual_annotated": min_dual_annotated,
             "max_unresolved_disagreements": max_unresolved_disagreements,
             "min_raw_dual_agreement_rate": min_raw_dual_agreement_rate,
@@ -952,6 +989,9 @@ def compute_support_label_sidecar_gate(
             "high_risk_case_count": high_risk_case_count,
             "high_risk_reviewed": high_risk_reviewed,
             "high_risk_unreviewed": high_risk_unreviewed,
+            "high_risk_case_count_by_language": case_count_by_language,
+            "high_risk_reviewed_by_language": reviewed_by_language,
+            "high_risk_unreviewed_by_language": unreviewed_by_language,
             "dual_annotated": dual_annotated,
             "unresolved_disagreements": unresolved_disagreements,
             "supported_disagreements": supported_disagreements,
@@ -975,6 +1015,12 @@ def _safe_float(value: Any) -> float:
         return float(value)
     except (TypeError, ValueError):
         return 0.0
+
+
+def _int_mapping(value: Any) -> Dict[str, int]:
+    if not isinstance(value, dict):
+        return {}
+    return {str(key): _safe_int(raw_value) for key, raw_value in sorted(value.items(), key=lambda item: str(item[0]))}
 
 
 def _run_support_predictions(cases: List[SupportCase], backend: SupportBackend) -> List[str]:

@@ -123,6 +123,13 @@ def main(argv: Optional[list[str]] = None) -> int:
         action="store_true",
         help="With --audit, exit non-zero when contradiction, hard_negative, or full_text_required cases remain unreviewed.",
     )
+    parser.add_argument(
+        "--fail-on-high-risk-unreviewed-language",
+        action="append",
+        default=[],
+        metavar="LANG",
+        help="With --audit, exit non-zero when high-risk cases in this language remain unreviewed; repeat for multiple languages.",
+    )
     args = parser.parse_args(argv)
     selected_modes = sum(
         bool(value)
@@ -212,6 +219,11 @@ def main(argv: Optional[list[str]] = None) -> int:
             include_context=args.include_context,
             filters=_filter_summary(args),
         )
+        report["audit_gate"] = _build_audit_gate(
+            report,
+            fail_on_high_risk_unreviewed=args.fail_on_high_risk_unreviewed,
+            fail_on_high_risk_unreviewed_languages=args.fail_on_high_risk_unreviewed_language,
+        )
         text = json.dumps(
             report,
             indent=2,
@@ -221,7 +233,7 @@ def main(argv: Optional[list[str]] = None) -> int:
             Path(args.output).write_text(text, encoding="utf-8")
         else:
             print(text, end="")
-        if args.fail_on_high_risk_unreviewed and report["high_risk_unreviewed_count"] > 0:
+        if not report["audit_gate"]["ok"]:
             return 1
         return 0
     text = json.dumps(payload, indent=2, ensure_ascii=False) + "\n"
@@ -723,6 +735,62 @@ def _build_audit_report(
         "high_risk_unreviewed": high_risk_unreviewed,
         "unreviewed": unreviewed,
         "next_actions": _next_actions(unreviewed),
+    }
+
+
+def _build_audit_gate(
+    report: dict,
+    *,
+    fail_on_high_risk_unreviewed: bool,
+    fail_on_high_risk_unreviewed_languages: list[str],
+) -> dict:
+    failures = []
+    language_thresholds = sorted(
+        {str(lang).strip().lower() for lang in fail_on_high_risk_unreviewed_languages if str(lang).strip()}
+    )
+    if fail_on_high_risk_unreviewed and report.get("high_risk_unreviewed_count", 0) > 0:
+        failures.append(
+            {
+                "code": "high_risk_unreviewed",
+                "message": "High-risk support-label cases remain unreviewed.",
+                "actual": report.get("high_risk_unreviewed_count", 0),
+                "case_ids": [item.get("case_id") for item in report.get("high_risk_unreviewed", [])],
+            }
+        )
+    by_language = report.get("high_risk_unreviewed_by_language", {})
+    if not isinstance(by_language, dict):
+        by_language = {}
+    high_risk_rows = report.get("high_risk_unreviewed", [])
+    for language in language_thresholds:
+        actual = int(by_language.get(language, 0))
+        if actual <= 0:
+            continue
+        failures.append(
+            {
+                "code": "high_risk_unreviewed_by_language",
+                "message": "High-risk support-label cases for a language remain unreviewed.",
+                "language": language,
+                "actual": actual,
+                "case_ids": [
+                    item.get("case_id")
+                    for item in high_risk_rows
+                    if str(item.get("lang", "")).strip().lower() == language
+                ],
+            }
+        )
+    return {
+        "ok": not failures,
+        "thresholds": {
+            "fail_on_high_risk_unreviewed": fail_on_high_risk_unreviewed,
+            "fail_on_high_risk_unreviewed_languages": language_thresholds,
+        },
+        "metrics": {
+            "unreviewed_count": report.get("unreviewed_count", 0),
+            "high_risk_unreviewed_count": report.get("high_risk_unreviewed_count", 0),
+            "unreviewed_by_language": report.get("unreviewed_by_language", {}),
+            "high_risk_unreviewed_by_language": by_language,
+        },
+        "failures": failures,
     }
 
 
