@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 import importlib.util
+from pathlib import Path
 import unittest
 from unittest import mock
 
-from scripts.smoke_mcp import _server_command, main as run_smoke
+from citeguard.runtime import SOURCE_HEALTH_SCHEMA_VERSION
+from citeguard.verification import CACHE_SCHEMA_VERSION
+from scripts.smoke_mcp import _require_status_payload, _server_command, main as run_smoke
 
 
 class MCPStdioSmokeCommandTests(unittest.TestCase):
@@ -34,6 +37,34 @@ class MCPStdioSmokeCommandTests(unittest.TestCase):
         with mock.patch("scripts.smoke_mcp._load_mcp_client", return_value=None):
             self.assertEqual(run_smoke([]), 0)
             self.assertEqual(run_smoke(["--require-sdk"]), 1)
+
+    def test_status_payload_contract_accepts_current_source_health_schema(self):
+        fixture_path = Path("/tmp/citeguard-fixture.json")
+        payload = {
+            "schema_version": 1,
+            "service": "CiteGuard",
+            "fixture_citations_path": str(fixture_path),
+            "cache_status": {
+                "path": ":memory:",
+                "inspect_ok": True,
+                "schema_version": CACHE_SCHEMA_VERSION,
+                "next_action": "continue",
+            },
+            "source_health": {
+                "schema_version": SOURCE_HEALTH_SCHEMA_VERSION,
+                "mode": "fixture",
+                "summary": {
+                    "sources_available": ["fixture"],
+                    "sources_failed": [],
+                    "failure_count": 0,
+                    "failure_details": [],
+                    "degraded": False,
+                    "next_action": "continue",
+                },
+            },
+        }
+
+        _require_status_payload(payload, fixture_path)
 
 
 @unittest.skipUnless(importlib.util.find_spec("mcp") is not None, "MCP SDK is not installed")

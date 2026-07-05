@@ -21,6 +21,7 @@ from _bootstrap import ensure_project_root
 
 ensure_project_root()
 
+from citeguard.runtime import SOURCE_HEALTH_SCHEMA_VERSION
 from citeguard.verification import CACHE_SCHEMA_VERSION, STABLE_NEXT_ACTIONS
 
 
@@ -315,8 +316,10 @@ def _require_status_payload(payload: dict, fixture_path: Path) -> None:
     source_health = payload.get("source_health")
     if not isinstance(source_health, dict):
         raise RuntimeError(f"Expected structured source_health, got: {payload!r}")
-    if source_health.get("schema_version") != 1:
-        raise RuntimeError(f"Expected source_health schema_version=1, got: {payload!r}")
+    if source_health.get("schema_version") != SOURCE_HEALTH_SCHEMA_VERSION:
+        raise RuntimeError(
+            f"Expected source_health schema_version={SOURCE_HEALTH_SCHEMA_VERSION}, got: {payload!r}"
+        )
     if source_health.get("mode") != "fixture":
         raise RuntimeError(f"Expected fixture source-health mode, got: {payload!r}")
 
@@ -328,6 +331,8 @@ def _require_status_payload(payload: dict, fixture_path: Path) -> None:
         raise RuntimeError(f"Expected fixture in sources_available, got: {payload!r}")
     if summary.get("sources_failed") != []:
         raise RuntimeError(f"Expected no failed sources in offline fixture smoke, got: {payload!r}")
+    if summary.get("failure_count") != 0 or summary.get("failure_details") != []:
+        raise RuntimeError(f"Expected no source-health failures in offline fixture smoke, got: {payload!r}")
     if summary.get("degraded") is not False:
         raise RuntimeError(f"Expected offline fixture status not to be degraded, got: {payload!r}")
 
