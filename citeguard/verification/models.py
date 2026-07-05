@@ -231,6 +231,7 @@ def filter_high_risk_payload(payload: Dict[str, Any]) -> Dict[str, Any]:
             high_risk_indexes.add(index)
     returned_indexes = [index for index in range(original_count) if index in high_risk_indexes]
     omitted_indexes = [index for index in range(original_count) if index not in high_risk_indexes]
+    omitted_index_set = set(omitted_indexes)
     filtered = dict(payload)
     filtered["results"] = [
         result for index, result in enumerate(payload.get("results", [])) if index in returned_indexes
@@ -246,6 +247,14 @@ def filter_high_risk_payload(payload: Dict[str, Any]) -> Dict[str, Any]:
         "original_results": original_count,
         "returned_indexes": returned_indexes,
         "omitted_indexes": omitted_indexes,
+        "omitted_review_summary": review_summary_from_risk_ranking(
+            len(omitted_indexes),
+            [
+                dict(item)
+                for item in payload.get("risk_ranking", [])
+                if isinstance(item, dict) and item.get("index") in omitted_index_set
+            ],
+        ),
     }
     return filtered
 

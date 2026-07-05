@@ -1,5 +1,11 @@
 # CiteGuard v1 设计:可接入 Agent 的引用核验能力
 
+> **Archived historical design note:** This file records the pre-migration
+> design from before the stable public `citeguard.*` package became the
+> user-facing API. Mentions of `src.*` are historical compatibility context, not
+> current import guidance. Use `docs/public_api_migration.md`,
+> `docs/mcp_setup.md`, and `docs/cli_reference.md` for current public APIs.
+
 - **日期**: 2026-06-03
 - **状态**: 已确认,待写实现计划
 - **范围**: v1(防幻觉:存在性 + 元数据核验),交付为分层架构 + MCP server(主) + Claude Code Skill(辅)

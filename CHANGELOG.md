@@ -14,6 +14,8 @@
 - Added `filtered.returned_indexes` and `filtered.omitted_indexes` to
   `--high-risk-only` / MCP `high_risk_only` batch outputs for traceability back
   to original inputs.
+- Added `filtered.omitted_review_summary` to high-risk filtered batch outputs so
+  agents can summarize hidden low/medium-risk queues without expanding every row.
 - Added `citeguard support-set` and `check_claim_support_set_tool` for
   abstract-level checks of one claim against multiple cited papers.
 - Added machine-readable `evidence_scope` to claim-support outputs so agents can
@@ -47,6 +49,10 @@
   keeping the registry and docs synchronized.
 - Added structured `file_error` details for cache export output-path failures,
   including `details.field=output` and `details.cache_command=export`.
+- Added `details.field`, `details.expected`, and `details.received` to MCP
+  batch shape errors so agents can repair malformed `citations` / `items`
+  payloads without parsing prose, and extended the MCP stdio smoke to verify
+  those details through the real server transport.
 - Added support-labeling guidelines for future human-reviewed claim-support
   benchmark expansion.
 - Added support-label sidecar maturity diagnostics for dual-label disagreement
@@ -58,6 +64,8 @@
 - Added support-eval validation for high-risk `test` split coverage so final
   support reports cannot omit weak-support, hard-negative, contradiction, or
   full-text-required boundaries.
+- Added grouped `false_support_case_ids` and `weak_false_support_case_ids` in
+  support false-overcall analysis for split/case-type/evidence-scope triage.
 - Expanded the CiteGuard agent skill with client-specific MCP setup notes,
   structured-error recovery guidance, and safe wording examples for ambiguous,
   metadata-mismatch, not-found, outage, and claim-support results.

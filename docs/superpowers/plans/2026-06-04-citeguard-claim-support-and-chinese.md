@@ -1,5 +1,11 @@
 # CiteGuard v2 实现计划:claim 支撑性核验 + 中文支持
 
+> **Archived historical plan:** This file records the pre-migration
+> implementation plan from before the stable public `citeguard.*` package
+> became the user-facing API. Mentions of `src.*` are historical compatibility context,
+> not current import guidance. Use `docs/public_api_migration.md`,
+> `docs/mcp_setup.md`, and `docs/cli_reference.md` for current public APIs.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 新增 claim↔paper 支撑性核验(独立工具 `check_claim_support`,4 档弃权优先判定,复用现有 NLI+reranker ensemble),并让整条链路对中文可用。

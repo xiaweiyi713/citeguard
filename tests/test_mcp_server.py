@@ -559,10 +559,21 @@ class MCPServerHelperTests(unittest.TestCase):
         self.assertEqual(invalid_year["error"]["details"]["field"], "year")
 
     def test_mcp_batch_tools_return_structured_errors_for_invalid_items(self):
+        invalid_citations_shape = self.server.audit_citations_tool(citations="not a list")
+        self.assertFalse(invalid_citations_shape["ok"])
+        self.assertEqual(invalid_citations_shape["error"]["code"], "invalid_input")
+        self.assertEqual(invalid_citations_shape["error"]["details"]["tool"], "audit_citations_tool")
+        self.assertEqual(invalid_citations_shape["error"]["details"]["field"], "citations")
+        self.assertEqual(invalid_citations_shape["error"]["details"]["expected"], "list")
+        self.assertEqual(invalid_citations_shape["error"]["details"]["received"], "str")
+
         invalid_audit = self.server.audit_citations_tool(citations=[{"title": "GhostCite"}, "not an object"])
         self.assertFalse(invalid_audit["ok"])
         self.assertEqual(invalid_audit["error"]["code"], "invalid_input")
         self.assertEqual(invalid_audit["error"]["details"]["index"], 2)
+        self.assertEqual(invalid_audit["error"]["details"]["field"], "citations")
+        self.assertEqual(invalid_audit["error"]["details"]["expected"], "object")
+        self.assertEqual(invalid_audit["error"]["details"]["received"], "str")
 
         missing_audit_citation = self.server.audit_citations_tool(citations=[{}])
         self.assertFalse(missing_audit_citation["ok"])
@@ -583,11 +594,32 @@ class MCPServerHelperTests(unittest.TestCase):
         self.assertFalse(empty_set["ok"])
         self.assertEqual(empty_set["error"]["code"], "missing_citation_input")
         self.assertEqual(empty_set["error"]["details"]["tool"], "check_claim_support_set_tool")
+        self.assertEqual(empty_set["error"]["details"]["field"], "citations")
+        self.assertEqual(empty_set["error"]["details"]["expected"], "non_empty_list")
+
+        invalid_set_shape = self.server.check_claim_support_set_tool("A claim.", "not a list")
+        self.assertFalse(invalid_set_shape["ok"])
+        self.assertEqual(invalid_set_shape["error"]["code"], "invalid_input")
+        self.assertEqual(invalid_set_shape["error"]["details"]["tool"], "check_claim_support_set_tool")
+        self.assertEqual(invalid_set_shape["error"]["details"]["field"], "citations")
+        self.assertEqual(invalid_set_shape["error"]["details"]["expected"], "non_empty_list")
+        self.assertEqual(invalid_set_shape["error"]["details"]["received"], "str")
 
         invalid_set_item = self.server.check_claim_support_set_tool("A claim.", ["not an object"])
         self.assertFalse(invalid_set_item["ok"])
         self.assertEqual(invalid_set_item["error"]["code"], "invalid_input")
         self.assertEqual(invalid_set_item["error"]["details"]["index"], 1)
+        self.assertEqual(invalid_set_item["error"]["details"]["field"], "citations")
+        self.assertEqual(invalid_set_item["error"]["details"]["expected"], "object")
+        self.assertEqual(invalid_set_item["error"]["details"]["received"], "str")
+
+        invalid_support_items_shape = self.server.audit_claim_support_tool("not a list")
+        self.assertFalse(invalid_support_items_shape["ok"])
+        self.assertEqual(invalid_support_items_shape["error"]["code"], "invalid_input")
+        self.assertEqual(invalid_support_items_shape["error"]["details"]["tool"], "audit_claim_support_tool")
+        self.assertEqual(invalid_support_items_shape["error"]["details"]["field"], "items")
+        self.assertEqual(invalid_support_items_shape["error"]["details"]["expected"], "list")
+        self.assertEqual(invalid_support_items_shape["error"]["details"]["received"], "str")
 
         invalid_audit_set_item = self.server.audit_claim_support_tool(
             [{"claim": "A claim.", "citations": [{"title": "GhostCite"}, {"title": 42}]}]

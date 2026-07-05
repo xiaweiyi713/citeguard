@@ -1,5 +1,11 @@
 # CiteGuard 引用核验能力(v1)实现计划
 
+> **Archived historical plan:** This file records the pre-migration
+> implementation plan from before the stable public `citeguard.*` package
+> became the user-facing API. Mentions of `src.*` are historical compatibility context,
+> not current import guidance. Use `docs/public_api_migration.md`,
+> `docs/mcp_setup.md`, and `docs/cli_reference.md` for current public APIs.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 把 CiteGuard 强项(存在性 + 元数据核验)做成一个 claim-free 的核心库,并通过 MCP server 暴露给 Claude Code / Codex / Cursor 等 agent 调用,发现问题时给出改正建议。

@@ -135,6 +135,11 @@ Expected error recovery:
 - `missing_claim`: ask for the exact claim sentence before running support tools.
 - `invalid_json` / `invalid_input`: point to the malformed input and ask for a
   corrected JSON/JSONL item.
+  When `error.details` includes `field`, `expected`, and `received`, name the
+  broken field and the shape mismatch directly. For example, if
+  `details.field=citations`, `details.expected=list`, and `details.received=str`,
+  rebuild the MCP call with `citations` as an array of citation objects instead
+  of asking the user to interpret the tool error.
 - `source_unavailable` / `timeout`: say the check is inconclusive because a
   source was unavailable; do not call the citation fake.
 - `model_unavailable`: continue existence/metadata checks, but label support
@@ -191,10 +196,16 @@ configured via environment variables.
   not as the decision contract.
 - For large MCP batches, pass `high_risk_only=true` when the user only wants
   risky items. Use `filtered.returned_indexes` and `filtered.omitted_indexes` to
-  map filtered rows back to the original input list.
+  map filtered rows back to the original input list. Use
+  `filtered.omitted_review_summary` to briefly say what was hidden by the filter
+  instead of implying omitted rows were unexamined.
 - For expected tool errors (`ok=false`), use `error.next_action` for branching
   and `error.recovery` as the concise next-step instruction instead of
   paraphrasing `error.message`.
+- For MCP batch shape errors, prefer `error.details.field`,
+  `error.details.expected`, `error.details.received`, and 1-based
+  `error.details.index` / `error.details.citation_index` for repair guidance.
+  Do not quote raw validation prose when structured details are available.
 - For claim-support checks, mention `evidence_scope` when it is not `full_text`.
   Treat `abstract`, `metadata`, `metadata_snippet`, `title`, `mixed`, and `none`
   as limited evidence scopes. Treat `mixed_with_full_text` as partly full-text,
@@ -240,7 +251,8 @@ For multi-item audits, prefer this order:
    Keep `why` short and reserve longer explanations for the riskiest rows.
 4. If `high_risk_only=true`, explicitly say the response is filtered and cite
    `filtered.returned_indexes` / `filtered.omitted_indexes` so the user can map
-   results back to the original batch.
+   results back to the original batch. If `filtered.omitted_review_summary` is
+   present, summarize any omitted next-action queues in one sentence.
 5. End with the safest next action: add identifiers, retry/check source health,
    inspect full text, weaken the claim, replace the citation, or keep as-is.
 

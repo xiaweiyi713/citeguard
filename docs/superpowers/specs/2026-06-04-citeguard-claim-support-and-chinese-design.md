@@ -1,5 +1,11 @@
 # CiteGuard v2 设计:claim 支撑性核验(深度模式)+ 中文学术场景支持
 
+> **Archived historical design note:** This file records the pre-migration
+> design from before the stable public `citeguard.*` package became the
+> user-facing API. Mentions of `src.*` are historical compatibility context, not
+> current import guidance. Use `docs/public_api_migration.md`,
+> `docs/mcp_setup.md`, and `docs/cli_reference.md` for current public APIs.
+
 - **日期**: 2026-06-04
 - **状态**: 已确认,待写实现计划
 - **依赖**: v1(存在性 + 元数据核验,`src/verification/`)已合并到 main

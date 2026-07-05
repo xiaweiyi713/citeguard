@@ -26,8 +26,9 @@ benchmark claims.
   abstention rate, misjudged-support rate, contradiction recall, confusion
   matrices, case-type breakdowns, evidence-scope breakdowns, split breakdowns,
   per-case rows, `false_support_analysis` release-triage summaries,
-  diagnostics, a deterministic `support_set_policy` fixture, and conservative
-  quality gates.
+  including grouped `false_support_case_ids` and
+  `weak_false_support_case_ids`, diagnostics, a deterministic
+  `support_set_policy` fixture, and conservative quality gates.
 - `scripts/compare_support_baselines.py` compares deterministic fixture and
   heuristic support baselines, including total support-overcall counts and
   high-risk false support case ids, and writes reproducible artifacts when an

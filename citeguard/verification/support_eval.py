@@ -1298,6 +1298,12 @@ def _false_support_group_summary(items: List[Dict[str, str]], field_name: str) -
             "weak_false_support": sum(1 for item in grouped[key] if item.get("bucket") == "weak_false_support"),
             "total": len(grouped[key]),
             "case_ids": [item["case_id"] for item in grouped[key]],
+            "false_support_case_ids": [
+                item["case_id"] for item in grouped[key] if item.get("bucket") == "false_support"
+            ],
+            "weak_false_support_case_ids": [
+                item["case_id"] for item in grouped[key] if item.get("bucket") == "weak_false_support"
+            ],
         }
         for key in sorted(grouped)
     }

@@ -98,7 +98,9 @@ Use it as the agent entry point for high/medium/low risk counts,
 Both `audit_citations_tool` and `audit_claim_support_tool` accept
 `high_risk_only=true`; filtered responses preserve full `review_summary` counts
 and include `filtered.returned_indexes` / `filtered.omitted_indexes` using the
-original batch indexes.
+original batch indexes. They also include `filtered.omitted_review_summary`,
+which preserves omitted rows' risk counts, `next_actions`, and `action_queues`
+so agents can explain what the high-risk filter hid.
 `audit_claim_support_tool` items can be single-citation objects with `claim`
 plus citation fields, or citation-set objects with `claim` plus `citations`, a
 non-empty list of citation objects. Citation-set rows return
@@ -153,7 +155,8 @@ checks its `review_summary`, calls `search_counterevidence_tool` for an offline
 review lead with `signal=explicit_contradiction_cue` and
 `next_action=review_counterevidence_leads`, and confirms expected input failures
 return the structured error contract (`ok=false`, `error.code`,
-`error.recovery`, `error.next_action`, and `error.details.tool`). It sets
+`error.recovery`, `error.next_action`, `error.details.tool`, and batch shape
+`details.expected` / `details.received`). It sets
 `CITEGUARD_FIXTURE_CITATIONS` so no live scholarly source is contacted.
 
 If the MCP SDK is not installed, the default command prints a skip message and
@@ -167,7 +170,12 @@ MCP tools return stable `invalid_input` payloads for malformed citation fields
 instead of transport exceptions. String fields such as `title`, `doi`, and
 `arxiv_id` must be strings; `authors` must be a list of strings; `year` may be
 an integer or digit string. Errors include `details.tool`, `details.field`, and
-`details.index` for batch inputs.
+`details.index` for batch inputs. Top-level batch shape errors also include
+`details.expected` and `details.received`; for example,
+`audit_citations_tool(citations=...)` reports `details.field=citations`,
+`audit_claim_support_tool(items=...)` reports `details.field=items`, and
+`check_claim_support_set_tool(citations=...)` reports
+`details.expected=non_empty_list` when the set input is missing or malformed.
 
 ## Environment
 

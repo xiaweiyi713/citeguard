@@ -93,6 +93,9 @@ preserve `recovery_code` as the stable reason/error-code hint when present.
 - Citation field validation errors include `details.field`; for example,
   `authors` must be a list of strings and `year` must be an integer year or a
   digit string.
+- MCP batch shape errors include `details.tool`, `details.field`,
+  `details.expected`, and `details.received`; list item shape errors also
+  include 1-based `details.index`.
 - Full-text evidence file validation errors use `details.field=full_text_file`.
   In batch commands, they also include 1-based `details.index` and
   `details.command` so agents can identify the broken item.

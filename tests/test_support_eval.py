@@ -1699,9 +1699,14 @@ class SupportEvalTests(unittest.TestCase):
         self.assertEqual(analysis["total_overcall_count"], 3)
         self.assertEqual(analysis["high_risk_case_ids"], ["a", "c"])
         self.assertEqual(analysis["by_case_type"]["hard_negative"]["false_support"], 1)
+        self.assertEqual(analysis["by_case_type"]["hard_negative"]["false_support_case_ids"], ["a"])
+        self.assertEqual(analysis["by_case_type"]["hard_negative"]["weak_false_support_case_ids"], [])
         self.assertEqual(analysis["by_case_type"]["contradiction"]["weak_false_support"], 1)
+        self.assertEqual(analysis["by_case_type"]["contradiction"]["weak_false_support_case_ids"], ["b"])
         self.assertEqual(analysis["by_evidence_scope"]["abstract"]["total"], 2)
         self.assertEqual(analysis["by_split"]["test"]["case_ids"], ["a", "b"])
+        self.assertEqual(analysis["by_split"]["test"]["false_support_case_ids"], ["a"])
+        self.assertEqual(analysis["by_split"]["test"]["weak_false_support_case_ids"], ["b"])
         self.assertIn("highest-risk", analysis["interpretation"])
 
 

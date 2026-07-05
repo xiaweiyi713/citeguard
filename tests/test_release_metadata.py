@@ -190,6 +190,28 @@ License-File: LICENSE
         self.assertIn("compatibility package is deprecated", legacy_init)
         self.assertIn("from citeguard.version import __version__", legacy_init)
 
+    def test_historical_superpowers_docs_do_not_look_like_current_api_guidance(self):
+        docs_root = ROOT / "docs" / "superpowers"
+        legacy_name = INTERNAL_PACKAGE
+        pattern = re.compile(r"\b(from {0}\.|import {0}\b|{0}\.)".format(legacy_name))
+        offenders = []
+        for path in sorted(docs_root.rglob("*.md")):
+            text = path.read_text(encoding="utf-8")
+            if not pattern.search(text):
+                continue
+            required_phrases = [
+                "Archived historical",
+                "pre-migration",
+                "stable public `citeguard.*` package",
+                "historical compatibility context",
+                "docs/public_api_migration.md",
+            ]
+            missing = [phrase for phrase in required_phrases if phrase not in text]
+            if missing:
+                offenders.append(f"{path.relative_to(ROOT)} missing {missing}")
+
+        self.assertEqual(offenders, [])
+
     def test_roadmap_tracks_agent_auditor_release_state(self):
         roadmap = (ROOT / "ROADMAP.md").read_text(encoding="utf-8")
 
@@ -469,6 +491,7 @@ License-File: LICENSE
         setup_doc = (ROOT / "docs" / "mcp_setup.md").read_text(encoding="utf-8")
 
         self.assertIn("_require_error_payload", smoke)
+        self.assertIn("_require_shape_error_payload", smoke)
         self.assertIn("_require_status_payload", smoke)
         self.assertIn("_require_stable_next_action", smoke)
         self.assertIn("_require_support_next_action", smoke)
@@ -486,6 +509,9 @@ License-File: LICENSE
         self.assertIn("schema_version", smoke)
         self.assertIn("error.recovery", smoke)
         self.assertIn("error.next_action", smoke)
+        self.assertIn("details.expected", smoke)
+        self.assertIn("details.received", smoke)
+        self.assertIn("batch shape error details", smoke)
         self.assertIn('shutil.which("citeguard-mcp")', smoke)
         self.assertIn("missing_citation_input", smoke)
         self.assertIn("missing_claim", smoke)
@@ -496,6 +522,7 @@ License-File: LICENSE
         self.assertIn("high_risk_only", smoke)
         self.assertIn("_require_high_risk_filtered_payload", smoke)
         self.assertIn("filtered.returned_indexes", smoke)
+        self.assertIn("filtered.omitted_review_summary", smoke)
         self.assertIn("search_counterevidence_tool", smoke)
         self.assertIn("_require_counterevidence_payload", smoke)
         self.assertIn("review_counterevidence_leads", smoke)
@@ -518,6 +545,11 @@ License-File: LICENSE
         self.assertIn("signal=explicit_contradiction_cue", setup_doc)
         self.assertIn("input_mode=citation_set", setup_doc)
         self.assertIn("MCP SDK requires Python 3.10+", setup_doc)
+        self.assertIn("Top-level batch shape errors", setup_doc)
+        self.assertIn("details.expected", setup_doc)
+        self.assertIn("details.received", setup_doc)
+        self.assertIn("details.field=citations", setup_doc)
+        self.assertIn("details.field=items", setup_doc)
         self.assertIn("MCP SDK requires Python 3.10+", (ROOT / "README.md").read_text(encoding="utf-8"))
         self.assertIn("structured error contract", setup_doc)
         self.assertIn("error.recovery", setup_doc)
@@ -618,6 +650,8 @@ License-File: LICENSE
             "JSON/JSONL parse errors",
             "filtered.returned_indexes",
             "filtered.omitted_indexes",
+            "filtered.omitted_review_summary",
+            "omitted rows' risk counts",
         ]
         for phrase in required_phrases:
             with self.subTest(phrase=phrase):
@@ -705,6 +739,9 @@ License-File: LICENSE
             "total_overcall_count",
             "high-risk false support case ids",
             "high_risk_false_support_case_ids",
+            "false_support_case_ids",
+            "weak_false_support_case_ids",
+            "test split",
         ]
         for phrase in required_phrases:
             with self.subTest(phrase=phrase):
@@ -799,6 +836,10 @@ License-File: LICENSE
             "review_counterevidence_leads",
             "error.next_action",
             "error.recovery",
+            "error.details.expected",
+            "error.details.received",
+            "MCP batch shape errors",
+            "Do not quote raw validation prose",
             "metadata.evidence_harvest_failures",
             "stage=remote_evidence",
             "Do not",

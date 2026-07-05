@@ -202,7 +202,9 @@ human/full-text review for contradiction, weak support, insufficient evidence, o
 unresolved citation identity.
 When using `--high-risk-only`, the `filtered` block includes
 `returned_indexes` and `omitted_indexes` so the compact result list can still be
-mapped back to the original batch input.
+mapped back to the original batch input. It also includes
+`omitted_review_summary`, preserving the omitted items' next-action counts and
+review queues so agents can report what was hidden by the high-risk filter.
 Use `--with-counterevidence` on support batch commands when you want CiteGuard to
 attach possible counter-evidence candidates to those review-worthy items; these
 are leads to inspect, not contradiction verdicts. Counter-evidence reports

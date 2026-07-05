@@ -40,7 +40,7 @@ schema；这不是模型质量指标。运行 `python3 scripts/eval_support.py -
 - `by_evidence_scope`: 按 title / abstract / full-text 等证据层级拆分
 - `by_split`: 按 `train` / `dev` / `test` 拆分,防止把校准集和最终报告混在一起
 - `error_bucket_counts` / `error_buckets`: false support、weak false support、missed contradiction、incorrect abstention 等误差桶
-- `false_support_analysis`: 汇总 total overcall count、high-risk false-support case ids,并按 case type、evidence scope 和 split 分组,用于发布前优先复核 supported 误报
+- `false_support_analysis`: 汇总 total overcall count、high-risk false-support case ids,并按 case type、evidence scope 和 split 分组；每个分组都列出 `false_support_case_ids` 与 `weak_false_support_case_ids`,用于发布前优先复核 test split 上的 supported 误报
 - `diagnostics`: 当前 backend、是否处于 heuristic 限制模式、需要 NLI 复核的 missed contradiction case ids、false/weak false support case ids、以及面向 threshold/backend 选择的 warnings 和 recommendations
 - `quality_gate`: 如果传入 `--quality-gate`,报告会附带保守发布门禁结果,并在失败时以非零状态码退出
 - `support_set_policy`: model-free citation-set 聚合边界报告,确认 multiple weak
@@ -113,7 +113,8 @@ python3 scripts/compare_support_baselines.py \
 基线,不代表模型质量；`heuristic` 是零模型词面 baseline,用于暴露没有 NLI 时的
 限制。输出的 `comparison` 表汇总 accuracy、supported precision/recall/F1、
 abstention rate、false-support rate、contradiction recall、error bucket
-counts、`total_overcall_count` 和 high-risk false support case ids,并为每个
+counts、`total_overcall_count`、high-risk false support case ids 和分组级
+`false_support_case_ids` / `weak_false_support_case_ids`,并为每个
 backend 附带 conservative `quality_gate`。需要模型-backed
 行时可显式加入 `--backend production`。顶层 `quality_gates_ok` 汇总所有
 backend 和 sidecar gate 的状态；默认命令即使 heuristic baseline 不过 gate 也

@@ -136,8 +136,10 @@ to one `action_queues` list for compact routing.
 `--high-risk-only` to return only high-risk results while preserving the full
 summary and review-summary counts. The `filtered` block includes
 `returned_indexes` and `omitted_indexes`, both using original input indexes, so
-agents can map filtered result rows back to the source batch. Each risk-ranking
-row includes `next_action`, a stable
+agents can map filtered result rows back to the source batch. It also includes
+`omitted_review_summary`, which preserves the omitted rows' risk counts,
+`next_actions`, and `action_queues` for compact reporting. Each risk-ranking row
+includes `next_action`, a stable
 machine-readable action for agents (`keep`, `review_metadata`,
 `resolve_identifier_or_replace`, `disambiguate_identifier`,
 `inspect_source_health`, or `retry_or_check_source_health`), plus a
@@ -322,7 +324,9 @@ attach `counterevidence` reports to the relevant results and risk-ranking rows.
 Use `--counterevidence-top-k` to limit candidates per claim.
 When `--high-risk-only` is enabled, the `filtered.returned_indexes` and
 `filtered.omitted_indexes` arrays preserve the original batch indexes for
-traceability.
+traceability. `filtered.omitted_review_summary` preserves omitted rows'
+`next_actions` and `action_queues`, so agents can still say whether hidden items
+were safe to keep, metadata review, or evidence review rows.
 
 ## support-set
 

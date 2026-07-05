@@ -105,19 +105,29 @@ class ModelsTests(unittest.TestCase):
         payload = {
             "results": [{"id": "low"}, {"id": "high"}, {"id": "medium"}],
             "risk_ranking": [
-                {"index": 1, "risk": "high"},
-                {"index": 2, "risk": "medium"},
-                {"index": 0, "risk": "low"},
+                {"index": 1, "risk": "high", "next_action": "resolve_identifier_or_replace"},
+                {"index": 2, "risk": "medium", "next_action": "review_metadata"},
+                {"index": 0, "risk": "low", "next_action": "keep"},
             ],
             "review_summary": {"total": 3},
         }
         filtered = filter_high_risk_payload(payload)
 
         self.assertEqual(filtered["results"], [{"id": "high"}])
-        self.assertEqual(filtered["risk_ranking"], [{"index": 1, "risk": "high"}])
+        self.assertEqual(
+            filtered["risk_ranking"],
+            [{"index": 1, "risk": "high", "next_action": "resolve_identifier_or_replace"}],
+        )
         self.assertEqual(filtered["review_summary"], {"total": 3})
         self.assertEqual(filtered["filtered"]["returned_indexes"], [1])
         self.assertEqual(filtered["filtered"]["omitted_indexes"], [0, 2])
+        omitted_summary = filtered["filtered"]["omitted_review_summary"]
+        self.assertEqual(omitted_summary["total"], 2)
+        self.assertEqual(omitted_summary["medium_risk_count"], 1)
+        self.assertEqual(omitted_summary["low_risk_count"], 1)
+        self.assertEqual(omitted_summary["next_actions"], {"review_metadata": 1, "keep": 1})
+        self.assertEqual(omitted_summary["action_queues"]["metadata_review_indexes"], [2])
+        self.assertEqual(omitted_summary["action_queues"]["safe_to_keep_indexes"], [0])
 
     def test_filter_high_risk_payload_ignores_invalid_risk_indexes(self):
         payload = {

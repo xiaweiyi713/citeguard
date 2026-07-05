@@ -149,7 +149,7 @@ def verify_citation_tool(
 
 
 @mcp.tool()
-def audit_citations_tool(citations: List[dict], high_risk_only: bool = False) -> dict:
+def audit_citations_tool(citations: Any, high_risk_only: bool = False) -> dict:
     """Verify MANY citations at once.
 
     `citations` is a list of objects, each with any of:
@@ -163,14 +163,25 @@ def audit_citations_tool(citations: List[dict], high_risk_only: bool = False) ->
         return error_payload(
             "invalid_input",
             "citations must be a list of citation objects.",
-            details={"tool": "audit_citations_tool"},
+            details=_shape_details(
+                tool="audit_citations_tool",
+                field="citations",
+                expected="list",
+                received=citations,
+            ),
         )
     for index, item in enumerate(citations, start=1):
         if not isinstance(item, dict):
             return error_payload(
                 "invalid_input",
                 f"citations item {index} must be an object.",
-                details={"tool": "audit_citations_tool", "index": index},
+                details=_shape_details(
+                    tool="audit_citations_tool",
+                    field="citations",
+                    index=index,
+                    expected="object",
+                    received=item,
+                ),
             )
         if not _has_citation_input(
             raw_text=item.get("raw_text", ""),
@@ -256,7 +267,7 @@ def check_claim_support_tool(
 @mcp.tool()
 def check_claim_support_set_tool(
     claim: str,
-    citations: List[dict],
+    citations: Any,
     lang: str = "",
     include_counterevidence: bool = False,
     counterevidence_top_k: int = 3,
@@ -274,11 +285,27 @@ def check_claim_support_set_tool(
             "Provide a non-empty claim.",
             details={"tool": "check_claim_support_set_tool"},
         )
-    if not isinstance(citations, list) or not citations:
+    if not isinstance(citations, list):
+        return error_payload(
+            "invalid_input",
+            "citations must be a non-empty list of citation objects.",
+            details=_shape_details(
+                tool="check_claim_support_set_tool",
+                field="citations",
+                expected="non_empty_list",
+                received=citations,
+            ),
+        )
+    if not citations:
         return error_payload(
             "missing_citation_input",
             "Provide a non-empty citations list.",
-            details={"tool": "check_claim_support_set_tool"},
+            details={
+                "tool": "check_claim_support_set_tool",
+                "field": "citations",
+                "expected": "non_empty_list",
+                "received": "list",
+            },
         )
     parsed_counterevidence_top_k = None
     if include_counterevidence:
@@ -294,7 +321,13 @@ def check_claim_support_set_tool(
             return error_payload(
                 "invalid_input",
                 f"citations item {index} must be an object.",
-                details={"tool": "check_claim_support_set_tool", "index": index},
+                details=_shape_details(
+                    tool="check_claim_support_set_tool",
+                    field="citations",
+                    index=index,
+                    expected="object",
+                    received=item,
+                ),
             )
         if not _has_citation_input(
             raw_text=item.get("raw_text", ""),
@@ -356,7 +389,7 @@ def search_counterevidence_tool(claim: str, top_k: int = 5) -> dict:
 
 @mcp.tool()
 def audit_claim_support_tool(
-    items: List[dict],
+    items: Any,
     lang: str = "",
     include_counterevidence: bool = False,
     counterevidence_top_k: int = 3,
@@ -378,7 +411,12 @@ def audit_claim_support_tool(
         return error_payload(
             "invalid_input",
             "items must be a list of claim/citation objects.",
-            details={"tool": "audit_claim_support_tool"},
+            details=_shape_details(
+                tool="audit_claim_support_tool",
+                field="items",
+                expected="list",
+                received=items,
+            ),
         )
     parsed_counterevidence_top_k = None
     if include_counterevidence:
@@ -394,7 +432,13 @@ def audit_claim_support_tool(
             return error_payload(
                 "invalid_input",
                 f"items item {index} must be an object.",
-                details={"tool": "audit_claim_support_tool", "index": index},
+                details=_shape_details(
+                    tool="audit_claim_support_tool",
+                    field="items",
+                    index=index,
+                    expected="object",
+                    received=item,
+                ),
             )
         claim = str(item.get("claim", "")).strip()
         if not claim:
@@ -670,6 +714,20 @@ def _input_details(
         details["citation_index"] = citation_index
     if field:
         details["field"] = field
+    return details
+
+
+def _shape_details(
+    tool: str,
+    field: str,
+    expected: str,
+    received: Any,
+    index: Optional[int] = None,
+    citation_index: Optional[int] = None,
+) -> dict:
+    details = _input_details(tool=tool, index=index, field=field, citation_index=citation_index)
+    details["expected"] = expected
+    details["received"] = type(received).__name__
     return details
 
 

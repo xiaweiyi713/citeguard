@@ -272,11 +272,54 @@ async def _run_smoke(command: str, server_args: List[str], require_sdk: bool = F
                     tool="check_claim_support_tool",
                 )
 
+                malformed_audit = _coerce_tool_payload(
+                    await session.call_tool(
+                        "audit_citations_tool",
+                        {"citations": "not a list"},
+                    )
+                )
+                _require_shape_error_payload(
+                    malformed_audit,
+                    tool="audit_citations_tool",
+                    field="citations",
+                    expected="list",
+                    received="str",
+                )
+
+                malformed_support_audit = _coerce_tool_payload(
+                    await session.call_tool(
+                        "audit_claim_support_tool",
+                        {"items": "not a list"},
+                    )
+                )
+                _require_shape_error_payload(
+                    malformed_support_audit,
+                    tool="audit_claim_support_tool",
+                    field="items",
+                    expected="list",
+                    received="str",
+                )
+
+                malformed_support_set = _coerce_tool_payload(
+                    await session.call_tool(
+                        "check_claim_support_set_tool",
+                        {"claim": "A claim.", "citations": "not a list"},
+                    )
+                )
+                _require_shape_error_payload(
+                    malformed_support_set,
+                    tool="check_claim_support_set_tool",
+                    field="citations",
+                    expected="non_empty_list",
+                    received="str",
+                )
+
     print(
         "OK: MCP stdio smoke passed "
         "(initialize, list_tools, status, offline verify, offline audit, offline support, "
         "offline support-audit citation set, offline counter-evidence leads, "
-        "high-risk-only batch filtering, source-health next_action, structured errors)."
+        "high-risk-only batch filtering, source-health next_action, structured errors, "
+        "batch shape error details)."
     )
     return 0
 
@@ -335,6 +378,20 @@ def _require_error_payload(payload: dict, code: str, tool: str) -> None:
     details = error.get("details")
     if not isinstance(details, dict) or details.get("tool") != tool:
         raise RuntimeError(f"Expected error details.tool={tool!r}, got: {payload!r}")
+
+
+def _require_shape_error_payload(payload: dict, tool: str, field: str, expected: str, received: str) -> None:
+    """Require details.field, details.expected, and details.received in MCP shape errors."""
+    _require_error_payload(payload, code="invalid_input", tool=tool)
+    details = payload["error"]["details"]
+    expected_details = {
+        "field": field,
+        "expected": expected,
+        "received": received,
+    }
+    for key, value in expected_details.items():
+        if details.get(key) != value:
+            raise RuntimeError(f"Expected error details.{key}={value!r}, got: {payload!r}")
 
 
 def _require_status_payload(payload: dict, fixture_path: Path) -> None:
@@ -481,6 +538,12 @@ def _require_high_risk_filtered_payload(payload: dict, total: int, returned_inde
     expected_omitted = [index for index in range(total) if index not in set(returned_indexes)]
     if filtered.get("omitted_indexes") != expected_omitted:
         raise RuntimeError(f"Expected filtered.omitted_indexes={expected_omitted}, got: {payload!r}")
+    omitted_summary = filtered.get("omitted_review_summary")
+    if not isinstance(omitted_summary, dict):
+        raise RuntimeError(f"Expected filtered.omitted_review_summary, got: {payload!r}")
+    if omitted_summary.get("total") != len(expected_omitted):
+        raise RuntimeError(f"Expected omitted_review_summary.total={len(expected_omitted)}, got: {payload!r}")
+    _require_action_queues(omitted_summary, total)
     results = payload.get("results")
     if not isinstance(results, list) or len(results) != len(returned_indexes):
         raise RuntimeError(f"Expected filtered results to match returned indexes, got: {payload!r}")
