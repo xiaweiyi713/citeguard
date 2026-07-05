@@ -2,7 +2,7 @@
 
 import unittest
 
-from src.verification.parse import extract_arxiv_id, extract_doi, extract_year, parse_citation
+from citeguard.verification.parse import extract_arxiv_id, extract_doi, extract_year, parse_citation
 
 
 class ParseTests(unittest.TestCase):
@@ -28,6 +28,22 @@ class ParseTests(unittest.TestCase):
         self.assertEqual(record.doi, "10.1000/xyz")
         self.assertEqual(record.authors, ["Akari Asai"])
         self.assertTrue(record.metadata["title_explicit"])
+
+    def test_parse_carries_user_provided_support_evidence(self):
+        record = parse_citation(
+            title="A Real Paper",
+            abstract="The abstract describes the setup.",
+            evidence_chunks=[
+                {
+                    "text": "The lawful full-text excerpt reports the main result.",
+                    "source_field": "user_full_text_excerpt_1",
+                    "evidence_scope": "full_text",
+                }
+            ],
+        )
+
+        self.assertEqual(record.abstract, "The abstract describes the setup.")
+        self.assertEqual(record.metadata["evidence_chunks"][0]["evidence_scope"], "full_text")
 
     def test_parse_raw_text_uses_text_as_query_not_explicit_title(self):
         record = parse_citation(raw_text="Asai et al., OpenScholar, arXiv:2411.14199, 2024")

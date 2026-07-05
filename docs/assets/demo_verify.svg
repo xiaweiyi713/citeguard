@@ -15,7 +15,7 @@
   <text x="20" y="194" fill="#8b949e">    Citation resolves to a real record and the provided metadata matches.</text>
 
   <text x="20" y="238"><tspan fill="#f85149">[X] NOT_FOUND</tspan><tspan fill="#e6edf3">          (confidence 0.8419)</tspan></text>
-  <text x="20" y="260" fill="#8b949e">    (LLM-fabricated) "Quantum Teleportation of Citation Hallucinations in Alpacas"</text>
+  <text x="20" y="260" fill="#8b949e">    (LLM-fabricated) "Quantum Teleportation of Citation Hallucinations in Synthetic Benchmarks"</text>
   <text x="20" y="282" fill="#8b949e">    sources checked: openalex, arxiv</text>
   <text x="20" y="304" fill="#8b949e">    Could not be verified in openalex, arxiv.</text>
 </svg>

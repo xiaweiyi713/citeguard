@@ -11,10 +11,10 @@ from _bootstrap import ensure_project_root
 
 ensure_project_root()
 
-from src.graph import CitationRecord
-from src.orchestrator import AgentTask, CiteGuardAgent
-from src.retrieval.scholarly_clients import InMemoryMetadataSource, build_live_metadata_source
-from src.verifiers import (
+from citeguard.graph import CitationRecord
+from citeguard.orchestrator import AgentTask, CiteGuardAgent
+from citeguard.retrieval.scholarly_clients import InMemoryMetadataSource, build_live_metadata_source
+from citeguard.verifiers import (
     DEFAULT_NLI_MODEL,
     DEFAULT_RERANKER_MODEL,
     SupportVerifier,

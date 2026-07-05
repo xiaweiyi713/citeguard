@@ -11,8 +11,8 @@ from _bootstrap import ensure_project_root
 
 ensure_project_root()
 
-from src.retrieval.scholarly_clients import build_live_metadata_source
-from src.verification import parse_citation, verify_citation
+from citeguard.retrieval.scholarly_clients import build_live_metadata_source
+from citeguard.verification import parse_citation, verify_citation
 
 ICON = {"verified": "[OK]", "metadata_mismatch": "[!]", "not_found": "[X]", "ambiguous": "[?]"}
 
@@ -26,8 +26,8 @@ def main() -> None:
             dict(title="Attention Is All You Need", arxiv_id="1706.03762"),
         ),
         (
-            '(LLM-fabricated) "Quantum Teleportation of Citation Hallucinations in Alpacas"',
-            dict(title="Quantum Teleportation of Citation Hallucinations in Alpacas"),
+            '(LLM-fabricated) "Quantum Teleportation of Citation Hallucinations in Synthetic Benchmarks"',
+            dict(title="Quantum Teleportation of Citation Hallucinations in Synthetic Benchmarks"),
         ),
     ]
     for label, fields in cases:

@@ -2,7 +2,7 @@
 
 import unittest
 
-from src.citation import normalize_text, sequence_similarity, tokenize_text
+from citeguard.citation import normalize_text, sequence_similarity, tokenize_text
 
 
 class ChineseNormalizationTests(unittest.TestCase):

@@ -2,7 +2,7 @@
 
 import unittest
 
-from src.benchmark import EvaluationRecord, MetricsCalculator
+from citeguard.benchmark import EvaluationRecord, MetricsCalculator
 
 
 class MetricsTests(unittest.TestCase):

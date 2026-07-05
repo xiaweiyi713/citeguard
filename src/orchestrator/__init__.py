@@ -1,7 +1,3 @@
-"""End-to-end CiteGuard orchestration."""
+"""Compatibility shim for public orchestration utilities."""
 
-from .graph import CiteGuardAgent
-from .policies import RiskPolicy
-from .states import AgentRunResult, AgentTask, SectionDraft
-
-__all__ = ["AgentRunResult", "AgentTask", "CiteGuardAgent", "RiskPolicy", "SectionDraft"]
+from citeguard.orchestrator import *  # noqa: F401,F403

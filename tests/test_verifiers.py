@@ -2,10 +2,10 @@
 
 import unittest
 
-from src.citation.proposer import CandidateCitation
-from src.graph import CitationRecord, Claim
-from src.retrieval.scholarly_clients import InMemoryMetadataSource
-from src.verifiers import (
+from citeguard.citation.proposer import CandidateCitation
+from citeguard.graph import CitationRecord, Claim
+from citeguard.retrieval.scholarly_clients import InMemoryMetadataSource
+from citeguard.verifiers import (
     ContradictionVerifier,
     EnsembleSupportPolicy,
     ExistenceVerifier,
@@ -13,6 +13,8 @@ from src.verifiers import (
     HeuristicSupportBackend,
     SupportAssessment,
     SupportVerifier,
+    TransformersNLIBackend,
+    SentenceTransformerRerankerBackend,
     combine_support_assessments,
 )
 
@@ -147,6 +149,31 @@ class VerifierTests(unittest.TestCase):
         )
         self.assertTrue(assessment.passed)
         self.assertEqual(assessment.details["decision_path"], "paired_reranker_nli")
+
+    def test_model_backend_failures_return_structured_model_unavailable_assessment(self):
+        class FailingNLI(TransformersNLIBackend):
+            def is_available(self):
+                return True
+
+            def _predict_probabilities(self, claim_text, evidence_text):
+                raise TimeoutError("model hub timed out")
+
+        class FailingReranker(SentenceTransformerRerankerBackend):
+            def is_available(self):
+                return True
+
+            def _predict_score(self, claim_text, evidence_text):
+                raise RuntimeError("model weights missing")
+
+        nli = FailingNLI(model_name="nli-model").assess("claim", "evidence")
+        reranker = FailingReranker(model_name="reranker-model").assess("claim", "evidence")
+
+        self.assertFalse(nli.passed)
+        self.assertEqual(nli.details["error_code"], "model_unavailable")
+        self.assertEqual(nli.details["error_type"], "TimeoutError")
+        self.assertFalse(reranker.passed)
+        self.assertEqual(reranker.details["error_code"], "model_unavailable")
+        self.assertEqual(reranker.details["error_type"], "RuntimeError")
 
 
 if __name__ == "__main__":

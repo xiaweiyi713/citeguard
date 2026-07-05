@@ -1,0 +1,11 @@
+include README.md
+include LICENSE
+include CHANGELOG.md
+include CITATION.cff
+include requirements-optional.txt
+recursive-include docs *.md *.svg *.csv *.yml
+recursive-include examples *.json *.jsonl *.md
+recursive-include data/eval *.json
+recursive-include skills *.md
+recursive-include scripts *.py
+recursive-include configs *.yaml

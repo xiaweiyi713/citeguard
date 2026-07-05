@@ -2,9 +2,9 @@
 
 import unittest
 
-from src.graph import CitationRecord
-from src.retrieval import HybridRetriever
-from src.retrieval.scholarly_clients import InMemoryMetadataSource
+from citeguard.verification import CitationRecord
+from citeguard.retrieval import HybridRetriever
+from citeguard.retrieval.scholarly_clients import InMemoryMetadataSource
 
 
 class RetrievalTests(unittest.TestCase):

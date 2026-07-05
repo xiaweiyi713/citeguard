@@ -9,11 +9,11 @@ from _bootstrap import ensure_project_root
 
 ensure_project_root()
 
-from src.benchmark import EvaluationRecord, MetricsCalculator
-from src.graph import CitationRecord
-from src.orchestrator import AgentTask, CiteGuardAgent
-from src.retrieval.scholarly_clients import InMemoryMetadataSource
-from src.verifiers import build_production_support_backend, SupportVerifier
+from citeguard.benchmark import EvaluationRecord, MetricsCalculator
+from citeguard.graph import CitationRecord
+from citeguard.orchestrator import AgentTask, CiteGuardAgent
+from citeguard.retrieval.scholarly_clients import InMemoryMetadataSource
+from citeguard.verifiers import build_production_support_backend, SupportVerifier
 
 
 def demo_records():

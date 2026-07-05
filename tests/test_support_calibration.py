@@ -2,14 +2,14 @@
 
 import unittest
 
-from src.benchmark.support_calibration import (
+from citeguard.benchmark.support_calibration import (
     ScoredSupportExample,
     SupportCalibrationConfig,
     SupportCalibrationExample,
     evaluate_support_config,
     grid_search_support_configs,
 )
-from src.verifiers import EnsembleSupportPolicy
+from citeguard.verifiers import EnsembleSupportPolicy
 
 
 class SupportCalibrationTests(unittest.TestCase):

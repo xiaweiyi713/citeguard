@@ -2,9 +2,9 @@
 
 import unittest
 
-from src.graph import CitationRecord
-from src.retrieval.scholarly_clients import InMemoryMetadataSource
-from src.verification import (
+from citeguard.verification import CitationRecord
+from citeguard.retrieval.scholarly_clients import InMemoryMetadataSource
+from citeguard.verification import (
     AuditReport,
     CachingMetadataSource,
     Verdict,

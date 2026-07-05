@@ -11,13 +11,13 @@ from _bootstrap import ensure_project_root
 
 ensure_project_root()
 
-from src.benchmark import (
+from citeguard.benchmark import (
     SupportCalibrationExample,
     default_support_calibration_examples,
     grid_search_support_configs,
     score_support_examples,
 )
-from src.verifiers import DEFAULT_NLI_MODEL, DEFAULT_RERANKER_MODEL
+from citeguard.verifiers import DEFAULT_NLI_MODEL, DEFAULT_RERANKER_MODEL
 
 
 def load_examples(path: Path) -> List[SupportCalibrationExample]:

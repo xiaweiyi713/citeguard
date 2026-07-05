@@ -35,6 +35,7 @@ Definition of done:
 
 - At least one benchmark subset with explicit label provenance
 - Stable evaluation scripts for calibration and final scoring
+- Standardized experiment artifacts with result/config/manifest snapshots
 - Baseline and CiteGuard comparison tables that can be reproduced from the repo
 
 ## Milestone 0.3: Stronger Evidence Verification

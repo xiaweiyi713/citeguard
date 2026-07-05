@@ -1,0 +1,202 @@
+# Release Checklist
+
+Use this checklist before publishing CiteGuard as a PyPI package, MCP tool, or
+agent skill bundle.
+
+## Package Metadata
+
+- Confirm `pyproject.toml` has the correct version, authors, license, Python
+  requirement, classifiers, project URLs, optional extras, and console scripts.
+- Build from a clean checkout:
+
+  ```bash
+  python -m pip install --upgrade build twine
+  python -m build
+  python -m twine check dist/*
+  ```
+
+- Run the consolidated release package gate:
+
+  ```bash
+  python scripts/release_package_gate.py --require-build-tools
+  python scripts/release_package_gate.py --skip-install-smoke --include-mcp-extra-smoke --require-mcp-extra-smoke
+  python scripts/release_package_gate.py --skip-install-smoke --include-mcp-stdio-smoke --require-mcp-stdio-smoke
+  ```
+
+  This runs fresh-venv wheel and source-distribution install smokes, checks
+  package archive cleanliness, verifies expected release files, runs the
+  `project_metadata_contract` source-file gate, checks the built artifact
+  distribution metadata contract, and runs PEP 517 `python -m build` plus
+  `python -m twine check` when release tools are installed. The MCP extra gate
+  records `mcp_extra_wheel_install_smoke` in the release summary and should be
+  run on Python 3.10+. The MCP stdio gate records `mcp_stdio_smoke` in the same
+  machine-readable summary; with `--require-mcp-stdio-smoke`, missing MCP
+  dependencies or Python <3.10 are release failures instead of local skips.
+
+- Inspect the wheel contents and verify `citeguard`, `src`, docs, examples, and
+  skill files intended for distribution are present.
+
+## Test Gates
+
+- Run the standard library test suite:
+
+  ```bash
+  python -m unittest discover -s tests -v
+  ```
+
+  This includes release metadata guardrails that check public console scripts,
+  package-distribution manifests, public docs/tests/scripts for accidental
+  legacy internal package imports, public `citeguard.*` implementation files for
+  accidental legacy-package dependencies, package archive cleanliness, and
+  documented stable error codes.
+
+- Run the package install smoke from a fresh virtual environment:
+
+  ```bash
+  python scripts/smoke_package.py
+  python scripts/smoke_package.py --install-mode wheel
+  python scripts/smoke_package.py --install-mode sdist
+  python scripts/smoke_package.py --install-mode wheel --extra mcp --with-deps
+  ```
+
+  This installs the core package from the source tree and from a freshly built
+  wheel and source distribution, checks that release artifacts contain the
+  public package, MCP module, legacy compatibility shim, entry point metadata,
+  PyPI-facing distribution metadata contract, docs, examples, eval fixtures,
+  skill files, and scripts, checks public imports, rejects generated/local files
+  such as `__pycache__`, `.pyc`, `.pyo`, `.DS_Store`, and `.venv` contents,
+  and, for the MCP release path on Python 3.10+, verifies that the wheel's `mcp`
+  extra installs the upstream MCP SDK and allows `citeguard.mcp.server` to import.
+  verifies the `citeguard` and `citeguard-mcp` console entry points, and runs
+  both `citeguard status` and `python -m citeguard status` without live
+  scholarly queries.
+
+- Run offline verification eval:
+
+  ```bash
+  python scripts/eval_verification.py
+  python scripts/eval_verification.py --output-dir experiments --run-id verification-release-smoke
+  ```
+
+- Run deterministic support eval and schema/provenance validation:
+
+  ```bash
+  python scripts/eval_support.py
+  python scripts/eval_support.py --report --split test --quality-gate
+  python scripts/eval_support.py --report --split test --quality-gate --output-dir experiments --run-id support-release-smoke
+  python scripts/compare_support_baselines.py --split test --output-dir experiments --run-id support-baselines-release
+  python scripts/prepare_support_label_sidecar.py --existing-sidecar data/eval/support_eval_label_sidecar.json --annotation-packet --priority high --split test --limit 3 --output experiments/support-label-packet-high-risk-test-batch1.json
+  python scripts/prepare_support_label_sidecar.py --existing-sidecar data/eval/support_eval_label_sidecar.json --merge-annotation-packet experiments/completed-support-label-packet-high-risk-test-batch1.json --output data/eval/support_eval_label_sidecar.merged.json
+  python scripts/prepare_support_label_sidecar.py --existing-sidecar data/eval/support_eval_label_sidecar.merged.json --apply-adjudications experiments/resolved-support-label-adjudications.json --output data/eval/support_eval_label_sidecar.adjudicated.json
+  python scripts/eval_support.py --validate-only --label-sidecar data/eval/support_eval_label_sidecar.json --min-sidecar-coverage 1.0 --min-human-reviewed 0 --min-dual-annotated 0 --max-unresolved-disagreements 0
+  ```
+
+  The quality gate should stay conservative for release candidates: false
+  support, weak false support, and missed contradictions must be reviewed before
+  relaxing thresholds. The report should include `support_set_policy` so
+  citation-set aggregation boundaries are checked alongside evidence-level
+  cases. The baseline comparison table should include at least the deterministic
+  `fixture` row and the zero-model `heuristic` row, with heuristic limitations
+  visible in the diagnostics. The label-sidecar gate should report coverage
+  `1.0`; keep `--min-human-reviewed` and `--min-dual-annotated` at `0` for the
+  synthetic seed set, then raise them when a human-reviewed subset exists. Keep
+  `--max-unresolved-disagreements 0`; add `--min-raw-dual-agreement-rate` for
+  release evidence once dual annotation exists. Annotation packets must be
+  blinded (`--annotation-packet`) and must not expose dataset `gold` or
+  `adjudicated_label` fields to reviewers. Completed packets must include
+  `annotation.annotator_id`; missing ids appear in `merge_report.skipped`, and
+  repeated annotator ids for the same case appear as `duplicate_annotator`
+  conflicts. Completed packets should be merged with `--merge-annotation-packet`;
+  any `merge_report.conflicts` must be adjudicated before raising human-review gates. Apply resolved adjudications
+  with `--apply-adjudications`; any `adjudication_report.conflicts` must be
+  reviewed before changing dataset gold or provenance. When `--output-dir` is used,
+  archive the generated `result.json`, `config.json`, and `manifest.json` with
+  release evidence.
+
+- Review support-label provenance maturity before making benchmark claims:
+
+  ```bash
+  python scripts/prepare_support_label_sidecar.py --existing-sidecar data/eval/support_eval_label_sidecar.json --audit
+  python scripts/prepare_support_label_sidecar.py --existing-sidecar data/eval/support_eval_label_sidecar.json --annotation-packet --priority high --split test --output experiments/support-label-packet-high-risk-test.json
+  python scripts/prepare_support_label_sidecar.py --existing-sidecar data/eval/support_eval_label_sidecar.json --annotation-packet --priority high --split test --limit 3 --output experiments/support-label-packet-high-risk-test-batch1.json
+  python scripts/prepare_support_label_sidecar.py --existing-sidecar data/eval/support_eval_label_sidecar.json --merge-annotation-packet experiments/completed-support-label-packet-high-risk-test-batch1.json --output data/eval/support_eval_label_sidecar.merged.json
+  python scripts/prepare_support_label_sidecar.py --existing-sidecar data/eval/support_eval_label_sidecar.merged.json --apply-adjudications experiments/resolved-support-label-adjudications.json --output data/eval/support_eval_label_sidecar.adjudicated.json
+  python scripts/prepare_support_label_sidecar.py --existing-sidecar data/eval/support_eval_label_sidecar.json --audit --fail-on-high-risk-unreviewed
+  ```
+
+  The seed set is allowed to report `human_reviewed: 0`, but release notes
+  should not call it a human-reviewed benchmark until this audit shows reviewed
+  cases, the high-risk unreviewed gate passes, a filtered high-risk test
+  annotation packet plus any limited reviewer batches have been archived or
+  intentionally skipped, and the sidecar gate is raised accordingly.
+
+- Run production support eval when model dependencies and cached/downloadable
+  weights are available:
+
+  ```bash
+  python scripts/eval_support.py --backend production --report --split test --quality-gate
+  ```
+
+- If releasing local PDF full-text evidence support, verify the optional extra
+  installs cleanly in a fresh environment:
+
+  ```bash
+  python -m pip install -e ".[pdf]"
+  citeguard support --help
+  ```
+
+- Run the MCP stdio smoke on Python 3.10+ with the MCP extra installed:
+
+  ```bash
+  python -m pip install -e ".[mcp]"
+  python scripts/smoke_mcp.py --require-sdk
+  ```
+
+## Documentation
+
+- Update `CHANGELOG.md`.
+- Confirm `README.md` quick start works from a fresh editable install.
+- Confirm `docs/cli_reference.md`, `docs/mcp_setup.md`,
+  `docs/error_codes.md`, and `docs/security_compliance.md` match current CLI and
+  MCP behavior.
+- Check example files:
+  - `examples/citations.json`
+  - `examples/claim_citations.json`
+  - `examples/claim_citations.jsonl`
+  - `examples/references.md`
+- Check cache replay:
+
+  ```bash
+  citeguard cache export --deterministic --output /tmp/citeguard-replay.json
+  CITEGUARD_FIXTURE_CITATIONS=/tmp/citeguard-replay.json citeguard status
+  ```
+
+## MCP and Agent Skill
+
+- Verify `citeguard-mcp` starts without importing heavy model dependencies.
+- Call `citeguard_status_tool` before live verification.
+- Confirm expected input errors return the machine-readable error contract.
+- Review `skills/citeguard-verify/SKILL.md` for current tool names, trigger
+  rules, and safety wording.
+
+## Safety and Compliance
+
+- Confirm no example or test requires gated sources, paywall bypass, CNKI, or
+  Wanfang access.
+- Confirm default remote evidence harvesting remains disabled.
+- Confirm docs say `not_found` is not proof of fabrication.
+- Confirm docs say CiteGuard is not a legal or final research-integrity
+  authority.
+
+## Release
+
+- Tag the release after tests pass.
+- Publish PyPI artifacts.
+- Create a GitHub release with changelog highlights, known limitations, and MCP
+  setup notes.
+- After publishing, test a fresh install in a new virtual environment:
+
+  ```bash
+  python -m pip install citeguard
+  citeguard status
+  ```

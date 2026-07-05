@@ -2,9 +2,9 @@
 
 import unittest
 
-from src.graph import CitationRecord
-from src.orchestrator import AgentTask, CiteGuardAgent
-from src.retrieval.scholarly_clients import InMemoryMetadataSource
+from citeguard.graph import CitationRecord
+from citeguard.orchestrator import AgentTask, CiteGuardAgent
+from citeguard.retrieval.scholarly_clients import InMemoryMetadataSource
 
 
 class WriterTests(unittest.TestCase):

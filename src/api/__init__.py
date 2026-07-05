@@ -1,6 +1,3 @@
-"""API helpers."""
+"""Compatibility shim for public API helpers."""
 
-from .app import create_app
-from .schemas import GenerateRequest, GenerateResponse
-
-__all__ = ["GenerateRequest", "GenerateResponse", "create_app"]
+from citeguard.api import *  # noqa: F401,F403

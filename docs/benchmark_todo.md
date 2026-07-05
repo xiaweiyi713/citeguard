@@ -1,100 +1,89 @@
-# Benchmark TODO
+# Benchmark Roadmap
 
-This document tracks the concrete next steps needed to turn the current prototype benchmark and calibration setup into a research-grade evaluation package.
+This document tracks what is already implemented in the benchmark package and
+what still has to happen before CiteGuard can make strong research-grade
+benchmark claims.
 
-## 1. Dataset Structure
+## Implemented Seed Package
 
-- Split support verification examples into `train`, `dev`, and `test`
-- Keep calibration on `dev` only and lock `test` for reporting
-- Add stable example identifiers and provenance fields for every example
-- Record whether evidence comes from title, abstract, or live evidence chunks
+- `data/eval/support_eval.json` uses schema version 2 with stable case ids,
+  `train` / `dev` / `test` splits, label source metadata, case types, evidence
+  scopes, and a dataset-level label policy.
+- The seed set covers direct support, weak support, unrelated negatives, hard
+  negatives, full-text-required cases, explicit contradictions, and citation-set
+  aggregation boundaries.
+- `data/eval/support_eval_label_sidecar.json` records adjudication status,
+  annotator counts, adjudicated labels, disagreement state, source locators, and
+  notes for every seed case. Sidecar validation also reports `label_maturity`
+  with dual-annotation counts, raw agreement rate, adjudicated cases, and
+  unresolved disagreement counts.
+- `scripts/eval_support.py` reports precision, recall, F1, false-support rate,
+  abstention rate, misjudged-support rate, contradiction recall, confusion
+  matrices, case-type breakdowns, evidence-scope breakdowns, split breakdowns,
+  per-case rows, `false_support_analysis` release-triage summaries,
+  diagnostics, a deterministic `support_set_policy` fixture, and conservative
+  quality gates.
+- `scripts/compare_support_baselines.py` compares deterministic fixture and
+  heuristic support baselines, including total support-overcall counts and
+  high-risk false support case ids, and writes reproducible artifacts when an
+  output directory is provided.
+- `scripts/prepare_support_label_sidecar.py --audit` checks label-sidecar
+  coverage and human-review maturity, including `label_maturity`. Its optional
+  `--fail-on-high-risk-unreviewed` gate exits non-zero while contradiction,
+  hard-negative, or full-text-required cases still lack human review. Use
+  `--priority high --split test --include-context` to produce a compact
+  maintainer review draft, or `--annotation-packet --priority high --split test`
+  to produce a blinded annotator packet for the riskiest held-out cases without
+  leaking dataset gold labels or claiming they have already been reviewed.
+  Completed packets can be merged back with `--merge-annotation-packet`; label
+  conflicts are reported instead of silently overwriting gold labels. Resolved
+  conflicts can be applied with `--apply-adjudications`, which requires an
+  adjudicator and refuses adjudicated labels that do not match current dataset
+  gold.
+- Verification and support eval scripts can write `result.json`, `config.json`,
+  and `manifest.json` artifacts under versioned `experiments/` run folders.
 
-## 2. Labeling
+## Current Limitations
 
-- Define clear support labels:
-  - `supported`
-  - `weakly_supported`
-  - `unsupported`
-  - `contradicted`
-- Write short adjudication guidelines with examples
-- Add at least two-reviewer labeling for ambiguous claim-evidence pairs
-- Track disagreements instead of silently collapsing them
+- The shipped seed set is maintainer-authored synthetic data, not a
+  human-reviewed benchmark.
+- The sidecar intentionally reports `human_reviewed: 0` until real annotation is
+  performed.
+- The deterministic fixture backend is useful for regression tests, but it is
+  not evidence that a production model stack is calibrated.
+- The benchmark is still small and does not support broad domain-general claims.
 
-## 3. Hard Negatives
+## Next Evaluation Milestones
 
-- Add overclaim negatives where the paper is related but does not justify the stronger statement
-- Add causal-overclaim negatives
-- Add frequency and quantitative-overclaim negatives
-- Add domain-mismatch negatives
-- Add metadata-correct but support-incorrect examples
+1. Build a human-reviewed subset with at least two annotators for ambiguous and
+   high-risk claim/evidence pairs.
+2. Raise the release gate from `--min-human-reviewed 0` once that subset exists.
+3. Add reviewer disagreement examples instead of silently collapsing labels.
+4. Expand domain coverage beyond the current synthetic seed set, especially for
+   review-writing claims, CS systems papers, and biomedical abstracts.
+5. Run production support evals with model dependencies installed and compare
+   fixture, heuristic, reranker-only, NLI-only, and ensemble configurations.
+6. Add retrieval-source ablations for in-memory fixtures, OpenAlex, Crossref,
+   arXiv, Semantic Scholar, and multi-source merged evidence.
+7. Publish compact benchmark tables only after label provenance and domain
+   coverage are strong enough to support the claim being made.
 
-## 4. Source Diversity
+## Release Rule
 
-- Add examples whose strongest evidence comes from:
-  - title only
-  - abstract sentence
-  - remote evidence chunk
-  - merged multi-source metadata
-- Track which sources succeed or fail to expose useful evidence chunks
-- Separate adapter quality from verifier quality in analysis
+Before any release note describes CiteGuard as having a human-reviewed benchmark,
+run:
 
-## 5. Metrics
+```bash
+python scripts/prepare_support_label_sidecar.py --existing-sidecar data/eval/support_eval_label_sidecar.json --audit
+python scripts/prepare_support_label_sidecar.py --existing-sidecar data/eval/support_eval_label_sidecar.json --annotation-packet --priority high --split test --limit 3 --output experiments/support-label-packet-high-risk-test-batch1.json
+python scripts/prepare_support_label_sidecar.py --existing-sidecar data/eval/support_eval_label_sidecar.json --merge-annotation-packet experiments/completed-support-label-packet-high-risk-test-batch1.json --output data/eval/support_eval_label_sidecar.merged.json
+python scripts/prepare_support_label_sidecar.py --existing-sidecar data/eval/support_eval_label_sidecar.merged.json --apply-adjudications experiments/resolved-support-label-adjudications.json --output data/eval/support_eval_label_sidecar.adjudicated.json
+python scripts/prepare_support_label_sidecar.py --existing-sidecar data/eval/support_eval_label_sidecar.json --audit --fail-on-high-risk-unreviewed
+python scripts/eval_support.py --validate-only \
+  --label-sidecar data/eval/support_eval_label_sidecar.json \
+  --min-sidecar-coverage 1.0 \
+  --min-human-reviewed <required-count>
+```
 
-- Keep existing citation-integrity metrics:
-  - `PCR`
-  - `MCR`
-  - `CSR`
-  - `UCR`
-  - `AU`
-  - `RIS`
-- Add support-verification confusion matrices
-- Add calibration diagnostics:
-  - precision / recall / F1
-  - false-support rate
-  - false-reject rate
-- Add abstention-sensitive reporting for high-risk claims
-
-## 6. Experiments
-
-- Run threshold and ensemble-weight calibration on labeled `dev`
-- Re-run the locked configuration on held-out `test`
-- Add ablations for:
-  - heuristic only
-  - reranker only
-  - NLI only
-  - heuristic + reranker
-  - reranker + NLI
-  - full ensemble
-- Add retrieval-source ablations:
-  - in-memory corpus
-  - OpenAlex
-  - Crossref
-  - arXiv
-  - multi-source merged
-
-## 7. Error Analysis
-
-- Create explicit buckets for:
-  - fabricated citation accepted
-  - real citation with bad metadata accepted
-  - unsupported citation accepted
-  - supported citation rejected
-  - correct abstention
-  - incorrect abstention
-- Save representative examples for each bucket
-- Track failures caused by neutral-heavy NLI outputs
-- Track failures caused by missing remote evidence chunks
-
-## 8. Artifact Hygiene
-
-- Save experiments under versioned subfolders in `experiments/`
-- Store config snapshots beside results
-- Add a compact results schema that downstream scripts can read consistently
-- Keep benchmark inputs small enough to ship in-repo, and larger datasets documented separately
-
-## 9. Publication Readiness
-
-- Produce one reproducible benchmark table from repo scripts alone
-- Add one error-analysis table and one calibration table
-- Add benchmark limitations section that is honest about domain coverage and label scale
-- Freeze a benchmark version before making strong comparative claims
+If the gate reports zero human-reviewed cases, or if the high-risk audit gate
+fails, describe the data as a deterministic synthetic seed set only.

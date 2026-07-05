@@ -1,0 +1,3 @@
+{"claim":"The Transformer relies entirely on attention mechanisms.","title":"Attention Is All You Need","authors":["Ashish Vaswani"],"year":2017,"venue":"NeurIPS","arxiv_id":"1706.03762","lang":"en"}
+{"claim":"A fabricated citation benchmark proves quantum teleportation improves reference accuracy.","raw_text":"Quantum Teleportation of Citation Hallucinations in Synthetic Benchmarks. Journal of Imaginary Methods, 2024.","lang":"en"}
+{"claim":"A claim can cite multiple papers while CiteGuard still reports per-paper support evidence.","citations":[{"title":"Attention Is All You Need","authors":["Ashish Vaswani"],"year":2017,"venue":"NeurIPS","arxiv_id":"1706.03762"},{"raw_text":"A second related citation that should be checked separately."}],"lang":"en"}

@@ -9,7 +9,7 @@ from _bootstrap import ensure_project_root
 
 ensure_project_root()
 
-from src.verifiers import (  # noqa: E402
+from citeguard.verifiers import (  # noqa: E402
     DEFAULT_NLI_MODEL,
     DEFAULT_RERANKER_MODEL,
     SentenceTransformerRerankerBackend,

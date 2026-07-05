@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "citeguard"
 version = "0.1.0"
-description = "A falsification-first research agent prototype for trustworthy scientific writing."
+description = "A falsification-first toolkit for trustworthy citation verification."
 readme = "README.md"
 requires-python = ">=3.9"
 license = { file = "LICENSE" }
@@ -29,8 +29,18 @@ classifiers = [
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
   "Topic :: Scientific/Engineering :: Artificial Intelligence",
+  "Topic :: Scientific/Engineering :: Information Analysis",
+  "Topic :: Text Processing :: Linguistic",
+  "Typing :: Typed",
 ]
 dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/xiaweiyi713/citeguard"
+Repository = "https://github.com/xiaweiyi713/citeguard"
+Issues = "https://github.com/xiaweiyi713/citeguard/issues"
+Changelog = "https://github.com/xiaweiyi713/citeguard/blob/main/CHANGELOG.md"
+Documentation = "https://github.com/xiaweiyi713/citeguard#readme"
 
 [project.optional-dependencies]
 api = [
@@ -46,9 +56,19 @@ models = [
 mcp = [
   "mcp>=1.2",
 ]
+pdf = [
+  "pypdf>=4,<6",
+]
 
 [project.scripts]
-citeguard-mcp = "src.mcp_server.server:main"
+citeguard = "citeguard.cli:main"
+citeguard-mcp = "citeguard.mcp.server:main"
 
 [tool.setuptools.packages.find]
-include = ["src", "src.*"]
+include = ["citeguard", "citeguard.*", "src", "src.*"]
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.package-data]
+citeguard = ["py.typed"]

@@ -1,27 +1,3 @@
-"""Graph data models for CiteGuard."""
+"""Compatibility shim for public graph models."""
 
-from .cceg import (
-    ActionType,
-    CCEG,
-    CitationRecord,
-    Claim,
-    ClaimCitationLink,
-    ClaimDecision,
-    EvidenceSpan,
-    RelationType,
-    VerificationFinding,
-)
-from .graph_store import InMemoryGraphStore
-
-__all__ = [
-    "ActionType",
-    "CCEG",
-    "CitationRecord",
-    "Claim",
-    "ClaimCitationLink",
-    "ClaimDecision",
-    "EvidenceSpan",
-    "InMemoryGraphStore",
-    "RelationType",
-    "VerificationFinding",
-]
+from citeguard.graph import *  # noqa: F401,F403

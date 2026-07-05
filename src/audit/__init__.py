@@ -1,7 +1,3 @@
-"""Audit and explainability utilities."""
+"""Compatibility shim for public audit utilities."""
 
-from .provenance import ProvenanceBuilder
-from .report_builder import AuditReportBuilder
-from .visualization import GraphVisualizer
-
-__all__ = ["AuditReportBuilder", "GraphVisualizer", "ProvenanceBuilder"]
+from citeguard.audit import *  # noqa: F401,F403

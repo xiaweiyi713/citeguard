@@ -3,7 +3,7 @@
 import os
 import unittest
 
-from src.verification.eval import compute_metrics, load_eval, run_eval
+from citeguard.verification.eval import compute_metrics, load_eval, run_eval
 
 EVAL_PATH = os.path.join("data", "eval", "verification_eval.json")
 

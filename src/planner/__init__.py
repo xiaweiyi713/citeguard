@@ -1,6 +1,3 @@
-"""Planning utilities for CiteGuard."""
+"""Compatibility shim for public planning utilities."""
 
-from .claim_decomposer import ClaimDecomposer
-from .outline_planner import OutlinePlanner, OutlineSection
-
-__all__ = ["ClaimDecomposer", "OutlinePlanner", "OutlineSection"]
+from citeguard.planner import *  # noqa: F401,F403

@@ -31,7 +31,7 @@ Verifying 2 citations against OpenAlex + arXiv ...
     Citation resolves to a real record and the provided metadata matches.
 
 [X] NOT_FOUND          (confidence 0.8419)
-    (LLM-fabricated) "Quantum Teleportation of Citation Hallucinations in Alpacas"
+    (LLM-fabricated) "Quantum Teleportation of Citation Hallucinations in Synthetic Benchmarks"
     sources checked: openalex, arxiv
     Could not be verified in openalex, arxiv.
 ```
@@ -66,7 +66,19 @@ CiteGuard answers two questions, against **OpenAlex, Crossref, arXiv, and Semant
 | `insufficient_evidence` | the abstract does not address the claim — **abstain**, not "unsupported" |
 | `contradicted` | the abstract actively contradicts the claim |
 
-Two guardrails keep it honest: a source being **unreachable is never escalated to "fabricated"** (it lowers confidence, and the output lists which sources were checked), and `insufficient_evidence` / `not_found` are phrased as "could not confirm", leaving the final judgment to a human or the host agent.
+Support results include a machine-readable `evidence_scope` (`title`,
+`abstract`, `metadata`, `metadata_snippet`, `full_text`, `mixed`,
+`mixed_with_full_text`, or `none`) so agents can avoid presenting abstract-level
+evidence as a full-text conclusion. Full-text support is opt-in: callers can
+provide short lawful excerpts via CLI/MCP/JSON inputs or local text/PDF
+`--full-text-file` / JSON `full_text_file` paths. PDF extraction uses optional
+`pypdf`/`PyPDF2` when installed (`pip install "citeguard[pdf]"`); CiteGuard
+still does not scrape gated sources, download remote full text, or bypass
+paywalls. If deep support models are installed
+but fail to load or time out, support outputs include `model_failure_details`
+with `error_code=model_unavailable` and fall back to available weaker scoring.
+
+Two guardrails keep it honest: a source being **unreachable is never escalated to "fabricated"** (it lowers confidence, sets `outage_limited=true` for outage-limited `not_found` results, and reports `sources_available`, `sources_failed`, and `source_failure_mode`), and `insufficient_evidence` / `not_found` are phrased as "could not confirm", leaving the final judgment to a human or the host agent.
 
 ---
 
@@ -80,6 +92,132 @@ python -m pip install -e ".[mcp]"     # + MCP server (requires Python >= 3.10)
 python -m pip install -e ".[models]"  # + reranker/NLI stack for support deep mode (heavy)
 python -m pip install -e ".[api]"     # + FastAPI surface
 ```
+
+Check your local configuration before live verification:
+
+```bash
+citeguard status
+python -m citeguard status
+citeguard status --check-sources  # optional live per-source health probe
+```
+
+Inspect or clear the local SQLite cache:
+
+```bash
+citeguard cache inspect
+citeguard cache export --deterministic --output replay_fixture.json
+citeguard cache clear
+```
+
+Verify one citation from the shell:
+
+```bash
+citeguard verify \
+  --title "Attention Is All You Need" \
+  --author "Ashish Vaswani" \
+  --year 2017 \
+  --arxiv-id 1706.03762
+```
+
+Batch-check a JSON list:
+
+```bash
+citeguard audit examples/citations.json
+citeguard audit examples/citations.json --high-risk-only
+```
+
+Batch inputs may be either JSON arrays (`.json`) or newline-delimited JSON
+object streams (`.jsonl`).
+
+Extract citation candidates from a manuscript or bibliography:
+
+```bash
+citeguard extract examples/references.md
+citeguard audit examples/references.md
+```
+
+Extraction supports Markdown/plain text reference sections, LaTeX `\bibitem`,
+BibTeX entries, and `.docx` document text using only the standard library.
+
+Check whether a paper supports a claim:
+
+```bash
+citeguard support \
+  --claim "The Transformer relies entirely on attention." \
+  --title "Attention Is All You Need" \
+  --arxiv-id 1706.03762
+citeguard support \
+  --claim "A claim that needs body-text evidence." \
+  --title "A verified paper title" \
+  --full-text-file lawful_excerpt.txt
+citeguard support \
+  --claim "A claim that needs body-text evidence." \
+  --title "A verified paper title" \
+  --full-text-file lawful_local_paper.pdf
+```
+
+Search for possible counter-evidence leads:
+
+```bash
+citeguard counterevidence --claim "The Transformer relies entirely on attention."
+```
+
+Batch-check claim/citation pairs:
+
+```bash
+citeguard support-audit examples/claim_citations.json
+citeguard support-audit examples/claim_citations.jsonl
+citeguard support-audit examples/claim_citations_full_text.json
+citeguard support-audit examples/claim_citations.json --high-risk-only
+citeguard support-audit examples/claim_citations.json --with-counterevidence
+```
+
+Each `support-audit` item can be a single claim/citation pair, or a claim with a
+`citations` array when the sentence cites multiple papers.
+
+Check whether one claim is supported by a set of citations:
+
+```bash
+citeguard support-set examples/citations.json \
+  --claim "Citation auditing should verify existence, metadata, and claim support."
+```
+
+Single verification/support results and batch `risk_ranking` rows include a
+stable `next_action` enum plus human-readable context, so agents can triage
+`not_found`, `ambiguous`, `metadata_mismatch`, contradicted, and unresolved
+support checks without parsing prose. Batch `audit` and `support-audit` reports
+also include `review_summary` with full-batch risk counts, next-action counts,
+and top risk indexes for compact review queues. Common `next_action` values include
+`keep`, `keep_claim`,
+`review_metadata`,
+`resolve_identifier_or_replace`, `disambiguate_identifier`,
+`retry_or_check_source_health`, `review_counterevidence_leads`,
+`inspect_full_text_or_find_stronger_citation`, and
+`rewrite_or_replace_evidence`. Claim-support outputs also include
+`counterevidence_review`; when it is `true`, treat the item as needing
+human/full-text review for contradiction, weak support, insufficient evidence, or
+unresolved citation identity.
+Use `--with-counterevidence` on support batch commands when you want CiteGuard to
+attach possible counter-evidence candidates to those review-worthy items; these
+are leads to inspect, not contradiction verdicts. Counter-evidence reports
+include `next_action`, `query_plan`, `query_results`, and per-candidate
+`matched_query_roles` so agents can explain whether a lead came from the
+original claim search, a negation probe, or an exception probe.
+Support-set reports include `support_mode` and per-evidence citation `index` so
+agents can distinguish a single strong citation from multiple weak citations
+without overstating tentative corroboration.
+
+CLI commands print JSON on success. Expected usage, input, file, and JSON-parse
+errors are also machine-readable on stderr. MCP tools use the same shape for
+expected tool-input errors, returned as the tool result instead of a transport
+exception:
+
+```json
+{"ok": false, "schema_version": 1, "error": {"code": "missing_citation_input", "message": "...", "details": {}, "recovery": "Ask for a DOI, arXiv id, title, or pasted reference.", "next_action": "provide_missing_input"}, "exit_code": 2}
+```
+
+See [`docs/error_codes.md`](docs/error_codes.md) for the stable error-code
+contract, `error.next_action` mapping, and agent recovery policy.
 
 ### As an agent tool (MCP) — the primary path
 
@@ -98,13 +236,48 @@ Register it in any MCP-compatible client (Claude Code example):
 }
 ```
 
-For Claude Code specifically, [`skills/citeguard-verify/SKILL.md`](skills/citeguard-verify/SKILL.md) makes it **proactively** verify citations while you write (and present results without silently editing your text) — copy it into your project's `.claude/skills/`.
+After connecting the server, call `citeguard_status_tool` once. It reports the
+configured scholarly sources, cache path and non-sensitive `cache_status`,
+MCP/Python readiness, contact-email status, Semantic Scholar key presence, and
+whether deep claim-support model dependencies are installed, without querying
+live sources or loading model weights. It also includes `remote_evidence_policy`
+and a source-level
+`source_health` block that says which sources are configured, whether a fixture
+is bypassing live sources, whether gated-source host suffixes are blocked, and
+whether source-specific credentials such as `CITEGUARD_MAILTO` or
+`SEMANTIC_SCHOLAR_API_KEY` are configured. `source_health.summary` gives agents a
+compact `degraded` flag, status counts, available/failed source lists, stable
+`recovery_code`, and stable `next_action` for retry/configuration decisions.
+`cache_status` gives agents cache schema version, entry counts, timestamp
+bounds, `inspect_ok`, and stable `next_action` without exposing raw cache
+queries.
+
+Run an offline end-to-end stdio smoke test when the MCP SDK is installed:
+
+```bash
+python3 scripts/smoke_mcp.py
+python3 scripts/smoke_mcp.py --require-sdk  # CI/release: fail if the MCP SDK is missing
+```
+
+The smoke test starts the installed `citeguard-mcp` console entry point when
+available, initializes an MCP client session, lists tools, calls
+`citeguard_status_tool`, verifies a fixture citation, runs one fixture-backed
+audit batch with `review_summary`, runs one fixture-backed claim-support check
+plus one citation-set support-audit check with `review_summary`, calls
+`search_counterevidence_tool` for an offline review lead, and checks structured
+expected-error payloads without contacting live scholarly sources. If the MCP SDK
+is missing, the default command prints a clear skip message; `--require-sdk`
+turns that into a failure for CI and release checks. The core package supports
+Python 3.9+, but the MCP SDK requires Python 3.10+; run real MCP stdio
+acceptance from a Python 3.10+ environment.
+
+For agent clients that support skills or reusable instructions, [`skills/citeguard-verify/SKILL.md`](skills/citeguard-verify/SKILL.md) makes CiteGuard **proactively** verify citations while you write (and present results without silently editing your text). It is written for MCP-compatible agents such as Codex, Claude Code, Cursor, and similar clients.
 
 ### As a Python library
 
 ```python
-from src.retrieval.scholarly_clients import build_live_metadata_source
-from src.verification import parse_citation, verify_citation, check_claim_support
+from citeguard.retrieval.scholarly_clients import build_live_metadata_source
+from citeguard.verification import parse_citation, verify_citation, check_claim_support, check_claim_support_set
 
 source = build_live_metadata_source(["openalex", "arxiv"], mailto="you@example.com")
 
@@ -117,6 +290,11 @@ support = check_claim_support("The Transformer relies entirely on attention.",
                               parse_citation(title="Attention Is All You Need", arxiv_id="1706.03762"),
                               source)
 print(support.verdict.value, support.engine)
+
+support_set = check_claim_support_set("The Transformer relies entirely on attention.",
+                                      [parse_citation(title="Attention Is All You Need", arxiv_id="1706.03762")],
+                                      source)
+print(support_set.verdict.value, support_set.risk)
 ```
 
 ---
@@ -125,9 +303,13 @@ print(support.verdict.value, support.engine)
 
 | tool | what it does |
 |---|---|
+| `citeguard_status_tool` | inspect MCP/Python readiness, cache readiness, source selection, and model dependency status without live queries |
 | `verify_citation_tool` | verify one citation; returns verdict, canonical record, per-field diffs, suggested fix, sources checked |
 | `audit_citations_tool` | verify a list of citations; returns a per-item report plus a verdict-count summary |
 | `check_claim_support_tool` | judge whether a cited paper supports a claim sentence (deep mode) |
+| `check_claim_support_set_tool` | judge whether one claim is supported by a set of cited papers |
+| `search_counterevidence_tool` | search for possible counter-evidence candidates; review leads only, not a contradiction verdict |
+| `audit_claim_support_tool` | judge a list of claim/citation pairs and summarize support verdicts |
 
 Configuration via environment variables:
 
@@ -137,10 +319,34 @@ Configuration via environment variables:
 | `CITEGUARD_MAILTO` | `research@example.com` | polite-pool contact for OpenAlex/Crossref |
 | `SEMANTIC_SCHOLAR_API_KEY` | — | optional, improves Semantic Scholar access |
 | `CITEGUARD_CACHE` | `data/logs/verification_cache.sqlite` | local SQLite resolution cache |
+| `CITEGUARD_FIXTURE_CITATIONS` | — | JSON/JSONL citation fixture for deterministic offline runs |
+| `CITEGUARD_HTTP_TIMEOUT` | `10` | timeout, in seconds, for live scholarly API calls |
+| `CITEGUARD_HTTP_RETRIES` | `1` | short retries for transient `429`/`5xx`/timeout failures |
+| `CITEGUARD_HTTP_RETRY_BACKOFF` | `0.2` | base retry backoff, in seconds; `Retry-After` is respected with a short cap |
+| `CITEGUARD_REMOTE_EVIDENCE` | `0` | set to `1` to fetch landing-page snippets in addition to title/abstract metadata |
+| `CITEGUARD_EVIDENCE_TIMEOUT` | `2` | timeout, in seconds, for each landing-page evidence fetch when remote evidence is enabled |
 | `CITEGUARD_RERANKER_MODEL` | English cross-encoder | support reranker model — set a multilingual one for non-English claims |
 | `CITEGUARD_NLI_MODEL` | English NLI | support NLI model — set a multilingual one for non-English claims |
 
-Support deep mode downloads model weights on first use; pre-download with `python3 scripts/warmup_support_models.py`. Without the models installed, support runs a labelled `heuristic` engine (which never emits `supported` or `contradicted`).
+Support deep mode downloads model weights on first use; pre-download with `python3 scripts/warmup_support_models.py`. Without the models installed, support runs a labelled `heuristic` engine (which never emits `supported` or `contradicted`). Remote landing-page evidence harvesting is disabled by default so CLI/MCP calls do not appear to hang on slow publisher pages; support checks still use titles, abstracts, and source metadata. Enable `CITEGUARD_REMOTE_EVIDENCE=1` when you want deeper snippet harvesting and are comfortable with slower live calls. If a publisher or DOI landing page times out or rate-limits while metadata resolution succeeds, records keep the citation metadata and add `metadata.evidence_harvest_failures` with `stage=remote_evidence` diagnostics instead of treating the source as unavailable.
+
+The SQLite cache records a schema version, timestamps, source name, query,
+operation, and per-record raw match score for search/lookup rows. `citeguard
+cache inspect` reports entry counts by key type without exposing raw queries;
+`citeguard cache clear` deletes cached rows while preserving schema metadata.
+`citeguard cache export --deterministic --output replay_fixture.json` writes
+cached resolved records as a deterministic records-only fixture that can be
+replayed offline with `CITEGUARD_FIXTURE_CITATIONS=replay_fixture.json`; stdout reports a
+manifest with schema version, cache entry counts, cache timestamp bounds, export
+timestamp, output path, and exported record count. Exported records include a
+`metadata.cache_provenance` block for reproducibility; `--deterministic` strips
+timestamp-only provenance from the records file while keeping source, query, and
+raw match score. Partial source outages are not cached.
+
+If `CITEGUARD_SOURCES` contains an unknown source name, the MCP server now fails
+with a clear configuration error instead of silently ignoring the typo. The
+accepted values are `openalex`, `crossref`, `arxiv`, and Semantic Scholar aliases
+such as `semantic_scholar`, `semantic-scholar`, or `s2`.
 
 ---
 
@@ -164,40 +370,135 @@ CNKI (知网) and Wanfang (万方) are **not** integrated: they have no open/fre
 
 ## Status, scope & known limitations
 
-**In scope today:** existence + metadata verification, abstract-level claim-support verification, multi-source adapters, SQLite caching, an MCP server, a Claude Code skill, and offline evals.
+**In scope today:** existence + metadata verification, abstract-level claim-support verification, user-provided local full-text evidence files, multi-citation claim checks, multi-source adapters, SQLite caching, Markdown/LaTeX/DOCX reference extraction, an MCP server, a Claude Code skill, and offline evals.
 
 **Known limitations**
 
 - **Identifiers are the reliable path.** With a DOI or arXiv id, resolution is definitive — provide one when you can.
 - **Title-only matching is best-effort.** A title can map to several records (e.g. an original paper plus a later reprint with a different `publication_year`); without an identifier a correct citation can surface a same-title record and be reported as a `metadata_mismatch` on `year`/`venue`. Treat title-only year/venue mismatches as "needs confirmation".
-- **Support is abstract-level.** It judges the abstract (and any harvested snippets), not full text; abstain (`insufficient_evidence`) is common and intentional.
+- **Support is abstract-level unless you provide full-text evidence.** It judges the abstract, harvested metadata snippets, and any lawful local text/PDF evidence you provide; abstain (`insufficient_evidence`) is common and intentional.
 
-**Not yet done:** full-text support, multi-paper support for one claim, active counter-evidence retrieval, a large human-reviewed benchmark. See [ROADMAP.md](ROADMAP.md).
+**Not yet done:** automated full-text retrieval, full-text multi-hop synthesis across papers, counter-evidence verdicting, a large human-reviewed benchmark. See [ROADMAP.md](ROADMAP.md).
 
 ---
 
 ## Tests & reproducibility
 
 ```bash
-python3 -m unittest discover -s tests -v   # full unit suite (63 tests; standard library only)
+python3 -m unittest discover -s tests -v   # full unit suite (322 tests; standard library only except optional MCP smoke)
+python3 scripts/smoke_mcp.py               # optional MCP stdio smoke; skips without the MCP SDK
+python3 scripts/smoke_mcp.py --require-sdk # CI/release MCP stdio smoke; fails without the MCP SDK
 python3 scripts/eval_verification.py       # offline, deterministic existence/metadata eval
-python3 scripts/eval_support.py            # claim-support eval (needs the [models] extra)
+python3 scripts/eval_support.py            # deterministic support fixture eval, no model downloads
+python3 scripts/eval_support.py --report   # fixture report with case-type/evidence-scope breakdowns
+python3 scripts/eval_support.py --report --split test --quality-gate
+python3 scripts/eval_support.py --backend heuristic --report --split test
+python3 scripts/eval_support.py --backend production --report --split test  # requires [models] and cached/downloadable weights
+python3 scripts/eval_support.py --validate-only  # dataset schema/provenance/coverage gate only
+python3 scripts/eval_support.py --validate-only --label-sidecar data/eval/support_eval_label_sidecar.json
+python3 scripts/eval_verification.py --output-dir experiments --run-id verification-smoke
+python3 scripts/eval_support.py --report --split test --quality-gate --output-dir experiments --run-id support-smoke
+python3 scripts/compare_support_baselines.py --split test --output-dir experiments --run-id support-baselines-smoke
+python3 scripts/smoke_package.py           # fresh-venv source install smoke, including python -m citeguard
+python3 scripts/smoke_package.py --install-mode wheel  # fresh-venv wheel install smoke
+python3 scripts/smoke_package.py --install-mode sdist  # fresh-venv source distribution smoke
+python3 scripts/smoke_package.py --install-mode wheel --extra mcp --with-deps  # verifies MCP extra deps
+python3 scripts/release_package_gate.py    # package release gate; add --require-build-tools before publishing
+python3 scripts/release_package_gate.py --skip-install-smoke --include-mcp-extra-smoke --require-mcp-extra-smoke
+python3 scripts/release_package_gate.py --skip-install-smoke --include-mcp-stdio-smoke --require-mcp-stdio-smoke
 ```
 
-The unit suite and the verification eval are network-free and run in CI. Eval datasets live in [`data/eval/`](data/eval/).
+The unit suite, verification eval, support fixture eval, and support dataset
+validation are network-free and run in CI. Eval datasets live in [`data/eval/`](data/eval/).
+The claim-support seed eval includes 30 evidence-level cases plus citation-set
+policy cases. It reports accuracy, supported precision/recall/F1, abstention
+rate, false-support rate, contradiction recall, optional breakdowns by
+`case_type` and `evidence_scope`, a confusion matrix, high-risk error buckets
+such as false support and missed contradiction, and provenance fields for each
+synthetic seed case. Reports also include `false_support_analysis`, which
+summarizes total support overcalls, high-risk false-support case ids, and
+breakdowns by case type, evidence scope, and split for release triage.
+`--quality-gate` turns the report into a conservative
+release gate: by default, any false support, weak false support, or missed
+contradiction fails the command with a machine-readable `quality_gate` block.
+Reports also include `support_set_policy`, a deterministic fixture that checks
+claim-level aggregation boundaries such as multiple weak citations remaining
+tentative and contradictions dominating the aggregate.
+The seed support data is split into `train`, `dev`, and
+`test` so calibration and final reporting can be separated. It is a regression
+fixture, not a final human-reviewed benchmark. The default support eval backend
+is `fixture`, which checks deterministic report plumbing rather than model
+quality; use `--backend production` for model-backed metrics. Optional
+label-provenance sidecars can record annotator counts, adjudication status,
+disagreements, and source locators separately from the compact seed cases.
+Sidecar gates can also require dual annotation, cap unresolved disagreements,
+and enforce a minimum raw dual-annotator agreement rate before a report is
+treated as benchmark-grade.
+Pass `--output-dir experiments --run-id <name>` to either eval script to save a
+standardized experiment folder with `result.json`, `config.json`, and
+`manifest.json` for reproducible tables and release evidence.
+`scripts/compare_support_baselines.py` writes a compact comparison table for the
+deterministic fixture row and the zero-model heuristic baseline, including
+quality-gate status and high-risk error bucket counts.
+Generate or complete a provenance sidecar draft with:
+
+```bash
+python3 scripts/prepare_support_label_sidecar.py \
+  --dataset data/eval/support_eval.json \
+  --existing-sidecar data/eval/support_eval_label_sidecar.json \
+  --include-context \
+  --output data/eval/support_eval_label_sidecar.draft.json
+```
+
+For independent human labeling, use a blinded annotation packet so reviewers do
+not see dataset gold labels:
+
+```bash
+python3 scripts/prepare_support_label_sidecar.py \
+  --dataset data/eval/support_eval.json \
+  --existing-sidecar data/eval/support_eval_label_sidecar.json \
+  --annotation-packet \
+  --priority high \
+  --split test \
+  --output experiments/support-label-packet-high-risk-test.json
+```
+
+Merge completed packets back conservatively; conflicts are reported instead of
+silently changing gold labels:
+
+```bash
+python3 scripts/prepare_support_label_sidecar.py \
+  --dataset data/eval/support_eval.json \
+  --existing-sidecar data/eval/support_eval_label_sidecar.json \
+  --merge-annotation-packet experiments/completed-support-label-packet.json \
+  --output data/eval/support_eval_label_sidecar.merged.json
+```
+
+Apply resolved adjudications explicitly after reviewer discussion:
+
+```bash
+python3 scripts/prepare_support_label_sidecar.py \
+  --dataset data/eval/support_eval.json \
+  --existing-sidecar data/eval/support_eval_label_sidecar.merged.json \
+  --apply-adjudications experiments/resolved-support-label-adjudications.json \
+  --output data/eval/support_eval_label_sidecar.adjudicated.json
+```
 
 ---
 
 ## Project layout
 
 ```text
-src/
+citeguard/
   verification/   # the core: parse, resolve, verify, audit, cache, claim-support, evals
-  mcp_server/     # FastMCP server exposing the three tools
+  cli.py          # zero-dependency `citeguard` command for status/verify/audit
+  runtime.py      # shared environment, source, cache, and status configuration
+  mcp/            # FastMCP server exposing status + verification tools
   retrieval/      # scholarly source adapters (OpenAlex/Crossref/arXiv/Semantic Scholar) + retrievers
   verifiers/      # existence/metadata + the reranker+NLI support ensemble
   citation/ graph/ audit/                 # shared models and helpers
-  orchestrator/ planner/ writer/ benchmark/ api/   # earlier "writing agent" prototype (legacy)
+  orchestrator/ planner/ writer/ benchmark/ api/   # writing-agent and benchmark surfaces
+src/                       # legacy compatibility shims for older imports
 skills/citeguard-verify/   # Claude Code skill
 scripts/                   # demo + eval + corpus/model utilities
 data/eval/                 # offline benchmarks
@@ -210,6 +511,9 @@ tests/                     # unittest suite
 ## Documents
 
 - Design specs & implementation plans: [`docs/superpowers/`](docs/superpowers/)
+- Setup/reference: [`docs/mcp_setup.md`](docs/mcp_setup.md) · [`docs/cli_reference.md`](docs/cli_reference.md) · [`docs/error_codes.md`](docs/error_codes.md)
+- Benchmarks: [`docs/benchmark_design.md`](docs/benchmark_design.md) · [`docs/benchmark_todo.md`](docs/benchmark_todo.md) · [`docs/support_labeling_guidelines.md`](docs/support_labeling_guidelines.md)
+- Release/safety: [`docs/release_checklist.md`](docs/release_checklist.md) · [`docs/security_compliance.md`](docs/security_compliance.md)
 - Architecture: [`docs/architecture.md`](docs/architecture.md) · Roadmap: [`ROADMAP.md`](ROADMAP.md) · ChinaXiv spike: [`docs/chinaxiv_spike.md`](docs/chinaxiv_spike.md)
 - Research framing / proposal: [`docs/proposal.md`](docs/proposal.md)
 
@@ -232,4 +536,4 @@ See [`CONTRIBUTING.md`](CONTRIBUTING.md). Released under the [MIT License](LICEN
 - **核心原则**:宁可说"查不准",也不乱指控;源不可达只降置信度,绝不升级成"伪造"。
 - **中文**:文本匹配已支持中文(CJK 分词,零依赖);判定中文支撑性时用环境变量配置多语模型。知网/万方无开放 API,不直连、不爬取受限内容。
 
-最快上手:`python -m pip install -e ".[mcp]"`(需 Python ≥ 3.10)后运行 `citeguard-mcp`,在 MCP 客户端里配置 `"command": "citeguard-mcp"`;或直接 `python3 scripts/demo_verify.py` 看实时效果。核心库与测试在 Python ≥ 3.9 下零依赖运行。
+最快上手:安装后先跑 `citeguard status` 看本地配置;用 `citeguard verify --title "..." --year 2024`、`citeguard audit citations.json`、`citeguard support --claim "..." --title "..."`、`citeguard support-set citations.json --claim "..."` 或 `citeguard support-audit claim_citations.json` 做命令行核验。接 MCP 时运行 `python -m pip install -e ".[mcp]"`(需 Python ≥ 3.10)后启动 `citeguard-mcp`,在 MCP 客户端里配置 `"command": "citeguard-mcp"`;或直接 `python3 scripts/demo_verify.py` 看实时效果。核心库与测试在 Python ≥ 3.9 下零依赖运行。
