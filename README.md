@@ -394,7 +394,7 @@ CNKI (知网) and Wanfang (万方) are **not** integrated: they have no open/fre
 ## Tests & reproducibility
 
 ```bash
-python3 -m unittest discover -s tests -v   # full unit suite (332 tests; standard library only except optional MCP smoke)
+python3 -m unittest discover -s tests -v   # full unittest suite; optional MCP stdio smoke skips without the MCP SDK
 python3 scripts/smoke_mcp.py               # optional MCP stdio smoke; skips without the MCP SDK
 python3 scripts/smoke_mcp.py --require-sdk # CI/release MCP stdio smoke; fails without the MCP SDK
 python3 scripts/eval_verification.py       # offline, deterministic existence/metadata eval
@@ -519,12 +519,16 @@ docs/                      # design specs, plans, architecture, spike notes
 tests/                     # unittest suite
 ```
 
+New user code should import from `citeguard` or `citeguard.*`. The legacy
+compatibility package remains available for older notebooks/scripts and emits a
+`DeprecationWarning`; see [`docs/public_api_migration.md`](docs/public_api_migration.md).
+
 ---
 
 ## Documents
 
 - Design specs & implementation plans: [`docs/superpowers/`](docs/superpowers/)
-- Setup/reference: [`docs/mcp_setup.md`](docs/mcp_setup.md) · [`docs/cli_reference.md`](docs/cli_reference.md) · [`docs/error_codes.md`](docs/error_codes.md)
+- Setup/reference: [`docs/mcp_setup.md`](docs/mcp_setup.md) · [`docs/cli_reference.md`](docs/cli_reference.md) · [`docs/error_codes.md`](docs/error_codes.md) · [`docs/public_api_migration.md`](docs/public_api_migration.md)
 - Benchmarks: [`docs/benchmark_design.md`](docs/benchmark_design.md) · [`docs/benchmark_todo.md`](docs/benchmark_todo.md) · [`docs/support_labeling_guidelines.md`](docs/support_labeling_guidelines.md)
 - Release/safety: [`docs/release_checklist.md`](docs/release_checklist.md) · [`docs/security_compliance.md`](docs/security_compliance.md)
 - Architecture: [`docs/architecture.md`](docs/architecture.md) · Roadmap: [`ROADMAP.md`](ROADMAP.md) · ChinaXiv spike: [`docs/chinaxiv_spike.md`](docs/chinaxiv_spike.md)

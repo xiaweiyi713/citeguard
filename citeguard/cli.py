@@ -231,9 +231,17 @@ def run(
             if args.cache_command == "export":
                 payload = export_cache_records(active_cache_path, deterministic=args.deterministic)
                 if args.output:
-                    with open(args.output, "w", encoding="utf-8") as handle:
-                        json.dump(payload["records"], handle, indent=2, sort_keys=True)
-                        handle.write("\n")
+                    try:
+                        with open(args.output, "w", encoding="utf-8") as handle:
+                            json.dump(payload["records"], handle, indent=2, sort_keys=True)
+                            handle.write("\n")
+                    except OSError as exc:
+                        raise _output_file_error(
+                            exc,
+                            command=args.command,
+                            path=args.output,
+                            cache_command=args.cache_command,
+                        ) from exc
                     _print_json(
                         {
                             "path": active_cache_path,
@@ -673,6 +681,20 @@ def _input_file_error(exc: OSError, command: str, path: str) -> CLIUsageError:
             command=command,
             filename=getattr(exc, "filename", None) or path,
             errno=getattr(exc, "errno", None),
+        ),
+    )
+
+
+def _output_file_error(exc: OSError, command: str, path: str, **extra: Any) -> CLIUsageError:
+    return CLIUsageError(
+        "file_error",
+        str(exc),
+        details=_error_details(
+            "output",
+            command=command,
+            filename=getattr(exc, "filename", None) or path,
+            errno=getattr(exc, "errno", None),
+            **extra,
         ),
     )
 

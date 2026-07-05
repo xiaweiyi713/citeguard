@@ -301,6 +301,30 @@ class CLITests(unittest.TestCase):
         self.assertEqual(payload["record_count"], 1)
         self.assertEqual(payload["records"][0]["title"], self.record.title)
 
+    def test_cache_export_output_file_error_includes_command_and_filename(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            cache_db = os.path.join(tmpdir, "cache.sqlite")
+            missing_dir = os.path.join(tmpdir, "missing")
+            output_path = os.path.join(missing_dir, "fixture.json")
+            cached = CachingMetadataSource(self.source, db_path=cache_db)
+            cached.search("GhostCite", top_k=5)
+            stderr = io.StringIO()
+
+            code = run(
+                ["cache", "export", "--path", cache_db, "--output", output_path],
+                stderr=stderr,
+            )
+
+        self.assertEqual(code, 2)
+        payload = json.loads(stderr.getvalue())
+        self.assertFalse(payload["ok"])
+        self.assertEqual(payload["error"]["code"], "file_error")
+        self.assertEqual(payload["error"]["details"]["command"], "cache")
+        self.assertEqual(payload["error"]["details"]["cache_command"], "export")
+        self.assertEqual(payload["error"]["details"]["field"], "output")
+        self.assertEqual(payload["error"]["details"]["filename"], output_path)
+        self.assertIsInstance(payload["error"]["details"]["errno"], int)
+
     def test_support_checks_claim_against_citation(self):
         stdout = io.StringIO()
 

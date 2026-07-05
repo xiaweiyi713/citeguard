@@ -12,6 +12,9 @@ benchmark claims.
 - The seed set covers direct support, weak support, unrelated negatives, hard
   negatives, full-text-required cases, explicit contradictions, and citation-set
   aggregation boundaries.
+- Dataset validation requires high-risk support boundaries in the `test` split:
+  weak support, hard negatives, contradictions, full-text-required cases, and
+  every gold label must be present before final-report metrics are trusted.
 - `data/eval/support_eval_label_sidecar.json` records adjudication status,
   annotator counts, adjudicated labels, disagreement state, source locators, and
   notes for every seed case. Sidecar validation also reports `label_maturity`

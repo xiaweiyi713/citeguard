@@ -99,6 +99,10 @@ preserve `recovery_code` as the stable reason/error-code hint when present.
 - Missing or unreadable CLI input files return `file_error` with
   `details.field=path`, `details.command`, `details.filename`, and
   `details.errno`.
+- CLI output file failures, such as `citeguard cache export --output`, return
+  `file_error` with `details.field=output`, `details.command`,
+  `details.filename`, and `details.errno`; cache export also includes
+  `details.cache_command=export`.
 - Missing or unreadable full-text evidence files return `file_error` with
   `details.field=full_text_file`, `details.filename`, and the same batch
   `details.index` / `details.command` context.

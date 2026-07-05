@@ -45,6 +45,8 @@
 - Added stable error-code documentation and CLI/MCP setup references.
 - Added a public stable error-code registry in `citeguard.errors`, with tests
   keeping the registry and docs synchronized.
+- Added structured `file_error` details for cache export output-path failures,
+  including `details.field=output` and `details.cache_command=export`.
 - Added support-labeling guidelines for future human-reviewed claim-support
   benchmark expansion.
 - Added support-label sidecar maturity diagnostics for dual-label disagreement
@@ -53,9 +55,19 @@
   disagreements remain unresolved.
 - Added high-risk support-label review coverage metrics and a
   `--min-high-risk-reviewed` sidecar gate for release readiness checks.
+- Added support-eval validation for high-risk `test` split coverage so final
+  support reports cannot omit weak-support, hard-negative, contradiction, or
+  full-text-required boundaries.
 - Expanded the CiteGuard agent skill with client-specific MCP setup notes,
   structured-error recovery guidance, and safe wording examples for ambiguous,
   metadata-mismatch, not-found, outage, and claim-support results.
+- Added a reusable agent response template for batch audit summaries, action
+  queues, high-risk filtering indexes, evidence-scope limits, and next steps.
 - Added release metadata guard tests for console scripts, distribution manifests,
   and public `citeguard.*` import hygiene.
+- Added a legacy import deprecation signal plus public API migration notes so
+  new code can standardize on `citeguard.*` while older imports keep working.
+- Refreshed the roadmap around the current agent-auditor package status,
+  implemented MCP/batch/cache/source-health foundations, and remaining
+  benchmark/full-text/release gaps.
 - Added example batch input files for citation and claim-support audits.

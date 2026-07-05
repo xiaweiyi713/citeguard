@@ -1152,7 +1152,7 @@ class SupportEvalTests(unittest.TestCase):
                     "evidence_scope": "title",
                     "label_source": "maintainer_synthetic",
                     "case_type": "weak_support",
-                    "split": "dev",
+                    "split": "test",
                     "label_notes": "Title-only topical relevance.",
                 },
                 {
@@ -1176,7 +1176,7 @@ class SupportEvalTests(unittest.TestCase):
                     "evidence_scope": "abstract",
                     "label_source": "maintainer_synthetic",
                     "case_type": "unrelated_negative",
-                    "split": "train",
+                    "split": "dev",
                 },
                 {
                     "id": "e",
@@ -1187,7 +1187,7 @@ class SupportEvalTests(unittest.TestCase):
                     "evidence_scope": "metadata_snippet",
                     "label_source": "maintainer_synthetic",
                     "case_type": "contradiction",
-                    "split": "dev",
+                    "split": "test",
                     "label_notes": "Explicit contradiction cue.",
                 },
                 {
@@ -1222,8 +1222,34 @@ class SupportEvalTests(unittest.TestCase):
         self.assertEqual(summary["n"], 7)
         self.assertEqual(summary["set_cases"]["n"], 0)
         self.assertEqual(summary["case_types"]["hard_negative"], 1)
-        self.assertEqual(summary["splits"]["test"], 3)
+        self.assertEqual(summary["splits"]["test"], 5)
+        self.assertEqual(summary["test_split"]["case_types"]["hard_negative"], 1)
+        self.assertEqual(summary["test_split"]["case_types"]["contradiction"], 1)
+        self.assertEqual(summary["test_split"]["case_types"]["weak_support"], 1)
+        self.assertEqual(summary["test_split"]["case_types"]["full_text_required"], 1)
+        self.assertEqual(summary["test_split"]["gold_labels"]["weakly_supported"], 1)
+        self.assertEqual(summary["test_split"]["required_case_types"], [
+            "contradiction",
+            "full_text_required",
+            "hard_negative",
+            "weak_support",
+        ])
         self.assertIn("maintainer_synthetic", summary["label_sources"])
+
+    def test_validate_support_eval_dataset_reports_test_split_high_risk_coverage(self):
+        with open(os.path.join("data", "eval", "support_eval.json"), encoding="utf-8") as handle:
+            summary = validate_support_eval_dataset(json.load(handle))
+
+        self.assertEqual(summary["test_split"]["case_types"]["hard_negative"], 1)
+        self.assertEqual(summary["test_split"]["case_types"]["contradiction"], 3)
+        self.assertEqual(summary["test_split"]["case_types"]["full_text_required"], 2)
+        self.assertEqual(summary["test_split"]["case_types"]["weak_support"], 1)
+        self.assertEqual(set(summary["test_split"]["gold_labels"]), {
+            "contradicted",
+            "insufficient_evidence",
+            "supported",
+            "weakly_supported",
+        })
 
     def test_validate_support_eval_dataset_reports_set_case_coverage(self):
         with open(os.path.join("data", "eval", "support_eval.json"), encoding="utf-8") as handle:
@@ -1256,6 +1282,108 @@ class SupportEvalTests(unittest.TestCase):
             validate_support_eval_dataset(dataset)
 
         self.assertIn("required case_type coverage", str(raised.exception))
+
+    def test_validate_support_eval_dataset_rejects_missing_test_split_high_risk_coverage(self):
+        dataset = {
+            "schema_version": 2,
+            "label_policy": {
+                "scope": "unit test",
+                "label_source": "maintainer_synthetic",
+                "notes": "Synthetic coverage contract test.",
+            },
+            "cases": [
+                {
+                    "id": "a",
+                    "claim": "claim",
+                    "evidence": "abstract support",
+                    "gold": "supported",
+                    "lang": "en",
+                    "evidence_scope": "abstract",
+                    "label_source": "maintainer_synthetic",
+                    "case_type": "direct_support",
+                    "split": "test",
+                },
+                {
+                    "id": "b",
+                    "claim": "claim",
+                    "evidence": "title",
+                    "gold": "weakly_supported",
+                    "lang": "en",
+                    "evidence_scope": "title",
+                    "label_source": "maintainer_synthetic",
+                    "case_type": "weak_support",
+                    "split": "dev",
+                    "label_notes": "Title-only topical relevance.",
+                },
+                {
+                    "id": "c",
+                    "claim": "claim",
+                    "evidence": "related but too weak",
+                    "gold": "insufficient_evidence",
+                    "lang": "en",
+                    "evidence_scope": "abstract",
+                    "label_source": "maintainer_synthetic",
+                    "case_type": "hard_negative",
+                    "split": "dev",
+                    "label_notes": "Related but does not support the stronger claim.",
+                },
+                {
+                    "id": "d",
+                    "claim": "claim",
+                    "evidence": "unrelated",
+                    "gold": "insufficient_evidence",
+                    "lang": "en",
+                    "evidence_scope": "abstract",
+                    "label_source": "maintainer_synthetic",
+                    "case_type": "unrelated_negative",
+                    "split": "train",
+                },
+                {
+                    "id": "e",
+                    "claim": "claim",
+                    "evidence": "contradiction",
+                    "gold": "contradicted",
+                    "lang": "en",
+                    "evidence_scope": "metadata_snippet",
+                    "label_source": "maintainer_synthetic",
+                    "case_type": "contradiction",
+                    "split": "dev",
+                    "label_notes": "Explicit contradiction cue.",
+                },
+                {
+                    "id": "f",
+                    "claim": "claim",
+                    "evidence": "abstract lacks methods detail",
+                    "gold": "insufficient_evidence",
+                    "lang": "en",
+                    "evidence_scope": "abstract",
+                    "label_source": "maintainer_synthetic",
+                    "case_type": "full_text_required",
+                    "split": "train",
+                    "label_notes": "Requires methods details.",
+                },
+                {
+                    "id": "g",
+                    "claim": "claim",
+                    "evidence": "full text support",
+                    "gold": "supported",
+                    "lang": "en",
+                    "evidence_scope": "full_text",
+                    "label_source": "maintainer_synthetic",
+                    "case_type": "direct_support",
+                    "split": "test",
+                },
+            ],
+        }
+
+        with self.assertRaises(SupportEvalValidationError) as raised:
+            validate_support_eval_dataset(dataset)
+
+        message = str(raised.exception)
+        self.assertIn("test split is missing required high-risk case_type coverage", message)
+        self.assertIn("hard_negative", message)
+        self.assertIn("test split is missing required gold label coverage", message)
+        self.assertIn("weakly_supported", message)
 
     def test_filter_support_cases_by_split(self):
         cases = [

@@ -187,6 +187,9 @@ file contains records only. Exported records include
 and raw match score. Use `--deterministic` with `--output` to strip timestamp-only
 record provenance and timestamp-only manifest fields while preserving source,
 query, and raw match score, producing a stable records-only replay fixture.
+If the output path cannot be written, the CLI returns `file_error` with
+`details.field=output`, `details.command=cache`, `details.cache_command=export`,
+`details.filename`, and `details.errno`.
 `cache clear` deletes cached lookup/search rows and preserves cache metadata.
 
 ## support

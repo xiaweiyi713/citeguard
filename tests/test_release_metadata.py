@@ -166,9 +166,57 @@ License-File: LICENSE
 
         self.assertIn("citeguard/", readme)
         self.assertIn("src/                       # legacy compatibility shims", readme)
+        self.assertIn("docs/public_api_migration.md", readme)
         self.assertNotIn("src/\n  verification/", readme)
         self.assertIn("citeguard/benchmark/metrics.py", benchmark_design)
         self.assertNotIn("src/benchmark/metrics.py", benchmark_design)
+
+    def test_public_api_migration_documents_legacy_deprecation(self):
+        migration = (ROOT / "docs" / "public_api_migration.md").read_text(encoding="utf-8")
+        legacy_init = (ROOT / INTERNAL_PACKAGE / "__init__.py").read_text(encoding="utf-8")
+
+        for public_package in [
+            "citeguard.verification",
+            "citeguard.retrieval",
+            "citeguard.mcp",
+            "citeguard.cli",
+            "citeguard.runtime",
+        ]:
+            with self.subTest(public_package=public_package):
+                self.assertIn(public_package, migration)
+
+        self.assertIn("DeprecationWarning", migration)
+        self.assertIn("temporary compatibility bridge", migration)
+        self.assertIn("compatibility package is deprecated", legacy_init)
+        self.assertIn("from citeguard.version import __version__", legacy_init)
+
+    def test_roadmap_tracks_agent_auditor_release_state(self):
+        roadmap = (ROOT / "ROADMAP.md").read_text(encoding="utf-8")
+
+        required_phrases = [
+            "stable agent-facing skeptical citation auditor",
+            "`Alpha agent-auditor package`",
+            "Public `citeguard.*` package facades",
+            "legacy `src` root package",
+            "MCP stdio smoke coverage",
+            "Batch citation and claim-support audits with JSON/JSONL input",
+            "Source-health/status contracts",
+            "checked/failed source separation",
+            "SQLite cache schema/version inspection",
+            "deterministic offline replay fixtures",
+            "Agent skill instructions",
+            "false-support risk",
+            "human review coverage",
+            "full-text evidence opt-in",
+            "do not bypass paywalls or gated sources",
+            "Codex",
+            "Claude Code",
+            "Cursor",
+            "source outages, model failures, and missing snippets as uncertainty",
+        ]
+        for phrase in required_phrases:
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, roadmap)
 
     def test_error_code_documentation_matches_public_registry(self):
         docs = (ROOT / "docs" / "error_codes.md").read_text(encoding="utf-8")
@@ -268,6 +316,15 @@ License-File: LICENSE
         for phrase in required_phrases:
             with self.subTest(phrase=phrase):
                 self.assertIn(phrase, combined)
+
+    def test_readme_test_command_avoids_stale_fixed_test_count(self):
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        tests_section = readme.split("## Tests & reproducibility", 1)[1].split("## Cache and reproducibility", 1)[0]
+
+        self.assertIn("python3 -m unittest discover -s tests -v", tests_section)
+        self.assertIn("full unittest suite", tests_section)
+        self.assertIn("optional MCP stdio smoke skips without the MCP SDK", tests_section)
+        self.assertIsNone(re.search(r"\b\d+\s+tests\b", tests_section))
 
     def test_release_gate_records_mcp_extra_smoke_policy(self):
         summary = {"ok": True, "steps": []}
@@ -583,6 +640,23 @@ License-File: LICENSE
             with self.subTest(phrase=phrase):
                 self.assertIn(phrase, combined)
 
+    def test_cli_reference_documents_output_file_error_contract(self):
+        cli_reference = (ROOT / "docs" / "cli_reference.md").read_text(encoding="utf-8")
+        error_docs = (ROOT / "docs" / "error_codes.md").read_text(encoding="utf-8")
+        combined = f"{cli_reference}\n{error_docs}"
+
+        required_phrases = [
+            "cache export --output",
+            "details.field=output",
+            "details.command=cache",
+            "details.cache_command=export",
+            "details.filename",
+            "details.errno",
+        ]
+        for phrase in required_phrases:
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, combined)
+
     def test_support_audit_citation_set_workflow_is_documented(self):
         cli_reference = (ROOT / "docs" / "cli_reference.md").read_text(encoding="utf-8")
         mcp_setup = (ROOT / "docs" / "mcp_setup.md").read_text(encoding="utf-8")
@@ -677,6 +751,8 @@ License-File: LICENSE
         self.assertIn("dual_disagreement_label_pair_counts", combined)
         self.assertIn("supported_disagreement_case_ids", combined)
         self.assertIn("high_risk_review", combined)
+        self.assertIn("test_split", combined)
+        self.assertIn("weak support, hard negatives, contradictions, full-text-required cases", combined)
         self.assertIn("--min-high-risk-reviewed", combined)
         self.assertIn("--min-dual-annotated", combined)
         self.assertIn("--max-unresolved-disagreements", combined)
@@ -732,6 +808,13 @@ License-File: LICENSE
             "rate_limited",
             "source_health.summary.next_action",
             "not evidence of fabrication",
+            "## Response template",
+            "One-sentence bottom line",
+            "Review queue summary from `review_summary.action_queues`",
+            "`filtered.returned_indexes` / `filtered.omitted_indexes`",
+            "`index`, `citation/claim`, `verdict`, `risk`, `next_action`, `why`, `next step`",
+            "source retry is inconclusive",
+            "Scope / limitations",
         ]
         for phrase in required_phrases:
             with self.subTest(phrase=phrase):

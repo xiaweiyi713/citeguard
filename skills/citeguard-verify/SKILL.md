@@ -224,6 +224,49 @@ configured via environment variables.
 - Always include a next step. Good next steps include: add DOI/arXiv id, confirm
   venue/year, inspect full text, replace citation, weaken claim, or keep as-is.
 
+## Response template
+
+For multi-item audits, prefer this order:
+
+1. One-sentence bottom line: say how many items are high-risk, whether confidence
+   was degraded by source/model failures, and whether any `supported` result is
+   limited to abstract/title/metadata evidence.
+2. Review queue summary from `review_summary.action_queues`: list only non-empty
+   queues, using original item indexes. Include `source_retry_indexes` separately
+   from `rewrite_or_replace_indexes`; source retry is inconclusive, not evidence
+   that a citation is fabricated.
+3. Compact risk table sorted by risk, with columns:
+   `index`, `citation/claim`, `verdict`, `risk`, `next_action`, `why`, `next step`.
+   Keep `why` short and reserve longer explanations for the riskiest rows.
+4. If `high_risk_only=true`, explicitly say the response is filtered and cite
+   `filtered.returned_indexes` / `filtered.omitted_indexes` so the user can map
+   results back to the original batch.
+5. End with the safest next action: add identifiers, retry/check source health,
+   inspect full text, weaken the claim, replace the citation, or keep as-is.
+
+Template:
+
+```text
+Bottom line: CiteGuard found {high_risk_count} high-risk item(s). {confidence_note}
+
+Review queues:
+- rewrite/replace: {rewrite_or_replace_indexes}
+- resolve identifier: {identity_resolution_indexes}
+- metadata review: {metadata_review_indexes}
+- evidence/full-text review: {evidence_review_indexes}
+- retry/check source health: {source_retry_indexes}
+- safe to keep: {safe_to_keep_indexes}
+
+| index | citation/claim | verdict | risk | next_action | why | next step |
+|---|---|---|---|---|---|---|
+| 2 | ... | `not_found` | high | `resolve_identifier_or_replace` | no strong match in checked sources | ask for DOI/arXiv id or replace |
+
+Scope / limitations: {source_health_or_evidence_scope_note}
+```
+
+Do not fill empty queues with reassuring prose. If every row is low-risk, say
+that directly and still mention checked sources and evidence scope.
+
 ## Tool examples
 
 Single citation:

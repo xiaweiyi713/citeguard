@@ -5,9 +5,38 @@ import json
 import subprocess
 import sys
 import unittest
+import warnings
+
+
+LEGACY_PACKAGE = "s" + "rc"
+
+warnings.filterwarnings(
+    "ignore",
+    message=r"The `src` compatibility package is deprecated;.*",
+    category=DeprecationWarning,
+)
 
 
 class PublicPackageTests(unittest.TestCase):
+    def setUp(self):
+        warnings.filterwarnings(
+            "ignore",
+            message=r"The `src` compatibility package is deprecated;.*",
+            category=DeprecationWarning,
+        )
+
+    def test_legacy_root_package_emits_deprecation_warning(self):
+        from citeguard.version import __version__
+
+        for name in list(sys.modules):
+            if name == LEGACY_PACKAGE or name.startswith(LEGACY_PACKAGE + "."):
+                sys.modules.pop(name, None)
+
+        with self.assertWarnsRegex(DeprecationWarning, "compatibility package is deprecated"):
+            legacy = importlib.import_module(LEGACY_PACKAGE)
+
+        self.assertEqual(legacy.__version__, __version__)
+
     def test_top_level_exports_core_verification_api(self):
         from citeguard import (
             ClaimSupportRequest,

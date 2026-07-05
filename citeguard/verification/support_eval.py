@@ -79,6 +79,15 @@ REQUIRED_SEED_EVIDENCE_SCOPES = {
     "full_text",
 }
 
+REQUIRED_TEST_CASE_TYPES = {
+    "weak_support",
+    "hard_negative",
+    "contradiction",
+    "full_text_required",
+}
+
+REQUIRED_TEST_GOLD_LABELS = set(ALLOWED_SUPPORT_LABELS)
+
 HIGH_RISK_SUPPORT_CASE_TYPES = {
     "contradiction",
     "contradiction_set",
@@ -230,6 +239,9 @@ def validate_support_eval_dataset(data: Dict[str, Any]) -> Dict[str, Any]:
     gold_labels = set()
     label_sources = set()
     splits = set()
+    test_case_types = set()
+    test_evidence_scopes = set()
+    test_gold_labels = set()
     notes_missing_for_risky_cases: List[str] = []
     for index, case in enumerate(raw_cases, start=1):
         if not isinstance(case, dict):
@@ -272,6 +284,13 @@ def validate_support_eval_dataset(data: Dict[str, Any]) -> Dict[str, Any]:
             case_types.add(case_type)
         if split:
             splits.add(split)
+        if split == "test":
+            if gold:
+                test_gold_labels.add(gold)
+            if scope:
+                test_evidence_scopes.add(scope)
+            if case_type:
+                test_case_types.add(case_type)
 
         if case_type in {"hard_negative", "full_text_required", "weak_support", "contradiction"} and not notes:
             notes_missing_for_risky_cases.append(case_id or str(index))
@@ -280,6 +299,8 @@ def validate_support_eval_dataset(data: Dict[str, Any]) -> Dict[str, Any]:
     missing_scopes = sorted(REQUIRED_SEED_EVIDENCE_SCOPES - evidence_scopes)
     missing_labels = sorted(ALLOWED_SUPPORT_LABELS - gold_labels)
     missing_splits = sorted(ALLOWED_SPLITS - splits)
+    missing_test_case_types = sorted(REQUIRED_TEST_CASE_TYPES - test_case_types)
+    missing_test_labels = sorted(REQUIRED_TEST_GOLD_LABELS - test_gold_labels)
     if missing_case_types:
         errors.append(f"dataset is missing required case_type coverage: {', '.join(missing_case_types)}")
     if missing_scopes:
@@ -288,6 +309,13 @@ def validate_support_eval_dataset(data: Dict[str, Any]) -> Dict[str, Any]:
         errors.append(f"dataset is missing required gold label coverage: {', '.join(missing_labels)}")
     if missing_splits:
         errors.append(f"dataset is missing required split coverage: {', '.join(missing_splits)}")
+    if missing_test_case_types:
+        errors.append(
+            "test split is missing required high-risk case_type coverage: "
+            + ", ".join(missing_test_case_types)
+        )
+    if missing_test_labels:
+        errors.append(f"test split is missing required gold label coverage: {', '.join(missing_test_labels)}")
     if notes_missing_for_risky_cases:
         warnings.append(
             "risky cases should explain label rationale in label_notes: "
@@ -351,6 +379,40 @@ def validate_support_eval_dataset(data: Dict[str, Any]) -> Dict[str, Any]:
         "evidence_scopes": {scope: sum(1 for case in raw_cases if isinstance(case, dict) and case.get("evidence_scope") == scope) for scope in sorted(evidence_scopes)},
         "gold_labels": {label: sum(1 for case in raw_cases if isinstance(case, dict) and case.get("gold") == label) for label in sorted(gold_labels)},
         "splits": {split: sum(1 for case in raw_cases if isinstance(case, dict) and case.get("split") == split) for split in sorted(splits)},
+        "test_split": {
+            "case_types": {
+                case_type: sum(
+                    1
+                    for case in raw_cases
+                    if isinstance(case, dict)
+                    and case.get("split") == "test"
+                    and case.get("case_type") == case_type
+                )
+                for case_type in sorted(test_case_types)
+            },
+            "evidence_scopes": {
+                scope: sum(
+                    1
+                    for case in raw_cases
+                    if isinstance(case, dict)
+                    and case.get("split") == "test"
+                    and case.get("evidence_scope") == scope
+                )
+                for scope in sorted(test_evidence_scopes)
+            },
+            "gold_labels": {
+                label: sum(
+                    1
+                    for case in raw_cases
+                    if isinstance(case, dict)
+                    and case.get("split") == "test"
+                    and case.get("gold") == label
+                )
+                for label in sorted(test_gold_labels)
+            },
+            "required_case_types": sorted(REQUIRED_TEST_CASE_TYPES),
+            "required_gold_labels": sorted(REQUIRED_TEST_GOLD_LABELS),
+        },
         "set_cases": {
             "n": len(raw_set_cases),
             "case_types": {

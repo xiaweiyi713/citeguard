@@ -52,7 +52,10 @@ schema；这不是模型质量指标。运行 `python3 scripts/eval_support.py -
 `label_notes`。这些字段是后续人工标注 benchmark 的结构基础；当前 seed
 set 仍只是维护者合成样本，不能当作最终论文级 benchmark。现有 seed set
 已经覆盖 direct support、weak support、hard negative、contradiction、
-full-text-required 和 full-text evidence examples。
+full-text-required 和 full-text evidence examples。dataset validation 还要求
+`test` split 覆盖 `weak_support`、`hard_negative`、`contradiction`、
+`full_text_required` 和全部 gold labels,避免最终报告绕过最容易造成 false
+support 或 missed contradiction 风险的样本。
 
 运行单个 split:
 
@@ -174,6 +177,9 @@ sidecar 用于保存不适合塞进 compact seed case 的标注元数据,例如
 `supported_disagreement_case_ids`,用于判断人工标注成熟度而不只看 coverage。
 validation 同时输出 `high_risk_review`,统计 contradiction、hard_negative、
 full_text_required 和 contradiction_set 的 reviewed/unreviewed 覆盖情况。
+dataset validation 也输出 `test_split`,列出测试集中的 case type、evidence
+scope、gold label 覆盖及 required coverage,用于确认最终测试集不是只在
+train/dev 中覆盖高风险样本。
 任何 supported-label disagreement 都应优先复核,因为把不充分证据误标成
 `supported` 是最危险的 benchmark 误差。`label_sidecar_gate` 可显式要求
 `--min-high-risk-reviewed`、`--min-dual-annotated`、
