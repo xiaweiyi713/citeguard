@@ -322,7 +322,12 @@ Each risk-ranking row includes a stable `next_action` such as
 `keep_claim`, `resolve_citation_identity`, `disambiguate_identifier`,
 `retry_or_check_source_health`, `tighten_claim_or_inspect_full_text`,
 `inspect_full_text_or_find_stronger_citation`, or
-`rewrite_or_replace_evidence`. Each support result and risk item includes
+`rewrite_or_replace_evidence`. Single-citation risk rows also include
+`support_confidence`, `support_engine`, `resolution_verdict`, `resolved_title`,
+`resolved_year`, `evidence_source_field`, and `evidence_source_url` so agents can
+show compact provenance without expanding the full result. Citation-set risk
+rows include aggregate `support_confidence` and `support_engine=citation_set`.
+Each support result and risk item includes
 `counterevidence_review`,
 `counterevidence_reason`, and `counterevidence_recommendation`; this is a
 conservative review signal, not proof that a separate counter-evidence search has

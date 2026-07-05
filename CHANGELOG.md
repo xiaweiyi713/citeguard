@@ -123,6 +123,10 @@
 - Added citation-audit `risk_ranking` repair hints (`mismatched_fields`,
   `suggested_citation`, and canonical identifiers) so batch agents can present
   metadata corrections directly from the risk-sorted review queue.
+- Added support-audit `risk_ranking` provenance fields (`support_confidence`,
+  `support_engine`, `resolution_verdict`, resolved title/year, and evidence
+  source fields) so claim-support batch rows can be displayed without expanding
+  full result payloads.
 - Added a default release-gate benchmark claim safety contract so
   release-facing docs cannot describe the synthetic support seed set as a
   human-reviewed benchmark while label provenance still reports

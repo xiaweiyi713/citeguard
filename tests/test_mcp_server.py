@@ -324,6 +324,16 @@ class MCPServerHelperTests(unittest.TestCase):
         self.assertTrue(report["risk_ranking"][0]["counterevidence_review"])
         self.assertEqual(report["risk_ranking"][0]["counterevidence_reason"], "unresolved_citation")
         self.assertEqual(report["risk_ranking"][0]["next_action"], "resolve_citation_identity")
+        self.assertEqual(report["risk_ranking"][0]["support_confidence"], 0.0)
+        self.assertEqual(report["risk_ranking"][0]["support_engine"], "none")
+        self.assertEqual(report["risk_ranking"][0]["resolution_verdict"], "not_found")
+        self.assertEqual(report["risk_ranking"][0]["resolved_title"], "")
+        self.assertEqual(report["risk_ranking"][0]["evidence_source_field"], "none")
+        self.assertEqual(report["risk_ranking"][1]["support_engine"], "ensemble")
+        self.assertEqual(report["risk_ranking"][1]["resolution_verdict"], "matched")
+        self.assertEqual(report["risk_ranking"][1]["resolved_title"], "GhostCite: A Large-Scale Analysis of Citation Validity")
+        self.assertEqual(report["risk_ranking"][1]["resolved_year"], 2026)
+        self.assertEqual(report["risk_ranking"][1]["evidence_source_field"], "abstract_sentence_1")
 
     def test_audit_claim_support_tool_can_filter_high_risk_only(self):
         source = InMemoryMetadataSource(
@@ -504,6 +514,8 @@ class MCPServerHelperTests(unittest.TestCase):
         self.assertEqual(report["risk_ranking"][0]["input_mode"], "citation_set")
         self.assertEqual(report["risk_ranking"][0]["supporting_citation_count"], 2)
         self.assertEqual(report["risk_ranking"][0]["next_action"], "keep_claim")
+        self.assertEqual(report["risk_ranking"][0]["support_engine"], "citation_set")
+        self.assertGreater(report["risk_ranking"][0]["support_confidence"], 0)
 
     def test_search_counterevidence_tool_returns_review_candidates(self):
         source = InMemoryMetadataSource(

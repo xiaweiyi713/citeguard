@@ -915,6 +915,16 @@ class CLITests(unittest.TestCase):
         self.assertEqual(payload["results"][0]["lang"], "en")
         self.assertEqual(payload["risk_ranking"][0]["evidence_scope"], "none")
         self.assertEqual(payload["risk_ranking"][0]["next_action"], "resolve_citation_identity")
+        self.assertEqual(payload["risk_ranking"][0]["support_confidence"], 0.0)
+        self.assertEqual(payload["risk_ranking"][0]["support_engine"], "none")
+        self.assertEqual(payload["risk_ranking"][0]["resolution_verdict"], "not_found")
+        self.assertEqual(payload["risk_ranking"][0]["resolved_title"], "")
+        self.assertEqual(payload["risk_ranking"][0]["evidence_source_field"], "none")
+        self.assertEqual(payload["risk_ranking"][1]["support_engine"], "ensemble")
+        self.assertEqual(payload["risk_ranking"][1]["resolution_verdict"], "matched")
+        self.assertEqual(payload["risk_ranking"][1]["resolved_title"], "GhostCite: A Large-Scale Analysis of Citation Validity")
+        self.assertEqual(payload["risk_ranking"][1]["resolved_year"], 2026)
+        self.assertEqual(payload["risk_ranking"][1]["evidence_source_field"], "abstract_sentence_1")
         self.assertTrue(payload["risk_ranking"][0]["counterevidence_review"])
         self.assertEqual(payload["risk_ranking"][0]["counterevidence_reason"], "unresolved_citation")
 
@@ -967,6 +977,8 @@ class CLITests(unittest.TestCase):
         self.assertEqual(payload["risk_ranking"][0]["input_mode"], "citation_set")
         self.assertEqual(payload["risk_ranking"][0]["supporting_citation_count"], 2)
         self.assertEqual(payload["risk_ranking"][0]["next_action"], "keep_claim")
+        self.assertEqual(payload["risk_ranking"][0]["support_engine"], "citation_set")
+        self.assertGreater(payload["risk_ranking"][0]["support_confidence"], 0)
 
     def test_support_audit_rejects_invalid_citation_set_item_with_nested_index(self):
         stderr = io.StringIO()

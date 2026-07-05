@@ -203,7 +203,9 @@ top risk indexes, and `action_queues` grouped into stable index lists such as
 `rewrite_or_replace_evidence`. Claim-support outputs also include
 `counterevidence_review`; when it is `true`, treat the item as needing
 human/full-text review for contradiction, weak support, insufficient evidence, or
-unresolved citation identity.
+unresolved citation identity. Support-audit risk rows carry compact provenance
+too: `support_confidence`, `support_engine`, `resolution_verdict`,
+`resolved_title`, and evidence source fields.
 When using `--high-risk-only`, the `filtered` block includes
 `returned_indexes` and `omitted_indexes` so the compact result list can still be
 mapped back to the original batch input. It also includes

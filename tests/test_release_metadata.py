@@ -403,6 +403,10 @@ License-File: LICENSE
             "examples/references.md",
             "examples/claim_citations.jsonl",
             "support_omitted_review_summary",
+            "support_risk_provenance",
+            "support_engine",
+            "resolution_verdict",
+            "evidence_source_field",
             "support_set_summary",
             "support_review_queue",
             "support_review_queue_annotation_packet",
@@ -1006,6 +1010,10 @@ License-File: LICENSE
         self.assertTrue(summary["steps"][0]["audit_metadata_suggested_citation_present"])
         self.assertEqual(summary["steps"][0]["audit_returned_indexes"], [1])
         self.assertEqual(summary["steps"][0]["support_summary"]["insufficient_evidence"], 3)
+        self.assertEqual(summary["steps"][0]["support_risk_provenance"]["support_confidence"], 0.0)
+        self.assertEqual(summary["steps"][0]["support_risk_provenance"]["support_engine"], "none")
+        self.assertEqual(summary["steps"][0]["support_risk_provenance"]["resolution_verdict"], "not_found")
+        self.assertEqual(summary["steps"][0]["support_risk_provenance"]["evidence_source_field"], "none")
         self.assertEqual(summary["steps"][0]["support_input_modes"], ["citation", "citation", "citation_set"])
         self.assertEqual(summary["steps"][0]["support_returned_indexes"], [1])
         self.assertEqual(summary["steps"][0]["support_omitted_review_summary"]["medium_risk_count"], 2)

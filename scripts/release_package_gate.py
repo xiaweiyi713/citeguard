@@ -1709,6 +1709,15 @@ def _check_batch_workflow_examples_gate(*, python: str, project_root: Path) -> D
     support_results = support_payload.get("results", [])
     if len(support_results) != 3 or support_results[2].get("input_mode") != "citation_set":
         errors.append("support-audit should preserve citation_set batch item shape")
+    support_risk = support_payload.get("risk_ranking", [{}])[0]
+    if support_risk.get("support_confidence") != 0.0:
+        errors.append("support-audit risk ranking should expose support_confidence")
+    if support_risk.get("support_engine") != "none":
+        errors.append("support-audit risk ranking should expose support_engine")
+    if support_risk.get("resolution_verdict") != "not_found":
+        errors.append("support-audit risk ranking should expose resolution_verdict")
+    if support_risk.get("evidence_source_field") != "none":
+        errors.append("support-audit risk ranking should expose evidence_source_field")
 
     if support_filtered.get("filtered", {}).get("high_risk_only") is not True:
         errors.append("support-audit JSONL high-risk run should include filtered.high_risk_only=true")
@@ -1736,6 +1745,12 @@ def _check_batch_workflow_examples_gate(*, python: str, project_root: Path) -> D
         "audit_metadata_suggested_citation_present": bool(mismatch_risk.get("suggested_citation")),
         "audit_returned_indexes": audit_filtered.get("filtered", {}).get("returned_indexes", []),
         "support_summary": support_payload.get("summary", {}),
+        "support_risk_provenance": {
+            "support_confidence": support_risk.get("support_confidence"),
+            "support_engine": support_risk.get("support_engine"),
+            "resolution_verdict": support_risk.get("resolution_verdict"),
+            "evidence_source_field": support_risk.get("evidence_source_field"),
+        },
         "support_input_modes": [item.get("input_mode") for item in support_results],
         "support_returned_indexes": support_filtered.get("filtered", {}).get("returned_indexes", []),
         "support_omitted_review_summary": support_filtered.get("filtered", {}).get("omitted_review_summary", {}),
