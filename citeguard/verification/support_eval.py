@@ -27,6 +27,14 @@ ALLOWED_SUPPORT_LABELS = {
     "contradicted",
 }
 
+SUPPORT_LABEL_ORDER = (
+    "supported",
+    "weakly_supported",
+    "insufficient_evidence",
+    "contradicted",
+)
+SUPPORT_LABEL_RANK = {label: index for index, label in enumerate(SUPPORT_LABEL_ORDER)}
+
 ALLOWED_EVIDENCE_SCOPES = {
     "title",
     "abstract",
@@ -616,6 +624,9 @@ def summarize_support_label_maturity(raw_items: List[Any], dataset_case_count: i
     unresolved_disagreement_count = 0
     disagreement_case_ids: List[str] = []
     unresolved_disagreement_case_ids: List[str] = []
+    supported_disagreement_case_ids: List[str] = []
+    dual_label_pair_counts: Dict[str, int] = {}
+    dual_disagreement_label_pair_counts: Dict[str, int] = {}
 
     for item in raw_items:
         if not isinstance(item, dict):
@@ -640,13 +651,25 @@ def summarize_support_label_maturity(raw_items: List[Any], dataset_case_count: i
             published_benchmark_count += 1
 
         if annotator_count >= 2 and len(annotator_labels) >= 2:
+            normalized_labels = [str(label) for label in annotator_labels]
+            for left_index in range(len(normalized_labels)):
+                for right_index in range(left_index + 1, len(normalized_labels)):
+                    pair_key = _label_pair_key(normalized_labels[left_index], normalized_labels[right_index])
+                    dual_label_pair_counts[pair_key] = dual_label_pair_counts.get(pair_key, 0) + 1
+                    if normalized_labels[left_index] != normalized_labels[right_index]:
+                        dual_disagreement_label_pair_counts[pair_key] = (
+                            dual_disagreement_label_pair_counts.get(pair_key, 0) + 1
+                        )
+
             dual_annotated_count += 1
-            if len({str(label) for label in annotator_labels}) == 1:
+            if len(set(normalized_labels)) == 1:
                 dual_agreed_count += 1
             else:
                 dual_disagreed_count += 1
                 if case_id:
                     disagreement_case_ids.append(case_id)
+                    if "supported" in normalized_labels:
+                        supported_disagreement_case_ids.append(case_id)
 
         if disagreement == "resolved":
             resolved_disagreement_count += 1
@@ -673,7 +696,19 @@ def summarize_support_label_maturity(raw_items: List[Any], dataset_case_count: i
         "unresolved_disagreement_count": unresolved_disagreement_count,
         "disagreement_case_ids": disagreement_case_ids,
         "unresolved_disagreement_case_ids": unresolved_disagreement_case_ids,
+        "dual_label_pair_counts": dict(sorted(dual_label_pair_counts.items())),
+        "dual_disagreement_label_pair_counts": dict(sorted(dual_disagreement_label_pair_counts.items())),
+        "supported_disagreement_count": len(supported_disagreement_case_ids),
+        "supported_disagreement_case_ids": supported_disagreement_case_ids,
     }
+
+
+def _label_pair_key(left: str, right: str) -> str:
+    labels = sorted(
+        [left, right],
+        key=lambda label: (SUPPORT_LABEL_RANK.get(label, len(SUPPORT_LABEL_RANK)), label),
+    )
+    return f"{labels[0]}|{labels[1]}"
 
 
 def compute_support_label_sidecar_gate(

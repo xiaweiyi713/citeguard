@@ -34,6 +34,8 @@
   keeping the registry and docs synchronized.
 - Added support-labeling guidelines for future human-reviewed claim-support
   benchmark expansion.
+- Added support-label sidecar maturity diagnostics for dual-label disagreement
+  pairs and supported-label disagreement case ids.
 - Expanded the CiteGuard agent skill with client-specific MCP setup notes,
   structured-error recovery guidance, and safe wording examples for ambiguous,
   metadata-mismatch, not-found, outage, and claim-support results.

@@ -167,8 +167,11 @@ sidecar 用于保存不适合塞进 compact seed case 的标注元数据,例如
 `disagreement` 和 `source_locator`。sidecar validation 还输出
 `label_maturity`,汇总 `reviewed_fraction`、`dual_annotated_count`、
 `raw_dual_agreement_rate`、`adjudicated_count`、
-`resolved_disagreement_count` 和 `unresolved_disagreement_count`,用于判断人工
-标注成熟度而不只看 coverage。`label_sidecar_gate` 可显式要求
+`resolved_disagreement_count`、`unresolved_disagreement_count`、
+`dual_label_pair_counts`、`dual_disagreement_label_pair_counts` 和
+`supported_disagreement_case_ids`,用于判断人工标注成熟度而不只看 coverage。
+任何 supported-label disagreement 都应优先复核,因为把不充分证据误标成
+`supported` 是最危险的 benchmark 误差。`label_sidecar_gate` 可显式要求
 `--min-dual-annotated`、`--max-unresolved-disagreements` 和
 `--min-raw-dual-agreement-rate`,让发布报告在双标不足、分歧未解决或一致率过低
 时以机器可读 failure code 失败。validation 还会检查 status consistency:

@@ -16,7 +16,9 @@ benchmark claims.
   annotator counts, adjudicated labels, disagreement state, source locators, and
   notes for every seed case. Sidecar validation also reports `label_maturity`
   with dual-annotation counts, raw agreement rate, adjudicated cases, and
-  unresolved disagreement counts.
+  unresolved disagreement counts, plus label-pair disagreement diagnostics such
+  as `dual_disagreement_label_pair_counts` and
+  `supported_disagreement_case_ids`.
 - `scripts/eval_support.py` reports precision, recall, F1, false-support rate,
   abstention rate, misjudged-support rate, contradiction recall, confusion
   matrices, case-type breakdowns, evidence-scope breakdowns, split breakdowns,

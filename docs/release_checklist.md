@@ -105,7 +105,11 @@ agent skill bundle.
   `1.0`; keep `--min-human-reviewed` and `--min-dual-annotated` at `0` for the
   synthetic seed set, then raise them when a human-reviewed subset exists. Keep
   `--max-unresolved-disagreements 0`; add `--min-raw-dual-agreement-rate` for
-  release evidence once dual annotation exists. Annotation packets must be
+  release evidence once dual annotation exists. Inspect
+  `dual_disagreement_label_pair_counts` and `supported_disagreement_case_ids`
+  before publishing benchmark claims; supported-label disagreements require
+  explicit adjudication because false support is the highest-risk error.
+  Annotation packets must be
   blinded (`--annotation-packet`) and must not expose dataset `gold` or
   `adjudicated_label` fields to reviewers. Generate an annotator instruction
   sheet with `--instructions-output` for each reviewer batch so labeling rules,

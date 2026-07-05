@@ -658,6 +658,8 @@ License-File: LICENSE
         self.assertIn("label_maturity", combined)
         self.assertIn("raw_dual_agreement_rate", combined)
         self.assertIn("unresolved_disagreement_count", combined)
+        self.assertIn("dual_disagreement_label_pair_counts", combined)
+        self.assertIn("supported_disagreement_case_ids", combined)
         self.assertIn("--min-dual-annotated", combined)
         self.assertIn("--max-unresolved-disagreements", combined)
         self.assertIn("--min-raw-dual-agreement-rate", combined)

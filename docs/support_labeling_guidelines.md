@@ -125,8 +125,12 @@ for high-stakes final benchmark cases with resolved reviewer disagreement.
 Sidecar validation reports a `label_maturity` block with `reviewed_fraction`,
 `dual_annotated_count`, `raw_dual_agreement_rate`, `adjudicated_count`,
 `resolved_disagreement_count`, `unresolved_disagreement_count`,
-`disagreement_case_ids`, and `unresolved_disagreement_case_ids`. Review these
-fields before claiming benchmark maturity; coverage alone is not enough.
+`disagreement_case_ids`, `unresolved_disagreement_case_ids`,
+`dual_label_pair_counts`, `dual_disagreement_label_pair_counts`, and
+`supported_disagreement_case_ids`. Review these fields before claiming benchmark
+maturity; coverage alone is not enough. Treat any supported-label disagreement
+as high priority because a premature `supported` label is the most dangerous
+benchmark error for a skeptical citation auditor.
 Validation also checks status consistency so maturity cannot be inflated by
 malformed rows: `not_human_reviewed` must have zero annotators and no labels,
 `dual_annotator_agreed` must contain matching annotator labels,

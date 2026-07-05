@@ -170,7 +170,7 @@ class SupportEvalTests(unittest.TestCase):
                     "case_id": "b",
                     "adjudication_status": "dual_annotator_adjudicated",
                     "annotator_count": 2,
-                    "annotator_labels": ["contradicted", "insufficient_evidence"],
+                    "annotator_labels": ["supported", "contradicted"],
                     "adjudicated_label": "contradicted",
                     "disagreement": "resolved",
                     "adjudicator": "reviewer-c",
@@ -198,6 +198,19 @@ class SupportEvalTests(unittest.TestCase):
         self.assertEqual(summary["label_maturity"]["adjudicated_count"], 1)
         self.assertEqual(summary["label_maturity"]["resolved_disagreement_count"], 1)
         self.assertEqual(summary["label_maturity"]["disagreement_case_ids"], ["b"])
+        self.assertEqual(
+            summary["label_maturity"]["dual_label_pair_counts"],
+            {
+                "supported|supported": 1,
+                "supported|contradicted": 1,
+            },
+        )
+        self.assertEqual(
+            summary["label_maturity"]["dual_disagreement_label_pair_counts"],
+            {"supported|contradicted": 1},
+        )
+        self.assertEqual(summary["label_maturity"]["supported_disagreement_count"], 1)
+        self.assertEqual(summary["label_maturity"]["supported_disagreement_case_ids"], ["b"])
 
     def test_support_label_sidecar_gate_checks_coverage_and_human_review(self):
         passing = compute_support_label_sidecar_gate(
@@ -377,6 +390,8 @@ class SupportEvalTests(unittest.TestCase):
         self.assertEqual(payload["summary"]["human_reviewed"], 0)
         self.assertEqual(payload["label_maturity"]["reviewed_count"], 0)
         self.assertIsNone(payload["label_maturity"]["raw_dual_agreement_rate"])
+        self.assertEqual(payload["label_maturity"]["dual_label_pair_counts"], {})
+        self.assertEqual(payload["label_maturity"]["supported_disagreement_case_ids"], [])
         self.assertEqual(payload["unreviewed_count"], len(cases))
         self.assertGreater(payload["high_risk_unreviewed_count"], 0)
         self.assertLess(payload["high_risk_unreviewed_count"], payload["unreviewed_count"])
