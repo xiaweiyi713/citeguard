@@ -145,7 +145,10 @@ includes `next_action`, a stable
 machine-readable action for agents (`keep`, `review_metadata`,
 `resolve_identifier_or_replace`, `disambiguate_identifier`,
 `inspect_source_health`, or `retry_or_check_source_health`), plus a
-human-readable `recommendation`. Verification results include `sources_failed` and
+human-readable `recommendation`. For `metadata_mismatch` rows, `risk_ranking`
+also carries `mismatched_fields`, `suggested_citation`, and canonical title,
+year, venue, DOI, and arXiv id fields so agents can show a repair candidate from
+the risk-sorted view. Verification results include `sources_failed` and
 `source_failure_details` when a live source times out, rate-limits, or fails with
 an HTTP/network error. They also include `sources_available`, which is
 `sources_checked` minus `sources_failed`, and `sources_responded`, which only

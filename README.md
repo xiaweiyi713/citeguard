@@ -185,7 +185,11 @@ citeguard support-set examples/citations.json \
 Single verification/support results and batch `risk_ranking` rows include a
 stable `next_action` enum plus human-readable context, so agents can triage
 `not_found`, `ambiguous`, `metadata_mismatch`, contradicted, and unresolved
-support checks without parsing prose. Batch `audit` and `support-audit` reports
+support checks without parsing prose. Citation-audit risk rows also include
+`mismatched_fields`, `suggested_citation`, and canonical identifiers when a
+metadata correction is available, so agents can propose repairs from the
+risk-sorted list without re-parsing full result rows. Batch `audit` and
+`support-audit` reports
 also include `review_summary` with full-batch risk counts, next-action counts,
 top risk indexes, and `action_queues` grouped into stable index lists such as
 `identity_resolution_indexes`, `evidence_review_indexes`,

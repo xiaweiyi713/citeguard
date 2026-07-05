@@ -398,6 +398,8 @@ License-File: LICENSE
             "without silent edits or source-outage fabrication overclaims",
             "batch_workflow_examples",
             "_record_batch_workflow_examples_gate",
+            "audit_metadata_mismatch",
+            "audit_metadata_suggested_citation_present",
             "examples/references.md",
             "examples/claim_citations.jsonl",
             "support_omitted_review_summary",
@@ -1000,6 +1002,8 @@ License-File: LICENSE
         self.assertEqual(summary["steps"][0]["extract_count"], 2)
         self.assertEqual(summary["steps"][0]["audit_summary"]["verified"], 1)
         self.assertEqual(summary["steps"][0]["audit_summary"]["not_found"], 1)
+        self.assertEqual(summary["steps"][0]["audit_metadata_mismatch_fields"], ["year", "venue"])
+        self.assertTrue(summary["steps"][0]["audit_metadata_suggested_citation_present"])
         self.assertEqual(summary["steps"][0]["audit_returned_indexes"], [1])
         self.assertEqual(summary["steps"][0]["support_summary"]["insufficient_evidence"], 3)
         self.assertEqual(summary["steps"][0]["support_input_modes"], ["citation", "citation", "citation_set"])
@@ -1009,6 +1013,7 @@ License-File: LICENSE
         self.assertEqual(summary["steps"][0]["support_set_summary"]["insufficient_evidence"], 2)
         self.assertEqual(summary["steps"][0]["support_set_result_count"], 2)
         self.assertIn("extract_references", summary["steps"][0]["commands"])
+        self.assertIn("audit_metadata_mismatch", summary["steps"][0]["commands"])
         self.assertIn("support_audit_jsonl_high_risk", summary["steps"][0]["commands"])
         self.assertIn("support_set", summary["steps"][0]["commands"])
 

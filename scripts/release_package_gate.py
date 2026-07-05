@@ -1593,53 +1593,73 @@ def _check_batch_workflow_examples_gate(*, python: str, project_root: Path) -> D
         "CITEGUARD_NLI_MODEL": "",
         "TOKENIZERS_PARALLELISM": "false",
     }
-    commands = {
-        "extract_references": [python, "-m", "citeguard", "extract", "examples/references.md", "--compact"],
-        "audit_json": [python, "-m", "citeguard", "audit", "examples/citations.json", "--compact"],
-        "audit_markdown_high_risk": [
-            python,
-            "-m",
-            "citeguard",
-            "audit",
-            "examples/references.md",
-            "--high-risk-only",
-            "--compact",
-        ],
-        "support_audit_json": [
-            python,
-            "-m",
-            "citeguard",
-            "support-audit",
-            "examples/claim_citations.json",
-            "--compact",
-        ],
-        "support_audit_jsonl_high_risk": [
-            python,
-            "-m",
-            "citeguard",
-            "support-audit",
-            "examples/claim_citations.jsonl",
-            "--high-risk-only",
-            "--compact",
-        ],
-        "support_set": [
-            python,
-            "-m",
-            "citeguard",
-            "support-set",
-            "examples/citations.json",
-            "--claim",
-            "The Transformer relies entirely on attention mechanisms.",
-            "--compact",
-        ],
-    }
-    payloads = {
-        name: _run_json_command(command, cwd=project_root, env_overrides=env)
-        for name, command in commands.items()
-    }
+    with tempfile.NamedTemporaryFile("w", encoding="utf-8", suffix=".json", delete=False) as handle:
+        json.dump(
+            [
+                {
+                    "title": "Attention Is All You Need",
+                    "authors": ["Ashish Vaswani"],
+                    "year": 2020,
+                    "venue": "Journal of Imaginary Methods",
+                    "arxiv_id": "1706.03762",
+                }
+            ],
+            handle,
+        )
+        mismatch_path = handle.name
+
+    try:
+        commands = {
+            "extract_references": [python, "-m", "citeguard", "extract", "examples/references.md", "--compact"],
+            "audit_json": [python, "-m", "citeguard", "audit", "examples/citations.json", "--compact"],
+            "audit_metadata_mismatch": [python, "-m", "citeguard", "audit", mismatch_path, "--compact"],
+            "audit_markdown_high_risk": [
+                python,
+                "-m",
+                "citeguard",
+                "audit",
+                "examples/references.md",
+                "--high-risk-only",
+                "--compact",
+            ],
+            "support_audit_json": [
+                python,
+                "-m",
+                "citeguard",
+                "support-audit",
+                "examples/claim_citations.json",
+                "--compact",
+            ],
+            "support_audit_jsonl_high_risk": [
+                python,
+                "-m",
+                "citeguard",
+                "support-audit",
+                "examples/claim_citations.jsonl",
+                "--high-risk-only",
+                "--compact",
+            ],
+            "support_set": [
+                python,
+                "-m",
+                "citeguard",
+                "support-set",
+                "examples/citations.json",
+                "--claim",
+                "The Transformer relies entirely on attention mechanisms.",
+                "--compact",
+            ],
+        }
+        payloads = {
+            name: _run_json_command(command, cwd=project_root, env_overrides=env)
+            for name, command in commands.items()
+        }
+    finally:
+        Path(mismatch_path).unlink(missing_ok=True)
 
     extract_payload = payloads["extract_references"]
     audit_payload = payloads["audit_json"]
+    audit_mismatch = payloads["audit_metadata_mismatch"]
     audit_filtered = payloads["audit_markdown_high_risk"]
     support_payload = payloads["support_audit_json"]
     support_filtered = payloads["support_audit_jsonl_high_risk"]
@@ -1660,6 +1680,17 @@ def _check_batch_workflow_examples_gate(*, python: str, project_root: Path) -> D
         errors.append("audit examples/citations.json should queue the unresolved citation for identity resolution")
     if audit_payload.get("risk_ranking", [{}])[0].get("next_action") != "resolve_identifier_or_replace":
         errors.append("audit risk ranking should expose resolve_identifier_or_replace")
+    mismatch_risk = audit_mismatch.get("risk_ranking", [{}])[0]
+    if mismatch_risk.get("verdict") != "metadata_mismatch":
+        errors.append("audit metadata mismatch fixture should produce metadata_mismatch")
+    if mismatch_risk.get("next_action") != "review_metadata":
+        errors.append("audit metadata mismatch risk ranking should expose review_metadata")
+    if mismatch_risk.get("mismatched_fields") != ["year", "venue"]:
+        errors.append("audit metadata mismatch risk ranking should expose mismatched_fields")
+    if not mismatch_risk.get("suggested_citation"):
+        errors.append("audit metadata mismatch risk ranking should expose suggested_citation")
+    if mismatch_risk.get("canonical_year") != 2017 or mismatch_risk.get("canonical_arxiv_id") != "1706.03762":
+        errors.append("audit metadata mismatch risk ranking should expose canonical identifiers")
 
     if audit_filtered.get("filtered", {}).get("high_risk_only") is not True:
         errors.append("audit markdown high-risk run should include filtered.high_risk_only=true")
@@ -1701,6 +1732,8 @@ def _check_batch_workflow_examples_gate(*, python: str, project_root: Path) -> D
         "fixture": "examples/citations.json",
         "extract_count": len(extract_payload),
         "audit_summary": audit_payload.get("summary", {}),
+        "audit_metadata_mismatch_fields": mismatch_risk.get("mismatched_fields", []),
+        "audit_metadata_suggested_citation_present": bool(mismatch_risk.get("suggested_citation")),
         "audit_returned_indexes": audit_filtered.get("filtered", {}).get("returned_indexes", []),
         "support_summary": support_payload.get("summary", {}),
         "support_input_modes": [item.get("input_mode") for item in support_results],

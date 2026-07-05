@@ -268,6 +268,7 @@ def _append_review_queue_index(action_queues: Dict[str, List[int]], next_action:
 def verification_risk_item(index: int, result: VerificationResult) -> Dict[str, Any]:
     level, score, recommendation = RISK_BY_VERDICT[result.verdict.value]
     next_action = verification_next_action(result.verdict, result.source_failure_mode, result.sources_failed)
+    canonical = result.canonical_record
     if result.sources_failed:
         if level == "low":
             level = "medium"
@@ -284,6 +285,13 @@ def verification_risk_item(index: int, result: VerificationResult) -> Dict[str, 
         "title": result.input_citation.title,
         "doi": result.input_citation.doi,
         "arxiv_id": result.input_citation.arxiv_id,
+        "mismatched_fields": [diff.field for diff in result.field_diffs if not diff.matches],
+        "suggested_citation": result.suggested_citation,
+        "canonical_title": canonical.title if canonical else "",
+        "canonical_year": canonical.year if canonical else None,
+        "canonical_venue": canonical.venue if canonical else "",
+        "canonical_doi": canonical.doi if canonical else "",
+        "canonical_arxiv_id": canonical.arxiv_id if canonical else "",
         "sources_available": available_sources(result.sources_checked, result.sources_failed),
         "sources_failed": list(result.sources_failed),
         "source_failure_details": [dict(item) for item in result.source_failure_details],

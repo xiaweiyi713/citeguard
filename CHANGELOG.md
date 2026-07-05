@@ -120,6 +120,9 @@
   `extract`, `audit`, `support-audit`, JSONL, `support-set`, and
   `--high-risk-only` examples against an offline fixture, then checks summaries,
   action queues, filtered index traceability, and citation-set result shape.
+- Added citation-audit `risk_ranking` repair hints (`mismatched_fields`,
+  `suggested_citation`, and canonical identifiers) so batch agents can present
+  metadata corrections directly from the risk-sorted review queue.
 - Added a default release-gate benchmark claim safety contract so
   release-facing docs cannot describe the synthetic support seed set as a
   human-reviewed benchmark while label provenance still reports

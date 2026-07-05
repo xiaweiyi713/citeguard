@@ -1320,6 +1320,38 @@ class CLITests(unittest.TestCase):
         self.assertEqual(payload["review_summary"]["next_actions"]["resolve_identifier_or_replace"], 1)
         self.assertEqual(payload["risk_ranking"][0]["risk"], "high")
 
+    def test_audit_risk_ranking_includes_suggested_metadata_fix(self):
+        stdout = io.StringIO()
+        with tempfile.NamedTemporaryFile("w", encoding="utf-8", suffix=".json", delete=False) as handle:
+            json.dump(
+                [
+                    {
+                        "title": "GhostCite: A Large-Scale Analysis of Citation Validity",
+                        "authors": ["Zhe Xu"],
+                        "year": 2024,
+                        "venue": "Journal of Imaginary Methods",
+                    }
+                ],
+                handle,
+            )
+            path = handle.name
+
+        try:
+            code = run(["audit", path], source=self.source, stdout=stdout)
+        finally:
+            os.unlink(path)
+
+        self.assertEqual(code, 0)
+        payload = json.loads(stdout.getvalue())
+        risk_item = payload["risk_ranking"][0]
+        self.assertEqual(risk_item["verdict"], "metadata_mismatch")
+        self.assertEqual(risk_item["next_action"], "review_metadata")
+        self.assertEqual(risk_item["mismatched_fields"], ["year", "venue"])
+        self.assertIn("GhostCite: A Large-Scale Analysis of Citation Validity", risk_item["suggested_citation"])
+        self.assertEqual(risk_item["canonical_year"], 2026)
+        self.assertEqual(risk_item["canonical_venue"], "arXiv")
+        self.assertEqual(risk_item["canonical_doi"], "10.48550/arxiv.2602.06718")
+
     def test_audit_risk_ranking_includes_structured_source_failure_details(self):
         stdout = io.StringIO()
         with tempfile.NamedTemporaryFile("w", encoding="utf-8", suffix=".json", delete=False) as handle:

@@ -214,6 +214,41 @@ class MCPServerHelperTests(unittest.TestCase):
         self.assertEqual(report["review_summary"]["action_queues"]["safe_to_keep_indexes"], [0])
         self.assertEqual(report["review_summary"]["action_queues"]["identity_resolution_indexes"], [1])
 
+    def test_audit_citations_tool_risk_ranking_includes_suggested_metadata_fix(self):
+        source = InMemoryMetadataSource(
+            [
+                CitationRecord(
+                    citation_id="paper-1",
+                    title="GhostCite: A Large-Scale Analysis of Citation Validity",
+                    authors=["Zhe Xu", "Lin Wang"],
+                    abstract="GhostCite studies citation validity in generated references.",
+                    year=2026,
+                    venue="arXiv",
+                    doi="10.48550/arxiv.2602.06718",
+                    source="memory",
+                )
+            ]
+        )
+        with mock.patch.object(self.server, "_source", return_value=source):
+            report = self.server.audit_citations_tool(
+                [
+                    {
+                        "title": "GhostCite: A Large-Scale Analysis of Citation Validity",
+                        "authors": ["Zhe Xu"],
+                        "year": 2024,
+                        "venue": "Journal of Imaginary Methods",
+                    },
+                ]
+            )
+
+        risk_item = report["risk_ranking"][0]
+        self.assertEqual(risk_item["verdict"], "metadata_mismatch")
+        self.assertEqual(risk_item["next_action"], "review_metadata")
+        self.assertEqual(risk_item["mismatched_fields"], ["year", "venue"])
+        self.assertIn("GhostCite: A Large-Scale Analysis of Citation Validity", risk_item["suggested_citation"])
+        self.assertEqual(risk_item["canonical_year"], 2026)
+        self.assertEqual(risk_item["canonical_venue"], "arXiv")
+
     def test_audit_citations_tool_can_filter_high_risk_only(self):
         source = InMemoryMetadataSource(
             [
