@@ -59,6 +59,16 @@ def main(argv: Optional[List[str]] = None) -> int:
         action="store_true",
         help="Fail instead of skipping when the offline MCP stdio smoke cannot run.",
     )
+    parser.add_argument(
+        "--include-published-smoke-plan",
+        action="store_true",
+        help="Record a dry-run post-publish PyPI install smoke plan in the release summary.",
+    )
+    parser.add_argument(
+        "--include-published-mcp-smoke-plan",
+        action="store_true",
+        help="Record a dry-run post-publish MCP-extra install smoke plan in the release summary.",
+    )
     args = parser.parse_args(argv)
 
     project_root = Path(args.project_root).resolve()
@@ -99,6 +109,24 @@ def main(argv: Optional[List[str]] = None) -> int:
             python=args.python,
             project_root=project_root,
             require=args.require_mcp_stdio_smoke,
+        )
+
+    if args.include_published_smoke_plan:
+        _record_published_smoke_plan(
+            summary,
+            python=args.python,
+            project_root=project_root,
+            extra="",
+            require_extra_import="",
+        )
+
+    if args.include_published_mcp_smoke_plan:
+        _record_published_smoke_plan(
+            summary,
+            python=args.python,
+            project_root=project_root,
+            extra="mcp",
+            require_extra_import="mcp",
         )
 
     _record_official_build_and_twine_check(
@@ -381,6 +409,53 @@ def _record_mcp_stdio_smoke(
         cmd,
         cwd=project_root,
     )
+
+
+def _record_published_smoke_plan(
+    summary: Dict[str, Any],
+    *,
+    python: str,
+    project_root: Path,
+    extra: str,
+    require_extra_import: str,
+) -> None:
+    cmd = [
+        python,
+        "scripts/smoke_published_package.py",
+        "--version",
+        __version__,
+    ]
+    if extra:
+        cmd.extend(["--extra", extra])
+    if require_extra_import:
+        cmd.extend(["--require-extra-import", require_extra_import])
+    try:
+        completed = _run(cmd, cwd=project_root)
+        payload = json.loads(completed.stdout)
+    except (subprocess.CalledProcessError, json.JSONDecodeError) as exc:
+        summary["steps"].append(
+            {
+                "name": "published_package_smoke_plan",
+                "status": "failed",
+                "command": cmd,
+                "message": str(exc),
+            }
+        )
+        summary["ok"] = False
+        return
+
+    summary["steps"].append(
+        {
+            "name": "published_package_smoke_plan" if not extra else f"published_{extra}_smoke_plan",
+            "status": "passed" if payload.get("ok") and payload.get("dry_run") else "failed",
+            "command": cmd,
+            "package_spec": payload.get("package_spec"),
+            "install_command": payload.get("install_command"),
+            "dry_run": payload.get("dry_run"),
+        }
+    )
+    if not payload.get("ok") or not payload.get("dry_run"):
+        summary["ok"] = False
 
 
 def _record_subprocess_step(

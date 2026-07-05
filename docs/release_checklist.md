@@ -21,6 +21,7 @@ agent skill bundle.
   python scripts/release_package_gate.py --require-build-tools
   python scripts/release_package_gate.py --skip-install-smoke --include-mcp-extra-smoke --require-mcp-extra-smoke
   python scripts/release_package_gate.py --skip-install-smoke --include-mcp-stdio-smoke --require-mcp-stdio-smoke
+  python scripts/release_package_gate.py --skip-install-smoke --include-published-smoke-plan --include-published-mcp-smoke-plan
   ```
 
   This runs fresh-venv wheel and source-distribution install smokes, checks
@@ -32,6 +33,9 @@ agent skill bundle.
   run on Python 3.10+. The MCP stdio gate records `mcp_stdio_smoke` in the same
   machine-readable summary; with `--require-mcp-stdio-smoke`, missing MCP
   dependencies or Python <3.10 are release failures instead of local skips.
+  The published-package plan gate records `published_package_smoke_plan` and
+  `published_mcp_smoke_plan` as dry-run JSON summaries so the post-publish
+  PyPI/TestPyPI install commands are checked before artifacts are uploaded.
 
 - Inspect the wheel contents and verify `citeguard`, `src`, docs, examples, and
   skill files intended for distribution are present.
@@ -197,6 +201,23 @@ agent skill bundle.
 - After publishing, test a fresh install in a new virtual environment:
 
   ```bash
-  python -m pip install citeguard
-  citeguard status
+  python scripts/smoke_published_package.py --version 0.1.0
+  python scripts/smoke_published_package.py --version 0.1.0 --run
+  python scripts/smoke_published_package.py --version 0.1.0 --extra mcp --require-extra-import mcp --run
+  ```
+
+  The first command is a dry-run that prints the exact install command and
+  post-publish checks as JSON without touching the network. Use `--run` only
+  after the package is visible on the target index. For TestPyPI release
+  rehearsal, include both indexes so CiteGuard can come from TestPyPI while
+  dependencies come from PyPI:
+
+  ```bash
+  python scripts/smoke_published_package.py \
+    --version 0.1.0 \
+    --extra mcp \
+    --require-extra-import mcp \
+    --index-url https://test.pypi.org/simple/ \
+    --extra-index-url https://pypi.org/simple \
+    --run
   ```

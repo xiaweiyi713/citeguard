@@ -385,7 +385,7 @@ CNKI (知网) and Wanfang (万方) are **not** integrated: they have no open/fre
 ## Tests & reproducibility
 
 ```bash
-python3 -m unittest discover -s tests -v   # full unit suite (323 tests; standard library only except optional MCP smoke)
+python3 -m unittest discover -s tests -v   # full unit suite (327 tests; standard library only except optional MCP smoke)
 python3 scripts/smoke_mcp.py               # optional MCP stdio smoke; skips without the MCP SDK
 python3 scripts/smoke_mcp.py --require-sdk # CI/release MCP stdio smoke; fails without the MCP SDK
 python3 scripts/eval_verification.py       # offline, deterministic existence/metadata eval
@@ -406,6 +406,8 @@ python3 scripts/smoke_package.py --install-mode wheel --extra mcp --with-deps  #
 python3 scripts/release_package_gate.py    # package release gate; add --require-build-tools before publishing
 python3 scripts/release_package_gate.py --skip-install-smoke --include-mcp-extra-smoke --require-mcp-extra-smoke
 python3 scripts/release_package_gate.py --skip-install-smoke --include-mcp-stdio-smoke --require-mcp-stdio-smoke
+python3 scripts/release_package_gate.py --skip-install-smoke --include-published-smoke-plan --include-published-mcp-smoke-plan
+python3 scripts/smoke_published_package.py --version 0.1.0  # dry-run post-publish PyPI/TestPyPI smoke
 ```
 
 The unit suite, verification eval, support fixture eval, and support dataset

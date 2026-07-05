@@ -9,7 +9,7 @@ from citeguard.errors import ERROR_CODE_NEXT_ACTION, ERROR_SCHEMA_VERSION, STABL
 from citeguard.retrieval.scholarly_clients.factory import DEFAULT_USER_AGENT
 from citeguard.verification import STABLE_NEXT_ACTIONS
 from citeguard.version import __version__
-from scripts.release_package_gate import _record_mcp_extra_smoke, _record_mcp_stdio_smoke
+from scripts.release_package_gate import _record_mcp_extra_smoke, _record_mcp_stdio_smoke, _record_published_smoke_plan
 from scripts.smoke_package import _assert_archive_excludes_generated_files, _assert_distribution_metadata_contract
 
 
@@ -229,17 +229,22 @@ License-File: LICENSE
 
         required_phrases = [
             "scripts/release_package_gate.py",
+            "scripts/smoke_published_package.py",
             "--require-build-tools",
             "--skip-install-smoke",
             "--include-mcp-extra-smoke",
             "--require-mcp-extra-smoke",
             "--include-mcp-stdio-smoke",
             "--require-mcp-stdio-smoke",
+            "--include-published-smoke-plan",
+            "--include-published-mcp-smoke-plan",
             "--with-deps",
             "--extra mcp",
             "_MCP_EXTRA_SMOKE",
             "mcp_extra_wheel_install_smoke",
             "mcp_stdio_smoke",
+            "published_package_smoke_plan",
+            "published_mcp_smoke_plan",
             "MCP extra install smoke requires Python 3.10+",
             "MCP stdio smoke requires Python 3.10+",
             "python -m build",
@@ -251,7 +256,12 @@ License-File: LICENSE
             "python scripts/smoke_package.py --install-mode wheel --extra mcp --with-deps",
             "python scripts/release_package_gate.py --skip-install-smoke --include-mcp-extra-smoke --require-mcp-extra-smoke",
             "python scripts/release_package_gate.py --skip-install-smoke --include-mcp-stdio-smoke --require-mcp-stdio-smoke",
+            "python scripts/release_package_gate.py --skip-install-smoke --include-published-smoke-plan --include-published-mcp-smoke-plan",
             "python scripts/smoke_mcp.py --require-sdk",
+            "python scripts/smoke_published_package.py --version 0.1.0",
+            "--index-url https://test.pypi.org/simple/",
+            "--extra-index-url https://pypi.org/simple",
+            "--require-extra-import mcp",
             "citeguard.mcp.server",
         ]
         for phrase in required_phrases:
@@ -344,6 +354,57 @@ License-File: LICENSE
         self.assertEqual(args[1], "mcp_stdio_smoke")
         self.assertEqual(args[2], ["python3.10", "scripts/smoke_mcp.py", "--require-sdk"])
         self.assertEqual(kwargs["cwd"], ROOT)
+
+    def test_release_gate_records_published_smoke_plan(self):
+        summary = {"ok": True, "steps": []}
+        completed = mock.Mock(
+            stdout='{"ok": true, "dry_run": true, "package_spec": "citeguard==0.1.0", "install_command": ["python", "-m", "pip", "install", "citeguard==0.1.0"]}'
+        )
+        with mock.patch("scripts.release_package_gate._run", return_value=completed) as run:
+            _record_published_smoke_plan(
+                summary,
+                python="python3",
+                project_root=ROOT,
+                extra="",
+                require_extra_import="",
+            )
+
+        self.assertTrue(summary["ok"])
+        self.assertEqual(summary["steps"][0]["name"], "published_package_smoke_plan")
+        self.assertEqual(summary["steps"][0]["status"], "passed")
+        self.assertEqual(summary["steps"][0]["package_spec"], "citeguard==0.1.0")
+        run.assert_called_once()
+        self.assertEqual(run.call_args.args[0], ["python3", "scripts/smoke_published_package.py", "--version", __version__])
+
+        mcp_summary = {"ok": True, "steps": []}
+        mcp_completed = mock.Mock(
+            stdout='{"ok": true, "dry_run": true, "package_spec": "citeguard[mcp]==0.1.0", "install_command": ["python", "-m", "pip", "install", "citeguard[mcp]==0.1.0"]}'
+        )
+        with mock.patch("scripts.release_package_gate._run", return_value=mcp_completed) as mcp_run:
+            _record_published_smoke_plan(
+                mcp_summary,
+                python="python3",
+                project_root=ROOT,
+                extra="mcp",
+                require_extra_import="mcp",
+            )
+
+        self.assertTrue(mcp_summary["ok"])
+        self.assertEqual(mcp_summary["steps"][0]["name"], "published_mcp_smoke_plan")
+        self.assertEqual(mcp_summary["steps"][0]["package_spec"], "citeguard[mcp]==0.1.0")
+        self.assertEqual(
+            mcp_run.call_args.args[0],
+            [
+                "python3",
+                "scripts/smoke_published_package.py",
+                "--version",
+                __version__,
+                "--extra",
+                "mcp",
+                "--require-extra-import",
+                "mcp",
+            ],
+        )
 
     def test_mcp_smoke_checks_structured_errors(self):
         smoke = (ROOT / "scripts" / "smoke_mcp.py").read_text(encoding="utf-8")

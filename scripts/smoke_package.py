@@ -221,6 +221,7 @@ def _assert_sdist_contains_release_files(sdist_path: Path) -> None:
         "skills/citeguard-verify/SKILL.md",
         "scripts/smoke_mcp.py",
         "scripts/smoke_package.py",
+        "scripts/smoke_published_package.py",
         "scripts/release_package_gate.py",
         "scripts/prepare_support_label_sidecar.py",
         "scripts/compare_support_baselines.py",
