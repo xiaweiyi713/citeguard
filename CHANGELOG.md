@@ -83,9 +83,15 @@
   labels or backend predictions.
 - Added a release-gate contract that keeps the legacy `src` package limited to
   thin `citeguard.*` compatibility shims.
+- Added a default release-gate public API contract so README, tests, scripts,
+  user-facing docs, and `citeguard.*` package code stay on stable public imports
+  instead of the legacy namespace.
 - Added a release-gate cache replay fixture smoke that exports deterministic
   cache fixtures twice and verifies offline replay without timestamp-only
   provenance leaks.
+- Added a default release-gate error-code contract so `citeguard.errors`,
+  `docs/error_codes.md`, recovery guidance, `next_action` mappings, and sample
+  payload shape stay synchronized for agents.
 - Added a default release-gate CLI error contract smoke that runs real
   `python -m citeguard` failures for missing citation input, missing audit
   files, and invalid JSONL support-audit input, then verifies stable
@@ -96,6 +102,9 @@
   `next_action=retry_or_check_source_health`, while source-health summaries keep
   `sources_checked`, `sources_responded`, `sources_failed`, and timeout failure
   kinds separate for agents.
+- Added a default release-gate security/compliance contract so docs, polite
+  `CITEGUARD_MAILTO` status, fixture bypass behavior, gated-source host blocks,
+  and disabled-by-default remote evidence policy stay machine-checkable.
 - Added a default release-gate agent skill contract so packaged
   `citeguard-verify` instructions keep proactive triggers, forbidden behaviors,
   Codex/Claude Code/Cursor setup notes, response templates, MCP payload
@@ -104,6 +113,10 @@
   `extract`, `audit`, `support-audit`, JSONL, `support-set`, and
   `--high-risk-only` examples against an offline fixture, then checks summaries,
   action queues, filtered index traceability, and citation-set result shape.
+- Added a default release-gate benchmark claim safety contract so
+  release-facing docs cannot describe the synthetic support seed set as a
+  human-reviewed benchmark while label provenance still reports
+  `human_reviewed: 0`.
 - Added language coverage and `by_language` support-eval reporting so English
   and Chinese false-support or missed-contradiction risks can be triaged
   separately.

@@ -14,12 +14,16 @@ from citeguard.version import __version__
 from scripts.release_package_gate import (
     _record_agent_skill_contract_gate,
     _record_batch_workflow_examples_gate,
+    _record_benchmark_claim_safety_gate,
     _record_cache_replay_fixture_gate,
     _record_cli_error_contract_gate,
+    _record_error_codes_contract_gate,
     _record_legacy_src_shim_contract,
     _record_mcp_extra_smoke,
     _record_mcp_stdio_smoke,
     _record_published_smoke_plan,
+    _record_public_api_contract_gate,
+    _record_security_compliance_contract_gate,
     _record_source_outage_safety_gate,
     _record_support_label_sidecar_gate,
     _record_support_review_queue_gate,
@@ -341,14 +345,28 @@ License-File: LICENSE
             "--with-deps",
             "--extra mcp",
             "support_label_sidecar_gate",
+            "benchmark_claim_safety",
+            "_record_benchmark_claim_safety_gate",
+            "unsafe_human_reviewed_benchmark_claims",
+            "do not describe the synthetic seed set as a human-reviewed benchmark",
             "legacy_src_shim_contract",
             "_record_legacy_src_shim_contract",
             "legacy shims only; new code imports citeguard.*",
+            "public_api_contract",
+            "_record_public_api_contract_gate",
+            "README, tests, scripts, user-facing docs, and citeguard.* code stay on public citeguard.* imports",
+            "public_offenders",
+            "package_offenders",
             "cache_replay_fixture",
             "_record_cache_replay_fixture_gate",
             "cache export",
             "--deterministic",
             "byte_identical",
+            "error_codes_contract",
+            "_record_error_codes_contract_gate",
+            "stable error codes, recovery guidance, next_action mappings, and docs stay synchronized for agents",
+            "ERROR_CODE_RECOVERY",
+            "ERROR_CODE_NEXT_ACTION",
             "cli_error_contract",
             "_record_cli_error_contract_gate",
             "verify_missing_citation",
@@ -359,6 +377,12 @@ License-File: LICENSE
             "all_sources_failed",
             "outage_limited",
             "retry_or_check_source_health",
+            "security_compliance_contract",
+            "_record_security_compliance_contract_gate",
+            "fixture_bypasses_live_sources",
+            "missing_contact_email",
+            "blocked_gated_source_suffixes",
+            "remote_evidence_policy",
             "agent_skill_contract",
             "_record_agent_skill_contract_gate",
             "without silent edits or source-outage fabrication overclaims",
@@ -659,6 +683,35 @@ License-File: LICENSE
         self.assertEqual(summary["steps"][0]["failures"][0]["language"], "zh")
         self.assertEqual(summary["steps"][0]["metrics"]["high_risk_case_count_by_language"], {"zh": 5})
 
+    def test_release_gate_records_benchmark_claim_safety_contract(self):
+        summary = {"ok": True, "steps": []}
+
+        _record_benchmark_claim_safety_gate(
+            summary,
+            project_root=ROOT,
+            dataset="data/eval/support_eval.json",
+            label_sidecar="data/eval/support_eval_label_sidecar.json",
+        )
+
+        self.assertTrue(summary["ok"])
+        self.assertEqual(summary["steps"][0]["name"], "benchmark_claim_safety")
+        self.assertEqual(summary["steps"][0]["status"], "passed")
+        self.assertEqual(summary["steps"][0]["dataset"], "data/eval/support_eval.json")
+        self.assertEqual(summary["steps"][0]["label_sidecar"], "data/eval/support_eval_label_sidecar.json")
+        self.assertEqual(summary["steps"][0]["case_count"], 40)
+        self.assertEqual(summary["steps"][0]["sidecar_case_count"], 40)
+        self.assertEqual(summary["steps"][0]["human_reviewed"], 0)
+        self.assertEqual(summary["steps"][0]["dual_annotated"], 0)
+        self.assertEqual(summary["steps"][0]["published_benchmark"], 0)
+        self.assertIn("README.md", summary["steps"][0]["release_docs_checked"])
+        self.assertIn("CHANGELOG.md", summary["steps"][0]["release_docs_checked"])
+        self.assertIn("docs/releases/v0.1.0.md", summary["steps"][0]["release_docs_checked"])
+        self.assertEqual(summary["steps"][0]["unsafe_human_reviewed_benchmark_claims"], [])
+        occurrences = summary["steps"][0]["human_reviewed_benchmark_occurrences"]
+        self.assertTrue(any(item["path"] == "README.md" for item in occurrences))
+        self.assertTrue(all(item["qualified_as_not_ready"] for item in occurrences))
+        self.assertIn("synthetic seed set", summary["steps"][0]["policy"])
+
     def test_release_gate_records_legacy_src_shim_contract(self):
         summary = {"ok": True, "steps": []}
 
@@ -671,6 +724,23 @@ License-File: LICENSE
         self.assertLessEqual(summary["steps"][0]["max_lines"], 25)
         self.assertEqual(summary["steps"][0]["checked_root"], "src")
         self.assertEqual(summary["steps"][0]["policy"], "legacy shims only; new code imports citeguard.*")
+
+    def test_release_gate_records_public_api_contract(self):
+        summary = {"ok": True, "steps": []}
+
+        _record_public_api_contract_gate(summary, ROOT)
+
+        self.assertTrue(summary["ok"])
+        self.assertEqual(summary["steps"][0]["name"], "public_api_contract")
+        self.assertEqual(summary["steps"][0]["status"], "passed")
+        self.assertGreater(summary["steps"][0]["public_files_checked"], 0)
+        self.assertGreater(summary["steps"][0]["package_files_checked"], 0)
+        self.assertEqual(summary["steps"][0]["migration_doc"], "docs/public_api_migration.md")
+        self.assertEqual(summary["steps"][0]["public_offenders"], [])
+        self.assertEqual(summary["steps"][0]["package_offenders"], [])
+        self.assertIn("citeguard.verification", summary["steps"][0]["public_packages"])
+        self.assertIn("citeguard.runtime", summary["steps"][0]["public_packages"])
+        self.assertIn("citeguard.* imports", summary["steps"][0]["policy"])
 
     def test_release_gate_records_cache_replay_fixture_contract(self):
         summary = {"ok": True, "steps": []}
@@ -689,6 +759,26 @@ License-File: LICENSE
         self.assertIn("--deterministic", summary["steps"][0]["commands"][0])
         self.assertIn("cache", summary["steps"][0]["commands"][0])
         self.assertIn("export", summary["steps"][0]["commands"][0])
+
+    def test_release_gate_records_error_codes_contract(self):
+        summary = {"ok": True, "steps": []}
+
+        _record_error_codes_contract_gate(summary, project_root=ROOT)
+
+        self.assertTrue(summary["ok"])
+        self.assertEqual(summary["steps"][0]["name"], "error_codes_contract")
+        self.assertEqual(summary["steps"][0]["status"], "passed")
+        self.assertEqual(summary["steps"][0]["schema_version"], ERROR_SCHEMA_VERSION)
+        self.assertEqual(summary["steps"][0]["stable_code_count"], len(STABLE_ERROR_CODES))
+        self.assertEqual(summary["steps"][0]["documented_code_count"], len(STABLE_ERROR_CODES))
+        self.assertGreaterEqual(summary["steps"][0]["documented_next_action_count"], len(set(ERROR_CODE_NEXT_ACTION.values())))
+        self.assertEqual(set(summary["steps"][0]["error_codes"]), STABLE_ERROR_CODES)
+        self.assertEqual(summary["steps"][0]["error_next_actions"]["timeout"], "retry_or_check_source_health")
+        self.assertEqual(summary["steps"][0]["sample_error"]["code"], "missing_citation_input")
+        self.assertEqual(summary["steps"][0]["sample_error"]["next_action"], "provide_missing_input")
+        self.assertEqual(summary["steps"][0]["sample_error"]["details_keys"], ["command"])
+        self.assertEqual(summary["steps"][0]["docs_file"], "docs/error_codes.md")
+        self.assertIn("docs stay synchronized", summary["steps"][0]["policy"])
 
     def test_release_gate_records_cli_error_contract(self):
         summary = {"ok": True, "steps": []}
@@ -737,6 +827,43 @@ License-File: LICENSE
         self.assertEqual(health["failure_kind_sources"], {"timeout": ["openalex"]})
         self.assertEqual(health["next_action"], "retry_or_check_source_health")
         self.assertFalse(health["all_checked_sources_failed"])
+
+    def test_release_gate_records_security_compliance_contract(self):
+        summary = {"ok": True, "steps": []}
+
+        _record_security_compliance_contract_gate(summary, project_root=ROOT)
+
+        self.assertTrue(summary["ok"])
+        self.assertEqual(summary["steps"][0]["name"], "security_compliance_contract")
+        self.assertEqual(summary["steps"][0]["status"], "passed")
+        self.assertEqual(
+            summary["steps"][0]["docs_checked"],
+            ["README.md", "docs/release_checklist.md", "docs/security_compliance.md"],
+        )
+        self.assertIn("cnki.net", summary["steps"][0]["blocked_gated_source_suffixes"])
+        self.assertIn("wanfangdata.com", summary["steps"][0]["blocked_gated_source_suffixes"])
+        self.assertIn("cqvip.com", summary["steps"][0]["blocked_gated_source_suffixes"])
+        missing_contact = summary["steps"][0]["missing_contact"]
+        self.assertEqual(missing_contact["status"], "missing_contact_email")
+        self.assertFalse(missing_contact["compliant"])
+        self.assertEqual(missing_contact["configured_contact_required_sources"], ["openalex", "crossref"])
+        self.assertEqual(missing_contact["next_action"], "fix_configuration")
+        configured_contact = summary["steps"][0]["configured_contact"]
+        self.assertEqual(configured_contact["status"], "configured")
+        self.assertTrue(configured_contact["compliant"])
+        self.assertEqual(configured_contact["configured_contact_required_sources"], ["openalex"])
+        self.assertEqual(configured_contact["next_action"], "continue")
+        fixture_mode = summary["steps"][0]["fixture_mode"]
+        self.assertEqual(fixture_mode["status"], "fixture_bypasses_live_sources")
+        self.assertTrue(fixture_mode["compliant"])
+        self.assertEqual(fixture_mode["next_action"], "continue")
+        polite_access = summary["steps"][0]["source_health_polite_access"]
+        self.assertEqual(polite_access["openalex"]["status"], "missing_contact_email")
+        self.assertEqual(polite_access["crossref"]["status"], "missing_contact_email")
+        self.assertEqual(polite_access["arxiv"]["status"], "not_required")
+        self.assertFalse(summary["steps"][0]["remote_evidence_policy"]["default_enabled"])
+        self.assertFalse(summary["steps"][0]["remote_evidence_policy"]["non_http_urls_allowed"])
+        self.assertIn("no gated-source/paywall bypass", summary["steps"][0]["policy"])
 
     def test_release_gate_records_agent_skill_contract(self):
         summary = {"ok": True, "steps": []}

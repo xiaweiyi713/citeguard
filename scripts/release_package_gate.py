@@ -20,7 +20,7 @@ except ModuleNotFoundError:
 
 ensure_project_root()
 
-from citeguard.errors import ERROR_CODE_NEXT_ACTION, ERROR_CODE_RECOVERY, ERROR_SCHEMA_VERSION
+from citeguard.errors import ERROR_CODE_NEXT_ACTION, ERROR_CODE_RECOVERY, ERROR_SCHEMA_VERSION, STABLE_ERROR_CODES
 from citeguard.version import __version__
 from scripts.smoke_package import _assert_sdist_contains_release_files, _assert_wheel_contains_core_files
 
@@ -109,9 +109,12 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     _record_project_metadata_contract(summary, project_root)
     _record_legacy_src_shim_contract(summary, project_root)
+    _record_public_api_contract_gate(summary, project_root)
     _record_cache_replay_fixture_gate(summary, python=args.python, project_root=project_root)
+    _record_error_codes_contract_gate(summary, project_root=project_root)
     _record_cli_error_contract_gate(summary, python=args.python, project_root=project_root)
     _record_source_outage_safety_gate(summary, project_root=project_root)
+    _record_security_compliance_contract_gate(summary, project_root=project_root)
     _record_agent_skill_contract_gate(summary, project_root=project_root)
     _record_batch_workflow_examples_gate(summary, python=args.python, project_root=project_root)
 
@@ -131,6 +134,12 @@ def main(argv: Optional[List[str]] = None) -> int:
             min_raw_dual_agreement_rate=args.min_raw_dual_agreement_rate,
             max_supported_disagreements=args.max_supported_disagreements,
         )
+    _record_benchmark_claim_safety_gate(
+        summary,
+        project_root=project_root,
+        dataset=args.support_eval_dataset,
+        label_sidecar=args.support_label_sidecar,
+    )
     if not args.skip_support_review_queue:
         _record_support_review_queue_gate(
             summary,
@@ -285,6 +294,106 @@ def _check_legacy_src_shim_contract(project_root: Path) -> Dict[str, Any]:
     }
 
 
+def _record_public_api_contract_gate(summary: Dict[str, Any], project_root: Path) -> None:
+    try:
+        details = _check_public_api_contract(project_root)
+    except Exception as exc:
+        summary["steps"].append(
+            {
+                "name": "public_api_contract",
+                "status": "failed",
+                "message": str(exc),
+            }
+        )
+        summary["ok"] = False
+        return
+
+    summary["steps"].append(
+        {
+            "name": "public_api_contract",
+            "status": "passed",
+            **details,
+        }
+    )
+
+
+def _check_public_api_contract(project_root: Path) -> Dict[str, Any]:
+    public_paths = _public_api_contract_paths(project_root)
+    package_paths = sorted((project_root / "citeguard").rglob("*.py"))
+    legacy_namespace = "s" + "rc"
+    pattern = re.compile(rf"\b(from\s+{legacy_namespace}\.|import\s+{legacy_namespace}\b|{legacy_namespace}\.)")
+    public_offenders = _paths_with_legacy_src_references(project_root, public_paths, pattern)
+    package_offenders = _paths_with_legacy_src_references(project_root, package_paths, pattern)
+    migration = _read_required_text(project_root / "docs" / "public_api_migration.md")
+
+    missing_migration_targets = [
+        package
+        for package in [
+            "citeguard.verification",
+            "citeguard.retrieval",
+            "citeguard.mcp",
+            "citeguard.cli",
+            "citeguard.runtime",
+        ]
+        if package not in migration
+    ]
+    errors = []
+    if public_offenders:
+        errors.append("public docs/tests/scripts reference legacy src namespace: " + ", ".join(public_offenders))
+    if package_offenders:
+        errors.append("citeguard package references legacy src namespace: " + ", ".join(package_offenders))
+    if missing_migration_targets:
+        errors.append("docs/public_api_migration.md missing public packages: " + ", ".join(missing_migration_targets))
+    if "temporary compatibility bridge" not in migration or "DeprecationWarning" not in migration:
+        errors.append("public API migration doc must describe legacy src as a temporary compatibility bridge")
+    if errors:
+        raise RuntimeError("; ".join(errors))
+
+    return {
+        "public_files_checked": len(public_paths),
+        "package_files_checked": len(package_paths),
+        "migration_doc": "docs/public_api_migration.md",
+        "public_packages": [
+            "citeguard.verification",
+            "citeguard.retrieval",
+            "citeguard.mcp",
+            "citeguard.cli",
+            "citeguard.runtime",
+        ],
+        "legacy_reference_pattern": "legacy namespace import/use",
+        "public_offenders": public_offenders,
+        "package_offenders": package_offenders,
+        "policy": "README, tests, scripts, user-facing docs, and citeguard.* code stay on public citeguard.* imports",
+    }
+
+
+def _public_api_contract_paths(project_root: Path) -> List[Path]:
+    paths = [
+        project_root / "README.md",
+        project_root / "CHANGELOG.md",
+        project_root / "docs" / "benchmark_design.md",
+        project_root / "docs" / "cli_reference.md",
+        project_root / "docs" / "mcp_setup.md",
+        project_root / "docs" / "error_codes.md",
+        project_root / "docs" / "release_checklist.md",
+        project_root / "docs" / "security_compliance.md",
+        project_root / "docs" / "support_labeling_guidelines.md",
+        project_root / "skills" / "citeguard-verify" / "SKILL.md",
+    ]
+    paths.extend(sorted((project_root / "tests").glob("test_*.py")))
+    paths.extend(sorted((project_root / "scripts").glob("*.py")))
+    return [path for path in paths if path.exists()]
+
+
+def _paths_with_legacy_src_references(project_root: Path, paths: List[Path], pattern: re.Pattern[str]) -> List[str]:
+    offenders = []
+    for path in paths:
+        text = path.read_text(encoding="utf-8")
+        if pattern.search(text):
+            offenders.append(path.relative_to(project_root).as_posix())
+    return offenders
+
+
 def _record_cache_replay_fixture_gate(summary: Dict[str, Any], *, python: str, project_root: Path) -> None:
     try:
         details = _check_cache_replay_fixture_gate(python=python, project_root=project_root)
@@ -393,6 +502,125 @@ def _check_cache_replay_fixture_gate(*, python: str, project_root: Path) -> Dict
         "fixture_record_count": len(fixture_records),
         "replay_record_title": replay_records[0].title if replay_records else "",
         "leaked_timestamp_fields": sorted(set(leaked_timestamp_fields)),
+    }
+
+
+def _record_error_codes_contract_gate(summary: Dict[str, Any], *, project_root: Path) -> None:
+    try:
+        details = _check_error_codes_contract_gate(project_root=project_root)
+    except Exception as exc:
+        summary["steps"].append(
+            {
+                "name": "error_codes_contract",
+                "status": "failed",
+                "message": str(exc),
+            }
+        )
+        summary["ok"] = False
+        return
+
+    summary["steps"].append(
+        {
+            "name": "error_codes_contract",
+            "status": "passed",
+            **details,
+        }
+    )
+
+
+def _check_error_codes_contract_gate(*, project_root: Path) -> Dict[str, Any]:
+    from citeguard.errors import error_payload, is_stable_error_code
+    from citeguard.verification import STABLE_NEXT_ACTIONS
+
+    docs = _read_required_text(project_root / "docs" / "error_codes.md")
+    stable_codes_section = docs.split("## Stable Codes", 1)[1].split("## Details Contract", 1)[0]
+    next_action_section = docs.split("## Stable next_action Values", 1)[1].split("## Stable Codes", 1)[0]
+    documented_codes = set(re.findall(r"\| `([^`]+)` \|", stable_codes_section))
+    documented_next_actions = set(re.findall(r"\| `([^`]+)` \|", next_action_section))
+    registry_codes = set(STABLE_ERROR_CODES)
+    registry_next_actions = set(ERROR_CODE_NEXT_ACTION.values())
+
+    probe = error_payload(
+        "missing_citation_input",
+        "Provide citation input.",
+        details={"command": "verify"},
+        exit_code=2,
+    )
+
+    errors = []
+    if registry_codes != set(ERROR_CODE_RECOVERY):
+        errors.append("STABLE_ERROR_CODES must match ERROR_CODE_RECOVERY keys")
+    if registry_codes != set(ERROR_CODE_NEXT_ACTION):
+        errors.append("STABLE_ERROR_CODES must match ERROR_CODE_NEXT_ACTION keys")
+    if documented_codes != registry_codes:
+        errors.append(
+            "docs/error_codes.md stable code table mismatch: "
+            f"missing={sorted(registry_codes - documented_codes)} extra={sorted(documented_codes - registry_codes)}"
+        )
+    if documented_next_actions != STABLE_NEXT_ACTIONS:
+        errors.append(
+            "docs/error_codes.md next_action table mismatch: "
+            f"missing={sorted(STABLE_NEXT_ACTIONS - documented_next_actions)} "
+            f"extra={sorted(documented_next_actions - STABLE_NEXT_ACTIONS)}"
+        )
+    if not registry_next_actions.issubset(STABLE_NEXT_ACTIONS):
+        errors.append(
+            "ERROR_CODE_NEXT_ACTION values must be stable next actions: "
+            + ", ".join(sorted(registry_next_actions - STABLE_NEXT_ACTIONS))
+        )
+    for code in registry_codes:
+        if not is_stable_error_code(code):
+            errors.append(f"is_stable_error_code rejected documented code {code}")
+        if not ERROR_CODE_RECOVERY.get(code):
+            errors.append(f"ERROR_CODE_RECOVERY[{code}] must be non-empty")
+        if not ERROR_CODE_NEXT_ACTION.get(code):
+            errors.append(f"ERROR_CODE_NEXT_ACTION[{code}] must be non-empty")
+    required_phrases = [
+        "ERROR_SCHEMA_VERSION",
+        "ERROR_CODE_RECOVERY",
+        "ERROR_CODE_NEXT_ACTION",
+        "`error.recovery` is present on every error payload",
+        "`error.next_action` is present on every error payload",
+        "MCP tools return the same shape as the tool result",
+        "Prefer `error.next_action` for workflow branching",
+    ]
+    normalized_docs = _normalize_markdown_text(docs)
+    for phrase in required_phrases:
+        if _normalize_markdown_text(phrase) not in normalized_docs:
+            errors.append(f"docs/error_codes.md missing required phrase: {phrase}")
+    if probe.get("ok") is not False:
+        errors.append("error_payload must set ok=false")
+    if probe.get("schema_version") != ERROR_SCHEMA_VERSION:
+        errors.append("error_payload schema_version mismatch")
+    if probe.get("exit_code") != 2:
+        errors.append("error_payload exit_code mismatch")
+    probe_error = probe.get("error", {})
+    if probe_error.get("code") != "missing_citation_input":
+        errors.append("error_payload did not preserve code")
+    if probe_error.get("details") != {"command": "verify"}:
+        errors.append("error_payload did not preserve details")
+    if probe_error.get("recovery") != ERROR_CODE_RECOVERY["missing_citation_input"]:
+        errors.append("error_payload recovery mismatch")
+    if probe_error.get("next_action") != ERROR_CODE_NEXT_ACTION["missing_citation_input"]:
+        errors.append("error_payload next_action mismatch")
+    if errors:
+        raise RuntimeError("; ".join(errors))
+
+    return {
+        "schema_version": ERROR_SCHEMA_VERSION,
+        "documented_code_count": len(documented_codes),
+        "stable_code_count": len(registry_codes),
+        "documented_next_action_count": len(documented_next_actions),
+        "error_codes": sorted(registry_codes),
+        "error_next_actions": {code: ERROR_CODE_NEXT_ACTION[code] for code in sorted(registry_codes)},
+        "docs_file": "docs/error_codes.md",
+        "sample_error": {
+            "code": probe_error.get("code"),
+            "next_action": probe_error.get("next_action"),
+            "recovery": probe_error.get("recovery"),
+            "details_keys": sorted(probe_error.get("details", {})),
+        },
+        "policy": "stable error codes, recovery guidance, next_action mappings, and docs stay synchronized for agents",
     }
 
 
@@ -707,6 +935,166 @@ class _ReleaseGateTimeoutSource:
 
     def lookup(self, candidate: Any) -> Any:
         raise TimeoutError(f"{self.name} timed out during release gate lookup")
+
+
+def _record_security_compliance_contract_gate(summary: Dict[str, Any], *, project_root: Path) -> None:
+    try:
+        details = _check_security_compliance_contract_gate(project_root=project_root)
+    except Exception as exc:
+        summary["steps"].append(
+            {
+                "name": "security_compliance_contract",
+                "status": "failed",
+                "message": str(exc),
+            }
+        )
+        summary["ok"] = False
+        return
+
+    summary["steps"].append(
+        {
+            "name": "security_compliance_contract",
+            "status": "passed",
+            **details,
+        }
+    )
+
+
+def _check_security_compliance_contract_gate(*, project_root: Path) -> Dict[str, Any]:
+    from citeguard.retrieval.scholarly_clients.evidence import BLOCKED_EVIDENCE_HOST_SUFFIXES
+    from citeguard.runtime import environment_status, polite_access_status, source_health_status
+
+    docs = {
+        "README.md": _read_required_text(project_root / "README.md"),
+        "docs/security_compliance.md": _read_required_text(project_root / "docs" / "security_compliance.md"),
+        "docs/release_checklist.md": _read_required_text(project_root / "docs" / "release_checklist.md"),
+    }
+    combined_docs = "\n".join(docs.values())
+    required_doc_phrases = {
+        "cnki_boundary": "does not scrape CNKI",
+        "wanfang_boundary": "Wanfang",
+        "paywall_boundary": "must not bypass paywalls",
+        "robots_boundary": "robots.txt",
+        "mailto_config": "CITEGUARD_MAILTO",
+        "not_legal_authority": "not a legal authority",
+        "human_integrity_decisions": "Final decisions about research integrity",
+        "not_fake_overclaim": "not proof that a citation is fake",
+    }
+
+    missing = []
+    for name, phrase in required_doc_phrases.items():
+        if phrase not in combined_docs:
+            missing.append(f"compliance docs missing {name}: {phrase}")
+
+    missing_contact = polite_access_status(
+        env={
+            "CITEGUARD_SOURCES": "openalex,crossref",
+        }
+    )
+    configured_contact = polite_access_status(
+        env={
+            "CITEGUARD_SOURCES": "openalex,arxiv",
+            "CITEGUARD_MAILTO": "release-gate@example.com",
+        }
+    )
+    fixture_mode = polite_access_status(
+        env={
+            "CITEGUARD_FIXTURE_CITATIONS": "examples/citations.json",
+        }
+    )
+    health = source_health_status(
+        env={
+            "CITEGUARD_SOURCES": "openalex,crossref,arxiv",
+        },
+        check_live=False,
+    )
+    env_status = environment_status(
+        env={
+            "CITEGUARD_SOURCES": "openalex,crossref",
+            "CITEGUARD_REMOTE_EVIDENCE": "0",
+        },
+        check_sources=False,
+    )
+
+    if missing_contact.get("status") != "missing_contact_email":
+        missing.append("polite_access_status should flag missing OpenAlex/Crossref contact email")
+    if missing_contact.get("compliant") is not False:
+        missing.append("missing CITEGUARD_MAILTO should be non-compliant for OpenAlex/Crossref")
+    if missing_contact.get("configured_contact_required_sources") != ["openalex", "crossref"]:
+        missing.append("missing-contact summary should identify OpenAlex and Crossref")
+    if missing_contact.get("next_action") != "fix_configuration":
+        missing.append("missing-contact next_action should be fix_configuration")
+
+    if configured_contact.get("status") != "configured":
+        missing.append("configured CITEGUARD_MAILTO should report status=configured")
+    if configured_contact.get("compliant") is not True:
+        missing.append("configured CITEGUARD_MAILTO should be compliant")
+    if configured_contact.get("configured_contact_required_sources") != ["openalex"]:
+        missing.append("configured-contact summary should identify configured contact-required sources")
+    if configured_contact.get("next_action") != "continue":
+        missing.append("configured-contact next_action should be continue")
+
+    if fixture_mode.get("status") != "fixture_bypasses_live_sources":
+        missing.append("fixture mode should report fixture_bypasses_live_sources")
+    if fixture_mode.get("compliant") is not True:
+        missing.append("fixture mode should be compliant without live-source contact email")
+    if fixture_mode.get("next_action") != "continue":
+        missing.append("fixture-mode next_action should be continue")
+
+    sources = {source.get("name"): source for source in health.get("sources", [])}
+    for source_name in ["openalex", "crossref"]:
+        polite = sources.get(source_name, {}).get("polite_access", {})
+        if polite.get("status") != "missing_contact_email":
+            missing.append(f"{source_name} source health should expose missing_contact_email polite access")
+        if polite.get("next_action") != "fix_configuration":
+            missing.append(f"{source_name} source health should expose fix_configuration next_action")
+
+    remote_policy = env_status.get("remote_evidence_policy", {})
+    blocked_suffixes = list(BLOCKED_EVIDENCE_HOST_SUFFIXES)
+    for suffix in ["cnki.net", "wanfangdata.com", "cqvip.com"]:
+        if suffix not in blocked_suffixes:
+            missing.append(f"blocked gated source suffix missing: {suffix}")
+        if suffix not in remote_policy.get("blocked_host_suffixes", []):
+            missing.append(f"environment_status remote policy missing blocked suffix: {suffix}")
+    if remote_policy.get("default_enabled") is not False:
+        missing.append("remote evidence policy should remain disabled by default")
+    if remote_policy.get("non_http_urls_allowed") is not False:
+        missing.append("remote evidence policy should reject non-HTTP URLs")
+
+    if missing:
+        raise RuntimeError("; ".join(missing))
+
+    return {
+        "docs_checked": sorted(docs),
+        "blocked_gated_source_suffixes": blocked_suffixes,
+        "missing_contact": {
+            "status": missing_contact.get("status"),
+            "compliant": missing_contact.get("compliant"),
+            "configured_contact_required_sources": missing_contact.get("configured_contact_required_sources"),
+            "next_action": missing_contact.get("next_action"),
+        },
+        "configured_contact": {
+            "status": configured_contact.get("status"),
+            "compliant": configured_contact.get("compliant"),
+            "configured_contact_required_sources": configured_contact.get("configured_contact_required_sources"),
+            "next_action": configured_contact.get("next_action"),
+        },
+        "fixture_mode": {
+            "status": fixture_mode.get("status"),
+            "compliant": fixture_mode.get("compliant"),
+            "next_action": fixture_mode.get("next_action"),
+        },
+        "source_health_polite_access": {
+            name: sources.get(name, {}).get("polite_access", {})
+            for name in ["openalex", "crossref", "arxiv"]
+        },
+        "remote_evidence_policy": {
+            "enabled": remote_policy.get("enabled"),
+            "default_enabled": remote_policy.get("default_enabled"),
+            "non_http_urls_allowed": remote_policy.get("non_http_urls_allowed"),
+        },
+        "policy": "release gate enforces polite live-source access and no gated-source/paywall bypass boundaries",
+    }
 
 
 def _record_agent_skill_contract_gate(summary: Dict[str, Any], *, project_root: Path) -> None:
@@ -1232,6 +1620,127 @@ def _record_support_label_sidecar_gate(
     )
     if not passed:
         summary["ok"] = False
+
+
+def _record_benchmark_claim_safety_gate(
+    summary: Dict[str, Any],
+    *,
+    project_root: Path,
+    dataset: str,
+    label_sidecar: str,
+) -> None:
+    try:
+        details = _check_benchmark_claim_safety_gate(
+            project_root=project_root,
+            dataset=dataset,
+            label_sidecar=label_sidecar,
+        )
+    except Exception as exc:
+        summary["steps"].append(
+            {
+                "name": "benchmark_claim_safety",
+                "status": "failed",
+                "message": str(exc),
+            }
+        )
+        summary["ok"] = False
+        return
+
+    summary["steps"].append(
+        {
+            "name": "benchmark_claim_safety",
+            "status": "passed",
+            **details,
+        }
+    )
+
+
+def _check_benchmark_claim_safety_gate(*, project_root: Path, dataset: str, label_sidecar: str) -> Dict[str, Any]:
+    from citeguard.verification.support_eval import load_support_label_cases, load_support_label_sidecar
+
+    cases = load_support_label_cases(str(project_root / dataset))
+    sidecar = load_support_label_sidecar(str(project_root / label_sidecar), cases)
+    human_reviewed = sum(1 for item in sidecar if item.adjudication_status != "not_human_reviewed")
+    dual_annotated = sum(1 for item in sidecar if item.annotator_count >= 2)
+    published_benchmark = sum(1 for item in sidecar if item.adjudication_status == "published_benchmark")
+
+    release_docs = {
+        "README.md": project_root / "README.md",
+        "CHANGELOG.md": project_root / "CHANGELOG.md",
+    }
+    releases_dir = project_root / "docs" / "releases"
+    if releases_dir.exists():
+        for path in sorted(releases_dir.glob("*.md")):
+            release_docs[str(path.relative_to(project_root))] = path
+
+    occurrences = []
+    unsafe_occurrences = []
+    for label, path in release_docs.items():
+        for occurrence in _human_reviewed_benchmark_occurrences(_read_required_text(path), label):
+            occurrences.append(occurrence)
+            if human_reviewed == 0 and not occurrence["qualified_as_not_ready"]:
+                unsafe_occurrences.append(occurrence)
+
+    required_guard_docs = {
+        "README.md": "not a final human-reviewed benchmark",
+        "docs/release_checklist.md": "should not call it a human-reviewed benchmark",
+        "docs/benchmark_todo.md": "not a human-reviewed benchmark",
+    }
+    errors = [
+        f"{label} missing guard phrase: {phrase}"
+        for label, phrase in required_guard_docs.items()
+        if _normalize_markdown_text(phrase) not in _normalize_markdown_text(_read_required_text(project_root / label))
+    ]
+    if unsafe_occurrences:
+        errors.append(
+            "release-facing docs contain unqualified human-reviewed benchmark claims while human_reviewed=0: "
+            + ", ".join(f"{item['path']}:{item['line']}" for item in unsafe_occurrences)
+        )
+    if human_reviewed == 0 and published_benchmark:
+        errors.append("published_benchmark sidecar status cannot appear when human_reviewed=0")
+    if errors:
+        raise RuntimeError("; ".join(errors))
+
+    return {
+        "dataset": dataset,
+        "label_sidecar": label_sidecar,
+        "case_count": len(cases),
+        "sidecar_case_count": len(sidecar),
+        "human_reviewed": human_reviewed,
+        "dual_annotated": dual_annotated,
+        "published_benchmark": published_benchmark,
+        "release_docs_checked": sorted(release_docs),
+        "human_reviewed_benchmark_occurrences": occurrences,
+        "unsafe_human_reviewed_benchmark_claims": unsafe_occurrences,
+        "policy": "do not describe the synthetic seed set as a human-reviewed benchmark until sidecar maturity proves it",
+    }
+
+
+def _human_reviewed_benchmark_occurrences(text: str, path_label: str) -> List[Dict[str, Any]]:
+    pattern = re.compile(r"\bhuman[- ]reviewed\s+(?:support\s+)?benchmark\b", re.IGNORECASE)
+    qualifier_pattern = re.compile(
+        r"\b(not|not yet|not a|not final|should not|until|before|cannot|can't|large|synthetic)\b",
+        re.IGNORECASE,
+    )
+    occurrences: List[Dict[str, Any]] = []
+    lines = text.splitlines()
+    for index, line in enumerate(lines):
+        if not pattern.search(line):
+            continue
+        context = " ".join(lines[max(0, index - 2) : min(len(lines), index + 3)])
+        occurrences.append(
+            {
+                "path": path_label,
+                "line": index + 1,
+                "text": line.strip(),
+                "qualified_as_not_ready": bool(qualifier_pattern.search(context)),
+            }
+        )
+    return occurrences
+
+
+def _normalize_markdown_text(text: str) -> str:
+    return re.sub(r"\s+", " ", text).strip()
 
 
 def _record_support_review_queue_gate(

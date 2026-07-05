@@ -419,7 +419,7 @@ python3 scripts/smoke_package.py           # fresh-venv source install smoke, in
 python3 scripts/smoke_package.py --install-mode wheel  # fresh-venv wheel install smoke
 python3 scripts/smoke_package.py --install-mode sdist  # fresh-venv source distribution smoke
 python3 scripts/smoke_package.py --install-mode wheel --extra mcp --with-deps  # verifies MCP extra deps
-python3 scripts/release_package_gate.py    # package + CLI error + source-outage + agent-skill + batch examples + support-label release gate; add --require-build-tools before publishing
+python3 scripts/release_package_gate.py    # package + public-api + error-code + CLI error + source-outage + compliance + agent-skill + batch examples + support-label + benchmark-claim release gate; add --require-build-tools before publishing
 python3 scripts/release_package_gate.py --skip-install-smoke --include-mcp-extra-smoke --require-mcp-extra-smoke
 python3 scripts/release_package_gate.py --skip-install-smoke --include-mcp-stdio-smoke --require-mcp-stdio-smoke
 python3 scripts/release_package_gate.py --skip-install-smoke --include-published-smoke-plan --include-published-mcp-smoke-plan

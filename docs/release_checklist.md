@@ -28,13 +28,20 @@ agent skill bundle.
   package archive cleanliness, verifies expected release files, runs the
   `project_metadata_contract` source-file gate, runs the
   `legacy_src_shim_contract` to keep the legacy `src` package thin and
-  `citeguard.*`-forwarding, records `cache_replay_fixture` by exporting a
+  `citeguard.*`-forwarding, records `public_api_contract` so README, tests,
+  scripts, user-facing docs, and `citeguard.*` code stay free of legacy
+  namespace imports, records `cache_replay_fixture` by exporting a
   deterministic cache fixture twice and replaying it offline, records
-  `cli_error_contract` by running real `python -m citeguard` failures for
+  `error_codes_contract` so `citeguard.errors`, `docs/error_codes.md`,
+  recovery guidance, and `next_action` mappings remain synchronized for agents,
+  and records `cli_error_contract` by running real `python -m citeguard` failures for
   `verify_missing_citation`, `audit_missing_file`, and
   `support_audit_invalid_jsonl`, records `source_outage_safety` so all-source
   failures stay `not_found`, low-confidence, `outage_limited`, and routed to
   `retry_or_check_source_health` instead of fabrication overclaims, records
+  `security_compliance_contract` so security docs, `CITEGUARD_MAILTO` polite
+  access states, fixture bypass status, blocked gated-source suffixes, and the
+  disabled-by-default remote evidence policy remain machine-checkable, records
   `agent_skill_contract` so the packaged skill keeps proactive triggers,
   forbidden behaviors, Codex/Claude Code/Cursor setup notes, response templates,
   MCP payload examples, and safe wording examples, records
@@ -42,9 +49,11 @@ agent skill bundle.
   claim-support audit, JSONL, citation-set, and high-risk-only example workflows
   against an offline fixture, runs the
   `support_label_sidecar_gate` provenance check, records its structured
-  `thresholds`, `metrics`, and `failures`, records `support_review_queue` and
-  `support_review_queue_annotation_packet` so the fixture queue and heuristic
-  blinded packet path are release-smoked, checks the built artifact
+  `thresholds`, `metrics`, and `failures`, records `benchmark_claim_safety` so
+  release-facing docs cannot make unqualified human-reviewed benchmark claims
+  while the sidecar still reports `human_reviewed: 0`, records
+  `support_review_queue` and `support_review_queue_annotation_packet` so the
+  fixture queue and heuristic blinded packet path are release-smoked, checks the built artifact
   distribution metadata contract, and runs PEP 517 `python -m build` plus
   `python -m twine check` when release tools are installed. The MCP extra gate
   records `mcp_extra_wheel_install_smoke` in the release summary and should be
