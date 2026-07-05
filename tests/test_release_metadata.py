@@ -715,6 +715,11 @@ License-File: LICENSE
             "stage=remote_evidence",
             "Do not",
             "claim full-text or landing-page support from the missing snippet",
+            "failure_kind_counts",
+            "failure_kind_sources",
+            "rate_limited",
+            "source_health.summary.next_action",
+            "not evidence of fabrication",
         ]
         for phrase in required_phrases:
             with self.subTest(phrase=phrase):

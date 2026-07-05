@@ -84,7 +84,10 @@ Proactive trigger checklist:
    wants slower, deeper landing-page snippet harvesting.
    To diagnose source outages, call `citeguard_status_tool` with
    `check_sources=true` and, when useful, a project-specific `health_query`.
-   Do not run live probes repeatedly during normal citation checks.
+   Do not run live probes repeatedly during normal citation checks. In the
+   returned `source_health.summary`, branch on `failure_kind_counts` and
+   `failure_kind_sources` to distinguish timeouts, rate limits, HTTP errors, and
+   network failures without parsing prose.
 1. For a single citation, call the `verify_citation_tool` MCP tool with structured
    fields (`title`, `authors`, `year`, `doi`, `arxiv_id`) when you have them, or
    `raw_text` for a free-text reference. Identifiers (DOI/arXiv) give the most
@@ -165,6 +168,11 @@ configured via environment variables.
   `sources_failed` for source outages. `sources_responded` only means a source
   returned candidate records, so an empty `sources_responded` is not by itself an
   outage.
+- For status probes, read `source_health.summary.failure_kind_counts` and
+  `failure_kind_sources`. If the dominant kind is `timeout`, recommend retrying
+  or increasing timeouts; if it is `rate_limited`, recommend waiting, reducing
+  batch size, or configuring credentials. In every case, say source health
+  degraded confidence but is not evidence of fabrication.
 - Use `next_action` when present for workflow branching instead of parsing
   `explanation`; use `recovery_code` as the underlying reason when it is present
   (`ambiguous_citation`, `timeout`, or `source_unavailable`).
@@ -225,6 +233,22 @@ Single citation:
   }
 }
 ```
+
+Source health probe:
+
+```json
+{
+  "tool": "citeguard_status_tool",
+  "arguments": {
+    "check_sources": true,
+    "health_query": "Attention Is All You Need"
+  }
+}
+```
+
+If `source_health.summary.degraded=true`, summarize `sources_available`,
+`sources_failed`, `failure_kind_counts`, and `failure_kind_sources`; then branch
+on `source_health.summary.next_action`.
 
 Batch citation audit:
 
@@ -379,6 +403,12 @@ Source outage:
 > CiteGuard could not reach one or more sources, so this result is inconclusive.
 > I will not treat source failure as evidence that the citation is fake. If
 > `outage_limited=true`, I should retry or ask for stronger identifiers.
+
+Rate-limited source health:
+
+> CiteGuard reached the status probe, but Semantic Scholar is rate-limited
+> (`failure_kind_counts.rate_limited=1`). I should wait, reduce batch size, or
+> configure credentials; this does not make any unresolved citation fake.
 
 Remote evidence harvest failure:
 
