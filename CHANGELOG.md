@@ -86,6 +86,24 @@
 - Added a release-gate cache replay fixture smoke that exports deterministic
   cache fixtures twice and verifies offline replay without timestamp-only
   provenance leaks.
+- Added a default release-gate CLI error contract smoke that runs real
+  `python -m citeguard` failures for missing citation input, missing audit
+  files, and invalid JSONL support-audit input, then verifies stable
+  `schema_version`, `error.code`, `error.recovery`, `error.next_action`, and
+  `details` fields.
+- Added a default release-gate source-outage safety contract so all-source
+  failures stay low-confidence, `outage_limited` `not_found` results with
+  `next_action=retry_or_check_source_health`, while source-health summaries keep
+  `sources_checked`, `sources_responded`, `sources_failed`, and timeout failure
+  kinds separate for agents.
+- Added a default release-gate agent skill contract so packaged
+  `citeguard-verify` instructions keep proactive triggers, forbidden behaviors,
+  Codex/Claude Code/Cursor setup notes, response templates, MCP payload
+  examples, and safe wording examples for not-found/source-outage cases.
+- Added a default release-gate batch workflow examples smoke that runs packaged
+  `extract`, `audit`, `support-audit`, JSONL, `support-set`, and
+  `--high-risk-only` examples against an offline fixture, then checks summaries,
+  action queues, filtered index traceability, and citation-set result shape.
 - Added language coverage and `by_language` support-eval reporting so English
   and Chinese false-support or missed-contradiction risks can be triaged
   separately.

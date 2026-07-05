@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import subprocess
 import sys
@@ -19,6 +20,7 @@ except ModuleNotFoundError:
 
 ensure_project_root()
 
+from citeguard.errors import ERROR_CODE_NEXT_ACTION, ERROR_CODE_RECOVERY, ERROR_SCHEMA_VERSION
 from citeguard.version import __version__
 from scripts.smoke_package import _assert_sdist_contains_release_files, _assert_wheel_contains_core_files
 
@@ -108,6 +110,10 @@ def main(argv: Optional[List[str]] = None) -> int:
     _record_project_metadata_contract(summary, project_root)
     _record_legacy_src_shim_contract(summary, project_root)
     _record_cache_replay_fixture_gate(summary, python=args.python, project_root=project_root)
+    _record_cli_error_contract_gate(summary, python=args.python, project_root=project_root)
+    _record_source_outage_safety_gate(summary, project_root=project_root)
+    _record_agent_skill_contract_gate(summary, project_root=project_root)
+    _record_batch_workflow_examples_gate(summary, python=args.python, project_root=project_root)
 
     if not args.skip_support_label_gate:
         _record_support_label_sidecar_gate(
@@ -388,6 +394,589 @@ def _check_cache_replay_fixture_gate(*, python: str, project_root: Path) -> Dict
         "replay_record_title": replay_records[0].title if replay_records else "",
         "leaked_timestamp_fields": sorted(set(leaked_timestamp_fields)),
     }
+
+
+def _record_cli_error_contract_gate(summary: Dict[str, Any], *, python: str, project_root: Path) -> None:
+    try:
+        details = _check_cli_error_contract_gate(python=python, project_root=project_root)
+    except Exception as exc:
+        summary["steps"].append(
+            {
+                "name": "cli_error_contract",
+                "status": "failed",
+                "message": str(exc),
+            }
+        )
+        summary["ok"] = False
+        return
+
+    summary["steps"].append(
+        {
+            "name": "cli_error_contract",
+            "status": "passed",
+            **details,
+        }
+    )
+
+
+def _check_cli_error_contract_gate(*, python: str, project_root: Path) -> Dict[str, Any]:
+    with tempfile.TemporaryDirectory(prefix="citeguard-cli-errors-") as tmpdir:
+        tmp = Path(tmpdir)
+        missing_audit_path = tmp / "missing-citations.json"
+        invalid_support_jsonl = tmp / "invalid-support.jsonl"
+        invalid_support_jsonl.write_text('{"claim": ', encoding="utf-8")
+
+        cases = [
+            {
+                "name": "verify_missing_citation",
+                "command": [python, "-m", "citeguard", "verify"],
+                "expected_code": "missing_citation_input",
+                "expected_next_action": "provide_missing_input",
+                "expected_details": {"command": "verify"},
+            },
+            {
+                "name": "audit_missing_file",
+                "command": [python, "-m", "citeguard", "audit", str(missing_audit_path)],
+                "expected_code": "file_error",
+                "expected_next_action": "repair_input",
+                "expected_details": {
+                    "command": "audit",
+                    "field": "path",
+                    "filename": str(missing_audit_path),
+                },
+                "required_detail_keys": ["errno"],
+            },
+            {
+                "name": "support_audit_invalid_jsonl",
+                "command": [python, "-m", "citeguard", "support-audit", str(invalid_support_jsonl)],
+                "expected_code": "invalid_json",
+                "expected_next_action": "repair_input",
+                "expected_details": {
+                    "command": "support-audit",
+                    "line": 1,
+                    "column": 11,
+                },
+            },
+        ]
+
+        checked_cases = [
+            _run_expected_cli_error(case, cwd=project_root)
+            for case in cases
+        ]
+
+    return {
+        "schema_version": ERROR_SCHEMA_VERSION,
+        "cases": checked_cases,
+    }
+
+
+def _run_expected_cli_error(case: Dict[str, Any], *, cwd: Path) -> Dict[str, Any]:
+    command = case["command"]
+    completed = subprocess.run(
+        command,
+        cwd=str(cwd),
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    if completed.returncode == 0:
+        raise RuntimeError(f"{case['name']} unexpectedly succeeded")
+    if completed.stdout.strip():
+        raise RuntimeError(f"{case['name']} wrote unexpected stdout: {completed.stdout.strip()}")
+
+    try:
+        payload = json.loads(completed.stderr)
+    except json.JSONDecodeError as exc:
+        raise RuntimeError(f"{case['name']} did not write JSON error payload to stderr: {exc}") from exc
+    if not isinstance(payload, dict):
+        raise RuntimeError(f"{case['name']} wrote a non-object JSON error payload")
+
+    _validate_cli_error_payload(
+        case_name=case["name"],
+        payload=payload,
+        returncode=completed.returncode,
+        expected_code=case["expected_code"],
+        expected_next_action=case["expected_next_action"],
+        expected_details=case.get("expected_details", {}),
+        required_detail_keys=case.get("required_detail_keys", []),
+    )
+    error = payload["error"]
+    details = error["details"]
+    return {
+        "name": case["name"],
+        "command": command,
+        "exit_code": completed.returncode,
+        "expected_code": case["expected_code"],
+        "actual_code": error["code"],
+        "next_action": error["next_action"],
+        "details_keys": sorted(details),
+    }
+
+
+def _validate_cli_error_payload(
+    *,
+    case_name: str,
+    payload: Dict[str, Any],
+    returncode: int,
+    expected_code: str,
+    expected_next_action: str,
+    expected_details: Dict[str, Any],
+    required_detail_keys: List[str],
+) -> None:
+    errors = []
+    if payload.get("ok") is not False:
+        errors.append("ok must be false")
+    if payload.get("schema_version") != ERROR_SCHEMA_VERSION:
+        errors.append(f"schema_version must be {ERROR_SCHEMA_VERSION}")
+    if payload.get("exit_code") != returncode:
+        errors.append("exit_code must match process return code")
+    error = payload.get("error")
+    if not isinstance(error, dict):
+        errors.append("error must be an object")
+        error = {}
+    details = error.get("details")
+    if not isinstance(details, dict):
+        errors.append("error.details must be an object")
+        details = {}
+    if error.get("code") != expected_code:
+        errors.append(f"error.code must be {expected_code}")
+    if not isinstance(error.get("message"), str) or not error.get("message"):
+        errors.append("error.message must be nonempty")
+    if error.get("recovery") != ERROR_CODE_RECOVERY.get(expected_code):
+        errors.append("error.recovery must match public registry")
+    if error.get("next_action") != expected_next_action:
+        errors.append(f"error.next_action must be {expected_next_action}")
+    if error.get("next_action") != ERROR_CODE_NEXT_ACTION.get(expected_code):
+        errors.append("error.next_action must match public registry")
+    for key, expected_value in expected_details.items():
+        if details.get(key) != expected_value:
+            errors.append(f"details.{key} must be {expected_value!r}")
+    for key in required_detail_keys:
+        if key not in details:
+            errors.append(f"details.{key} is required")
+    if errors:
+        raise RuntimeError(f"{case_name} CLI error contract failed: {'; '.join(errors)}")
+
+
+def _record_source_outage_safety_gate(summary: Dict[str, Any], *, project_root: Path) -> None:
+    try:
+        details = _check_source_outage_safety_gate(project_root=project_root)
+    except Exception as exc:
+        summary["steps"].append(
+            {
+                "name": "source_outage_safety",
+                "status": "failed",
+                "message": str(exc),
+            }
+        )
+        summary["ok"] = False
+        return
+
+    summary["steps"].append(
+        {
+            "name": "source_outage_safety",
+            "status": "passed",
+            **details,
+        }
+    )
+
+
+def _check_source_outage_safety_gate(*, project_root: Path) -> Dict[str, Any]:
+    from citeguard.retrieval.scholarly_clients import InMemoryMetadataSource
+    from citeguard.retrieval.scholarly_clients.multi_source import MultiSourceMetadataSource
+    from citeguard.runtime import SOURCE_HEALTH_SCHEMA_VERSION, source_health_status
+    from citeguard.verification import CitationRecord, parse_citation, verify_citation
+
+    del project_root
+
+    candidate = parse_citation(title="Release Gate Source Outage Safety Probe")
+    failed_source = _ReleaseGateTimeoutSource("release_timeout_source")
+    all_failed = MultiSourceMetadataSource([failed_source])
+    outage_result = verify_citation(candidate, all_failed).to_dict()
+
+    healthy_record = CitationRecord(
+        citation_id="source-health-1",
+        title="Release Gate Source Health Control",
+        authors=["CiteGuard Maintainer"],
+        year=2026,
+        venue="Release Gate",
+        source="release_fixture",
+    )
+
+    def source_factory(names: List[str], **_: Any) -> object:
+        name = names[0]
+        if name == "openalex":
+            return _ReleaseGateTimeoutSource("openalex")
+        if name == "crossref":
+            return InMemoryMetadataSource([healthy_record])
+        raise RuntimeError(f"unexpected source: {name}")
+
+    health = source_health_status(
+        env={
+            "CITEGUARD_SOURCES": "openalex,crossref",
+            "CITEGUARD_MAILTO": "release-gate@example.com",
+            "CITEGUARD_HTTP_TIMEOUT": "1",
+            "CITEGUARD_HTTP_RETRIES": "0",
+        },
+        check_live=True,
+        health_query="Release Gate Source Health Control",
+        source_factory=source_factory,
+    )
+    health_summary = health.get("summary", {})
+
+    errors = []
+    if outage_result.get("verdict") != "not_found":
+        errors.append("all-source outage verification should remain not_found")
+    if outage_result.get("confidence", 1.0) > 0.35:
+        errors.append("all-source outage not_found confidence should be capped at 0.35")
+    if outage_result.get("source_failure_mode") != "all_sources_failed":
+        errors.append("all-source outage should set source_failure_mode=all_sources_failed")
+    if outage_result.get("sources_failed") != ["release_timeout_source"]:
+        errors.append("all-source outage should identify the failed source")
+    if outage_result.get("sources_available") != []:
+        errors.append("all-source outage should not report available sources")
+    if outage_result.get("outage_limited") is not True:
+        errors.append("all-source outage should set outage_limited=true")
+    if outage_result.get("next_action") != "retry_or_check_source_health":
+        errors.append("all-source outage should route agents to retry_or_check_source_health")
+    if outage_result.get("recovery_code") != "timeout":
+        errors.append("all-source outage recovery_code should preserve timeout")
+    if "not evidence of fabrication" not in outage_result.get("explanation", ""):
+        errors.append("all-source outage explanation should avoid fabrication overclaiming")
+    if not outage_result.get("source_failure_details"):
+        errors.append("all-source outage should expose source_failure_details")
+    elif outage_result["source_failure_details"][0].get("code") != "timeout":
+        errors.append("all-source outage source_failure_details should preserve timeout code")
+
+    if health.get("schema_version") != SOURCE_HEALTH_SCHEMA_VERSION:
+        errors.append("source health schema_version mismatch")
+    if health.get("mode") != "live" or health.get("live_check_performed") is not True:
+        errors.append("source health gate should exercise live-check summary mode with fake sources")
+    if health_summary.get("sources_checked") != ["openalex", "crossref"]:
+        errors.append("source health should report checked sources separately")
+    if health_summary.get("sources_failed") != ["openalex"]:
+        errors.append("source health should report failed sources separately")
+    if health_summary.get("sources_responded") != ["crossref"]:
+        errors.append("source health should report responded sources separately")
+    if health_summary.get("sources_available") != ["crossref"]:
+        errors.append("source health should preserve available source names")
+    if health_summary.get("failure_kind_counts") != {"timeout": 1}:
+        errors.append("source health should summarize timeout failure kind")
+    if health_summary.get("failure_kind_sources") != {"timeout": ["openalex"]}:
+        errors.append("source health should map timeout kind to source")
+    if health_summary.get("next_action") != "retry_or_check_source_health":
+        errors.append("source health should route agents to retry_or_check_source_health")
+    if health_summary.get("all_checked_sources_failed") is not False:
+        errors.append("partial source outage should not set all_checked_sources_failed")
+    if errors:
+        raise RuntimeError("; ".join(errors))
+
+    return {
+        "verification": {
+            "verdict": outage_result.get("verdict"),
+            "confidence": outage_result.get("confidence"),
+            "source_failure_mode": outage_result.get("source_failure_mode"),
+            "outage_limited": outage_result.get("outage_limited"),
+            "sources_failed": outage_result.get("sources_failed"),
+            "sources_available": outage_result.get("sources_available"),
+            "recovery_code": outage_result.get("recovery_code"),
+            "next_action": outage_result.get("next_action"),
+        },
+        "source_health": {
+            "schema_version": health.get("schema_version"),
+            "sources_checked": health_summary.get("sources_checked"),
+            "sources_responded": health_summary.get("sources_responded"),
+            "sources_failed": health_summary.get("sources_failed"),
+            "failure_kind_counts": health_summary.get("failure_kind_counts"),
+            "failure_kind_sources": health_summary.get("failure_kind_sources"),
+            "next_action": health_summary.get("next_action"),
+            "all_checked_sources_failed": health_summary.get("all_checked_sources_failed"),
+        },
+    }
+
+
+class _ReleaseGateTimeoutSource:
+    def __init__(self, name: str) -> None:
+        self.name = name
+
+    def all_records(self) -> List[Any]:
+        return []
+
+    def search(self, query: str, top_k: int = 5) -> List[Any]:
+        raise TimeoutError(f"{self.name} timed out during release gate probe")
+
+    def lookup(self, candidate: Any) -> Any:
+        raise TimeoutError(f"{self.name} timed out during release gate lookup")
+
+
+def _record_agent_skill_contract_gate(summary: Dict[str, Any], *, project_root: Path) -> None:
+    try:
+        details = _check_agent_skill_contract_gate(project_root=project_root)
+    except Exception as exc:
+        summary["steps"].append(
+            {
+                "name": "agent_skill_contract",
+                "status": "failed",
+                "message": str(exc),
+            }
+        )
+        summary["ok"] = False
+        return
+
+    summary["steps"].append(
+        {
+            "name": "agent_skill_contract",
+            "status": "passed",
+            **details,
+        }
+    )
+
+
+def _check_agent_skill_contract_gate(*, project_root: Path) -> Dict[str, Any]:
+    skill_path = project_root / "skills" / "citeguard-verify" / "SKILL.md"
+    examples_path = project_root / "skills" / "citeguard-verify" / "references" / "examples.md"
+    openai_agent_path = project_root / "skills" / "citeguard-verify" / "agents" / "openai.yaml"
+    skill = _read_required_text(skill_path)
+    examples = _read_required_text(examples_path)
+    openai_agent = _read_required_text(openai_agent_path)
+
+    required_skill_phrases = {
+        "trigger_related_work": "related work",
+        "trigger_bibliography": "pasted citations / a bibliography",
+        "trigger_generated_citations": "about to present citations you generated yourself",
+        "forbid_silent_edits": "Do not silently change the user's references.",
+        "forbid_not_found_fake": "Do not translate `not_found`, `source_unavailable`, or `timeout` into \"fake\".",
+        "forbid_full_text_upgrade": "Do not claim full-text support from an abstract-level support result.",
+        "codex_install_note": "Codex:",
+        "claude_code_install_note": "Claude Code:",
+        "cursor_install_note": "Cursor:",
+        "status_first": "call `citeguard_status_tool`",
+        "batch_review_summary": "`review_summary` first",
+        "high_risk_filtering": "`filtered.returned_indexes`",
+        "response_template": "## Response template",
+        "scenario_routing": "## Scenario routing",
+        "detailed_examples_reference": "references/examples.md",
+    }
+    required_example_phrases = {
+        "single_citation_example": '"tool": "verify_citation_tool"',
+        "batch_audit_example": '"tool": "audit_citations_tool"',
+        "claim_support_example": '"tool": "check_claim_support_tool"',
+        "support_set_example": '"tool": "check_claim_support_set_tool"',
+        "claim_batch_example": '"tool": "audit_claim_support_tool"',
+        "counterevidence_example": '"tool": "search_counterevidence_tool"',
+        "ambiguous_wording": "do not choose one match",
+        "metadata_mismatch_wording": "ask before editing the user's bibliography",
+        "not_found_wording": "not proof that the paper is fabricated",
+        "source_outage_wording": "not treat source failure as evidence",
+        "compact_table": "Suggested compact result table",
+    }
+    required_agent_phrases = {
+        "display_name": 'display_name: "CiteGuard Verify"',
+        "default_prompt": "default_prompt:",
+        "mcp_dependency": 'type: "mcp"',
+        "stdio_transport": 'transport: "stdio"',
+        "implicit_invocation": "allow_implicit_invocation: true",
+    }
+
+    missing = []
+    missing.extend(_missing_contract_phrases(skill, required_skill_phrases, "SKILL.md"))
+    missing.extend(_missing_contract_phrases(examples, required_example_phrases, "references/examples.md"))
+    missing.extend(_missing_contract_phrases(openai_agent, required_agent_phrases, "agents/openai.yaml"))
+    if missing:
+        raise RuntimeError("; ".join(missing))
+
+    return {
+        "skill_file": "skills/citeguard-verify/SKILL.md",
+        "examples_file": "skills/citeguard-verify/references/examples.md",
+        "agent_metadata_file": "skills/citeguard-verify/agents/openai.yaml",
+        "checked_contracts": {
+            "trigger_count": 3,
+            "forbidden_behavior_count": 3,
+            "client_setup_count": 3,
+            "tool_example_count": 6,
+            "safe_wording_example_count": 4,
+        },
+        "policy": "agent skill must proactively audit citations without silent edits or source-outage fabrication overclaims",
+    }
+
+
+def _missing_contract_phrases(text: str, required: Dict[str, str], label: str) -> List[str]:
+    return [
+        f"{label} missing {name}: {phrase}"
+        for name, phrase in required.items()
+        if phrase not in text
+    ]
+
+
+def _record_batch_workflow_examples_gate(summary: Dict[str, Any], *, python: str, project_root: Path) -> None:
+    try:
+        details = _check_batch_workflow_examples_gate(python=python, project_root=project_root)
+    except Exception as exc:
+        summary["steps"].append(
+            {
+                "name": "batch_workflow_examples",
+                "status": "failed",
+                "message": str(exc),
+            }
+        )
+        summary["ok"] = False
+        return
+
+    summary["steps"].append(
+        {
+            "name": "batch_workflow_examples",
+            "status": "passed",
+            **details,
+        }
+    )
+
+
+def _check_batch_workflow_examples_gate(*, python: str, project_root: Path) -> Dict[str, Any]:
+    fixture_path = project_root / "examples" / "citations.json"
+    env = {
+        "CITEGUARD_FIXTURE_CITATIONS": str(fixture_path),
+        "CITEGUARD_RERANKER_MODEL": "",
+        "CITEGUARD_NLI_MODEL": "",
+        "TOKENIZERS_PARALLELISM": "false",
+    }
+    commands = {
+        "extract_references": [python, "-m", "citeguard", "extract", "examples/references.md", "--compact"],
+        "audit_json": [python, "-m", "citeguard", "audit", "examples/citations.json", "--compact"],
+        "audit_markdown_high_risk": [
+            python,
+            "-m",
+            "citeguard",
+            "audit",
+            "examples/references.md",
+            "--high-risk-only",
+            "--compact",
+        ],
+        "support_audit_json": [
+            python,
+            "-m",
+            "citeguard",
+            "support-audit",
+            "examples/claim_citations.json",
+            "--compact",
+        ],
+        "support_audit_jsonl_high_risk": [
+            python,
+            "-m",
+            "citeguard",
+            "support-audit",
+            "examples/claim_citations.jsonl",
+            "--high-risk-only",
+            "--compact",
+        ],
+        "support_set": [
+            python,
+            "-m",
+            "citeguard",
+            "support-set",
+            "examples/citations.json",
+            "--claim",
+            "The Transformer relies entirely on attention mechanisms.",
+            "--compact",
+        ],
+    }
+    payloads = {
+        name: _run_json_command(command, cwd=project_root, env_overrides=env)
+        for name, command in commands.items()
+    }
+
+    extract_payload = payloads["extract_references"]
+    audit_payload = payloads["audit_json"]
+    audit_filtered = payloads["audit_markdown_high_risk"]
+    support_payload = payloads["support_audit_json"]
+    support_filtered = payloads["support_audit_jsonl_high_risk"]
+    support_set = payloads["support_set"]
+
+    errors = []
+    if not isinstance(extract_payload, list) or len(extract_payload) != 2:
+        errors.append("extract examples/references.md should return two citation candidates")
+    elif extract_payload[0].get("arxiv_id") != "1706.03762":
+        errors.append("extract examples/references.md should preserve the arXiv id")
+
+    if audit_payload.get("summary", {}).get("verified") != 1 or audit_payload.get("summary", {}).get("not_found") != 1:
+        errors.append("audit examples/citations.json should produce one verified and one not_found item")
+    audit_review = audit_payload.get("review_summary", {})
+    if audit_review.get("high_risk_count") != 1:
+        errors.append("audit examples/citations.json should expose one high-risk item")
+    if audit_review.get("action_queues", {}).get("identity_resolution_indexes") != [1]:
+        errors.append("audit examples/citations.json should queue the unresolved citation for identity resolution")
+    if audit_payload.get("risk_ranking", [{}])[0].get("next_action") != "resolve_identifier_or_replace":
+        errors.append("audit risk ranking should expose resolve_identifier_or_replace")
+
+    if audit_filtered.get("filtered", {}).get("high_risk_only") is not True:
+        errors.append("audit markdown high-risk run should include filtered.high_risk_only=true")
+    if audit_filtered.get("filtered", {}).get("returned_indexes") != [1]:
+        errors.append("audit markdown high-risk run should preserve returned index 1")
+    if len(audit_filtered.get("results", [])) != 1:
+        errors.append("audit markdown high-risk run should return one result")
+
+    if support_payload.get("summary", {}).get("insufficient_evidence") != 3:
+        errors.append("support-audit examples/claim_citations.json should report three insufficient_evidence items")
+    support_review = support_payload.get("review_summary", {})
+    if support_review.get("high_risk_count") != 1 or support_review.get("medium_risk_count") != 2:
+        errors.append("support-audit examples/claim_citations.json should expose one high and two medium risk items")
+    if support_review.get("action_queues", {}).get("identity_resolution_indexes") != [1]:
+        errors.append("support-audit should queue unresolved citations for identity resolution")
+    support_results = support_payload.get("results", [])
+    if len(support_results) != 3 or support_results[2].get("input_mode") != "citation_set":
+        errors.append("support-audit should preserve citation_set batch item shape")
+
+    if support_filtered.get("filtered", {}).get("high_risk_only") is not True:
+        errors.append("support-audit JSONL high-risk run should include filtered.high_risk_only=true")
+    if support_filtered.get("filtered", {}).get("returned_indexes") != [1]:
+        errors.append("support-audit JSONL high-risk run should preserve returned index 1")
+    if support_filtered.get("filtered", {}).get("omitted_review_summary", {}).get("medium_risk_count") != 2:
+        errors.append("support-audit JSONL high-risk run should summarize omitted medium-risk rows")
+    if support_set.get("support_mode") != "insufficient_evidence":
+        errors.append("support-set example should report insufficient_evidence support_mode")
+    if support_set.get("summary", {}).get("insufficient_evidence") != 2:
+        errors.append("support-set example should preserve per-citation summary counts")
+    if len(support_set.get("results", [])) != 2:
+        errors.append("support-set example should return per-citation results")
+    if support_set.get("next_action") != "inspect_full_text_or_find_stronger_citation":
+        errors.append("support-set example should expose stable next_action")
+    if errors:
+        raise RuntimeError("; ".join(errors))
+
+    return {
+        "commands": commands,
+        "fixture": "examples/citations.json",
+        "extract_count": len(extract_payload),
+        "audit_summary": audit_payload.get("summary", {}),
+        "audit_returned_indexes": audit_filtered.get("filtered", {}).get("returned_indexes", []),
+        "support_summary": support_payload.get("summary", {}),
+        "support_input_modes": [item.get("input_mode") for item in support_results],
+        "support_returned_indexes": support_filtered.get("filtered", {}).get("returned_indexes", []),
+        "support_omitted_review_summary": support_filtered.get("filtered", {}).get("omitted_review_summary", {}),
+        "support_set_mode": support_set.get("support_mode"),
+        "support_set_summary": support_set.get("summary", {}),
+        "support_set_result_count": len(support_set.get("results", [])),
+    }
+
+
+def _run_json_command(cmd: List[str], *, cwd: Path, env_overrides: Dict[str, str]) -> Any:
+    env = dict(os.environ)
+    env.update(env_overrides)
+    completed = subprocess.run(
+        cmd,
+        cwd=str(cwd),
+        env=env,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    if completed.returncode != 0:
+        raise subprocess.CalledProcessError(completed.returncode, completed.args, completed.stdout, completed.stderr)
+    if completed.stderr.strip():
+        raise RuntimeError(f"{cmd} wrote unexpected stderr: {completed.stderr.strip()}")
+    try:
+        return json.loads(completed.stdout)
+    except json.JSONDecodeError as exc:
+        raise RuntimeError(f"{cmd} did not write valid JSON to stdout: {exc}") from exc
 
 
 def _check_project_metadata_contract(project_root: Path) -> Dict[str, Any]:

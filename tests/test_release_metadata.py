@@ -12,11 +12,15 @@ from citeguard.retrieval.scholarly_clients.factory import DEFAULT_USER_AGENT
 from citeguard.verification import STABLE_NEXT_ACTIONS
 from citeguard.version import __version__
 from scripts.release_package_gate import (
+    _record_agent_skill_contract_gate,
+    _record_batch_workflow_examples_gate,
     _record_cache_replay_fixture_gate,
+    _record_cli_error_contract_gate,
     _record_legacy_src_shim_contract,
     _record_mcp_extra_smoke,
     _record_mcp_stdio_smoke,
     _record_published_smoke_plan,
+    _record_source_outage_safety_gate,
     _record_support_label_sidecar_gate,
     _record_support_review_queue_gate,
     _record_support_review_queue_annotation_packet_gate,
@@ -345,6 +349,25 @@ License-File: LICENSE
             "cache export",
             "--deterministic",
             "byte_identical",
+            "cli_error_contract",
+            "_record_cli_error_contract_gate",
+            "verify_missing_citation",
+            "audit_missing_file",
+            "support_audit_invalid_jsonl",
+            "source_outage_safety",
+            "_record_source_outage_safety_gate",
+            "all_sources_failed",
+            "outage_limited",
+            "retry_or_check_source_health",
+            "agent_skill_contract",
+            "_record_agent_skill_contract_gate",
+            "without silent edits or source-outage fabrication overclaims",
+            "batch_workflow_examples",
+            "_record_batch_workflow_examples_gate",
+            "examples/references.md",
+            "examples/claim_citations.jsonl",
+            "support_omitted_review_summary",
+            "support_set_summary",
             "support_review_queue",
             "support_review_queue_annotation_packet",
             "_record_support_review_queue_gate",
@@ -666,6 +689,99 @@ License-File: LICENSE
         self.assertIn("--deterministic", summary["steps"][0]["commands"][0])
         self.assertIn("cache", summary["steps"][0]["commands"][0])
         self.assertIn("export", summary["steps"][0]["commands"][0])
+
+    def test_release_gate_records_cli_error_contract(self):
+        summary = {"ok": True, "steps": []}
+
+        _record_cli_error_contract_gate(summary, python=sys.executable, project_root=ROOT)
+
+        self.assertTrue(summary["ok"])
+        self.assertEqual(summary["steps"][0]["name"], "cli_error_contract")
+        self.assertEqual(summary["steps"][0]["status"], "passed")
+        self.assertEqual(summary["steps"][0]["schema_version"], ERROR_SCHEMA_VERSION)
+        cases = {case["name"]: case for case in summary["steps"][0]["cases"]}
+        self.assertEqual(set(cases), {"verify_missing_citation", "audit_missing_file", "support_audit_invalid_jsonl"})
+        self.assertEqual(cases["verify_missing_citation"]["actual_code"], "missing_citation_input")
+        self.assertEqual(cases["verify_missing_citation"]["next_action"], "provide_missing_input")
+        self.assertIn("command", cases["verify_missing_citation"]["details_keys"])
+        self.assertEqual(cases["audit_missing_file"]["actual_code"], "file_error")
+        self.assertEqual(cases["audit_missing_file"]["next_action"], "repair_input")
+        self.assertIn("errno", cases["audit_missing_file"]["details_keys"])
+        self.assertIn("filename", cases["audit_missing_file"]["details_keys"])
+        self.assertEqual(cases["support_audit_invalid_jsonl"]["actual_code"], "invalid_json")
+        self.assertIn("line", cases["support_audit_invalid_jsonl"]["details_keys"])
+        self.assertIn("column", cases["support_audit_invalid_jsonl"]["details_keys"])
+
+    def test_release_gate_records_source_outage_safety_contract(self):
+        summary = {"ok": True, "steps": []}
+
+        _record_source_outage_safety_gate(summary, project_root=ROOT)
+
+        self.assertTrue(summary["ok"])
+        self.assertEqual(summary["steps"][0]["name"], "source_outage_safety")
+        self.assertEqual(summary["steps"][0]["status"], "passed")
+        verification = summary["steps"][0]["verification"]
+        self.assertEqual(verification["verdict"], "not_found")
+        self.assertLessEqual(verification["confidence"], 0.35)
+        self.assertEqual(verification["source_failure_mode"], "all_sources_failed")
+        self.assertTrue(verification["outage_limited"])
+        self.assertEqual(verification["sources_failed"], ["release_timeout_source"])
+        self.assertEqual(verification["sources_available"], [])
+        self.assertEqual(verification["recovery_code"], "timeout")
+        self.assertEqual(verification["next_action"], "retry_or_check_source_health")
+        health = summary["steps"][0]["source_health"]
+        self.assertEqual(health["sources_checked"], ["openalex", "crossref"])
+        self.assertEqual(health["sources_responded"], ["crossref"])
+        self.assertEqual(health["sources_failed"], ["openalex"])
+        self.assertEqual(health["failure_kind_counts"], {"timeout": 1})
+        self.assertEqual(health["failure_kind_sources"], {"timeout": ["openalex"]})
+        self.assertEqual(health["next_action"], "retry_or_check_source_health")
+        self.assertFalse(health["all_checked_sources_failed"])
+
+    def test_release_gate_records_agent_skill_contract(self):
+        summary = {"ok": True, "steps": []}
+
+        _record_agent_skill_contract_gate(summary, project_root=ROOT)
+
+        self.assertTrue(summary["ok"])
+        self.assertEqual(summary["steps"][0]["name"], "agent_skill_contract")
+        self.assertEqual(summary["steps"][0]["status"], "passed")
+        self.assertEqual(summary["steps"][0]["skill_file"], "skills/citeguard-verify/SKILL.md")
+        self.assertEqual(
+            summary["steps"][0]["examples_file"],
+            "skills/citeguard-verify/references/examples.md",
+        )
+        self.assertEqual(summary["steps"][0]["checked_contracts"]["trigger_count"], 3)
+        self.assertEqual(summary["steps"][0]["checked_contracts"]["forbidden_behavior_count"], 3)
+        self.assertEqual(summary["steps"][0]["checked_contracts"]["client_setup_count"], 3)
+        self.assertEqual(summary["steps"][0]["checked_contracts"]["tool_example_count"], 6)
+        self.assertEqual(summary["steps"][0]["checked_contracts"]["safe_wording_example_count"], 4)
+        self.assertIn("proactively audit citations", summary["steps"][0]["policy"])
+        self.assertIn("without silent edits", summary["steps"][0]["policy"])
+
+    def test_release_gate_records_batch_workflow_examples_contract(self):
+        summary = {"ok": True, "steps": []}
+
+        _record_batch_workflow_examples_gate(summary, python=sys.executable, project_root=ROOT)
+
+        self.assertTrue(summary["ok"])
+        self.assertEqual(summary["steps"][0]["name"], "batch_workflow_examples")
+        self.assertEqual(summary["steps"][0]["status"], "passed")
+        self.assertEqual(summary["steps"][0]["fixture"], "examples/citations.json")
+        self.assertEqual(summary["steps"][0]["extract_count"], 2)
+        self.assertEqual(summary["steps"][0]["audit_summary"]["verified"], 1)
+        self.assertEqual(summary["steps"][0]["audit_summary"]["not_found"], 1)
+        self.assertEqual(summary["steps"][0]["audit_returned_indexes"], [1])
+        self.assertEqual(summary["steps"][0]["support_summary"]["insufficient_evidence"], 3)
+        self.assertEqual(summary["steps"][0]["support_input_modes"], ["citation", "citation", "citation_set"])
+        self.assertEqual(summary["steps"][0]["support_returned_indexes"], [1])
+        self.assertEqual(summary["steps"][0]["support_omitted_review_summary"]["medium_risk_count"], 2)
+        self.assertEqual(summary["steps"][0]["support_set_mode"], "insufficient_evidence")
+        self.assertEqual(summary["steps"][0]["support_set_summary"]["insufficient_evidence"], 2)
+        self.assertEqual(summary["steps"][0]["support_set_result_count"], 2)
+        self.assertIn("extract_references", summary["steps"][0]["commands"])
+        self.assertIn("support_audit_jsonl_high_risk", summary["steps"][0]["commands"])
+        self.assertIn("support_set", summary["steps"][0]["commands"])
 
     def test_release_gate_records_support_review_queue_contract(self):
         summary = {"ok": True, "steps": []}

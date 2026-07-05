@@ -29,7 +29,18 @@ agent skill bundle.
   `project_metadata_contract` source-file gate, runs the
   `legacy_src_shim_contract` to keep the legacy `src` package thin and
   `citeguard.*`-forwarding, records `cache_replay_fixture` by exporting a
-  deterministic cache fixture twice and replaying it offline, runs the
+  deterministic cache fixture twice and replaying it offline, records
+  `cli_error_contract` by running real `python -m citeguard` failures for
+  `verify_missing_citation`, `audit_missing_file`, and
+  `support_audit_invalid_jsonl`, records `source_outage_safety` so all-source
+  failures stay `not_found`, low-confidence, `outage_limited`, and routed to
+  `retry_or_check_source_health` instead of fabrication overclaims, records
+  `agent_skill_contract` so the packaged skill keeps proactive triggers,
+  forbidden behaviors, Codex/Claude Code/Cursor setup notes, response templates,
+  MCP payload examples, and safe wording examples, records
+  `batch_workflow_examples` by running the packaged extraction, citation-audit,
+  claim-support audit, JSONL, citation-set, and high-risk-only example workflows
+  against an offline fixture, runs the
   `support_label_sidecar_gate` provenance check, records its structured
   `thresholds`, `metrics`, and `failures`, records `support_review_queue` and
   `support_review_queue_annotation_packet` so the fixture queue and heuristic
