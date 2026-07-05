@@ -66,6 +66,24 @@
   full-text-required boundaries.
 - Added grouped `false_support_case_ids` and `weak_false_support_case_ids` in
   support false-overcall analysis for split/case-type/evidence-scope triage.
+- Added `false_support_analysis.risk_slices` / `top_risk_slice` and baseline
+  comparison `false_support_risk_slices` so contradicted, hard-negative,
+  full-text-boundary, test-split, and non-English support overcalls have a
+  stable machine-readable review priority.
+- Added a default release-gate `support_baseline_comparison` contract so
+  baseline rows keep `false_support_risk_slices` / `top_false_support_risk_slice`
+  whenever support overcalls are present.
+- Added compact `false_support_analysis` to `scripts/eval_support.py
+  --review-queue-only` and the release-gate `support_review_queue` contract so
+  agent triage payloads expose supported-overcall priority slices without
+  expanding the full per-case report.
+- Updated the packaged `citeguard-verify` skill examples to read
+  `false_support_analysis.risk_slices` / `top_risk_slice` during support
+  benchmark triage and to treat contradicted supported-overcalls as
+  release-blocking review items.
+- Documented support-eval review-queue and baseline-comparison JSON contracts in
+  the CLI reference, including compact `false_support_analysis` and
+  `top_false_support_risk_slice` fields for agent triage.
 - Added support-eval `review_queue` plus baseline comparison
   `review_queue_case_ids` / `critical_review_case_ids` so agents and
   maintainers can inspect the highest-risk support failures first.

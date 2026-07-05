@@ -149,6 +149,21 @@ def main(argv: Optional[List[str]] = None) -> int:
             project_root=project_root,
             dataset=args.support_eval_dataset,
         )
+        _record_support_baseline_comparison_gate(
+            summary,
+            python=args.python,
+            project_root=project_root,
+            dataset=args.support_eval_dataset,
+            label_sidecar=args.support_label_sidecar,
+            min_sidecar_coverage=args.min_sidecar_coverage,
+            min_human_reviewed=args.min_human_reviewed,
+            min_high_risk_reviewed=args.min_high_risk_reviewed,
+            min_high_risk_reviewed_by_language=args.min_high_risk_reviewed_by_language,
+            min_dual_annotated=args.min_dual_annotated,
+            max_unresolved_disagreements=args.max_unresolved_disagreements,
+            min_raw_dual_agreement_rate=args.min_raw_dual_agreement_rate,
+            max_supported_disagreements=args.max_supported_disagreements,
+        )
         _record_support_review_queue_annotation_packet_gate(
             summary,
             python=args.python,
@@ -2212,7 +2227,13 @@ def _record_support_review_queue_gate(
     quality_gate = payload.get("quality_gate", {}) if isinstance(payload, dict) else {}
     review_queue = payload.get("review_queue", []) if isinstance(payload, dict) else []
     review_queue_summary = payload.get("review_queue_summary", {}) if isinstance(payload, dict) else {}
-    passed = isinstance(review_queue, list) and bool(quality_gate.get("ok"))
+    false_support_analysis = payload.get("false_support_analysis", {}) if isinstance(payload, dict) else {}
+    has_false_support_triage = (
+        isinstance(false_support_analysis, dict)
+        and isinstance(false_support_analysis.get("risk_slices"), list)
+        and "top_risk_slice" in false_support_analysis
+    )
+    passed = isinstance(review_queue, list) and bool(quality_gate.get("ok")) and has_false_support_triage
     summary["steps"].append(
         {
             "name": "support_review_queue",
@@ -2223,8 +2244,134 @@ def _record_support_review_queue_gate(
             "review_queue_summary": review_queue_summary,
             "review_queue_case_ids": quality_gate.get("review_queue_case_ids", []),
             "critical_review_case_ids": quality_gate.get("critical_review_case_ids", []),
+            "false_support_analysis": false_support_analysis,
+            "false_support_triage_present": has_false_support_triage,
             "failures": quality_gate.get("failures", []),
             "support_set_policy": payload.get("support_set_policy", {}) if isinstance(payload, dict) else {},
+            "stdout_tail": _tail(completed.stdout),
+        }
+    )
+    if not passed:
+        summary["ok"] = False
+
+
+def _record_support_baseline_comparison_gate(
+    summary: Dict[str, Any],
+    *,
+    python: str,
+    project_root: Path,
+    dataset: str,
+    label_sidecar: str,
+    min_sidecar_coverage: float,
+    min_human_reviewed: int,
+    min_high_risk_reviewed: int,
+    min_high_risk_reviewed_by_language: List[str],
+    min_dual_annotated: int,
+    max_unresolved_disagreements: int,
+    min_raw_dual_agreement_rate: Optional[float],
+    max_supported_disagreements: Optional[int],
+) -> None:
+    cmd = [
+        python,
+        "scripts/compare_support_baselines.py",
+        "--dataset",
+        dataset,
+        "--split",
+        "test",
+        "--label-sidecar",
+        label_sidecar,
+        "--min-sidecar-coverage",
+        str(min_sidecar_coverage),
+        "--min-human-reviewed",
+        str(min_human_reviewed),
+        "--min-high-risk-reviewed",
+        str(min_high_risk_reviewed),
+        "--min-dual-annotated",
+        str(min_dual_annotated),
+        "--max-unresolved-disagreements",
+        str(max_unresolved_disagreements),
+    ]
+    for threshold in min_high_risk_reviewed_by_language:
+        cmd.extend(["--min-high-risk-reviewed-by-language", threshold])
+    if min_raw_dual_agreement_rate is not None:
+        cmd.extend(["--min-raw-dual-agreement-rate", str(min_raw_dual_agreement_rate)])
+    if max_supported_disagreements is not None:
+        cmd.extend(["--max-supported-disagreements", str(max_supported_disagreements)])
+
+    try:
+        completed = _run(cmd, cwd=project_root)
+        payload = json.loads(completed.stdout)
+    except subprocess.CalledProcessError as exc:
+        summary["steps"].append(
+            {
+                "name": "support_baseline_comparison",
+                "status": "failed",
+                "command": cmd,
+                "stdout_tail": _tail(exc.stdout or ""),
+                "stderr_tail": _tail(exc.stderr or ""),
+            }
+        )
+        summary["ok"] = False
+        return
+    except json.JSONDecodeError as exc:
+        summary["steps"].append(
+            {
+                "name": "support_baseline_comparison",
+                "status": "failed",
+                "command": cmd,
+                "message": f"Could not parse compare_support_baselines.py JSON output: {exc}",
+                "stdout_tail": _tail(completed.stdout),
+            }
+        )
+        summary["ok"] = False
+        return
+
+    comparison = payload.get("comparison", []) if isinstance(payload, dict) else []
+    rows = [row for row in comparison if isinstance(row, dict)] if isinstance(comparison, list) else []
+    row_by_backend = {str(row.get("backend", "")): row for row in rows}
+    rows_missing_risk_fields = [
+        str(row.get("backend", ""))
+        for row in rows
+        if "false_support_risk_slices" not in row or "top_false_support_risk_slice" not in row
+    ]
+    rows_missing_active_risk_slices = [
+        str(row.get("backend", ""))
+        for row in rows
+        if int(row.get("total_overcall_count", 0) or 0) > 0
+        and (
+            not isinstance(row.get("false_support_risk_slices"), list)
+            or not row.get("false_support_risk_slices")
+            or not isinstance(row.get("top_false_support_risk_slice"), dict)
+        )
+    ]
+    fixture_row = row_by_backend.get("fixture", {})
+    heuristic_row = row_by_backend.get("heuristic", {})
+    sidecar_gate = payload.get("label_sidecar_gate", {}) if isinstance(payload, dict) else {}
+    passed = (
+        bool(rows)
+        and "fixture" in row_by_backend
+        and "heuristic" in row_by_backend
+        and bool(fixture_row.get("quality_gate_ok"))
+        and bool(sidecar_gate.get("ok", True))
+        and not rows_missing_risk_fields
+        and not rows_missing_active_risk_slices
+    )
+    summary["steps"].append(
+        {
+            "name": "support_baseline_comparison",
+            "status": "passed" if passed else "failed",
+            "command": cmd,
+            "case_count": payload.get("case_count") if isinstance(payload, dict) else None,
+            "quality_gates_ok": payload.get("quality_gates_ok") if isinstance(payload, dict) else None,
+            "backends": [str(row.get("backend", "")) for row in rows],
+            "fixture_quality_gate_ok": fixture_row.get("quality_gate_ok"),
+            "heuristic_quality_gate_ok": heuristic_row.get("quality_gate_ok"),
+            "heuristic_limited": heuristic_row.get("heuristic_limited"),
+            "heuristic_total_overcall_count": heuristic_row.get("total_overcall_count"),
+            "heuristic_top_false_support_risk_slice": heuristic_row.get("top_false_support_risk_slice"),
+            "rows_missing_risk_fields": rows_missing_risk_fields,
+            "rows_missing_active_risk_slices": rows_missing_active_risk_slices,
+            "label_sidecar_gate_ok": sidecar_gate.get("ok") if isinstance(sidecar_gate, dict) else None,
             "stdout_tail": _tail(completed.stdout),
         }
     )

@@ -452,7 +452,9 @@ contradiction fails the command with a machine-readable `quality_gate` block.
 Failed gates include `quality_gate.review_queue_case_ids` and
 `quality_gate.critical_review_case_ids` so agents can inspect the highest-risk
 cases first. Use `--review-queue-only` when an agent or release script only
-needs the compact support-failure triage payload instead of the full report.
+needs the compact support-failure triage payload instead of the full report;
+the compact payload includes `false_support_analysis.risk_slices` and
+`false_support_analysis.top_risk_slice` for supported-overcall priorities.
 Reports also include `support_set_policy`, a deterministic fixture that checks
 claim-level aggregation boundaries such as multiple weak citations remaining
 tentative and contradictions dominating the aggregate.
@@ -475,7 +477,9 @@ standardized experiment folder with `result.json`, `config.json`, and
 `manifest.json` for reproducible tables and release evidence.
 `scripts/compare_support_baselines.py` writes a compact comparison table for the
 deterministic fixture row and the zero-model heuristic baseline, including
-quality-gate status and high-risk error bucket counts.
+quality-gate status, high-risk error bucket counts, and
+`false_support_risk_slices` / `top_false_support_risk_slice` for prioritizing
+the most dangerous support overcalls.
 Generate or complete a provenance sidecar draft with:
 
 ```bash

@@ -137,11 +137,16 @@ agent skill bundle.
   empty `review_queue` and `review_queue_summary.count=0`; the heuristic `--review-queue-only` output is a compact
   triage artifact for `quality_gate.review_queue_case_ids` and
   `quality_gate.critical_review_case_ids`, with `review_queue_summary` grouped by
-  severity and recommended action, not a model-quality claim. The report should include `support_set_policy` so
+  severity and recommended action plus compact `false_support_analysis.risk_slices`
+  / `false_support_analysis.top_risk_slice`, not a model-quality claim. The report should include `support_set_policy` so
   citation-set aggregation boundaries are checked alongside evidence-level
   cases. The baseline comparison table should include at least the deterministic
   `fixture` row and the zero-model `heuristic` row, with heuristic limitations
-  visible in the diagnostics. The label-sidecar gate should report coverage
+  visible in the diagnostics, plus `false_support_risk_slices` and
+  `top_false_support_risk_slice` for prioritized false-support triage. The
+  consolidated release gate records this as `support_baseline_comparison`, and
+  fails if an active support overcall row lacks a top risk slice. The
+  label-sidecar gate should report coverage
   `1.0`; keep `--min-human-reviewed`, `--min-high-risk-reviewed`, and
   `--min-dual-annotated` at `0` for the synthetic seed set, then raise them when
   a human-reviewed subset exists. Keep language-specific placeholders such as

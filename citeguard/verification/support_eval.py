@@ -1527,12 +1527,15 @@ def compute_false_support_analysis(error_buckets: Dict[str, List[Dict[str, str]]
     weak_items = list(error_buckets.get("weak_false_support", []))
     items = [dict(item, bucket="false_support") for item in false_items]
     items.extend(dict(item, bucket="weak_false_support") for item in weak_items)
+    risk_slices = _false_support_risk_slices(items)
     return {
         "false_support_count": len(false_items),
         "weak_false_support_count": len(weak_items),
         "total_overcall_count": len(items),
         "case_ids": [item["case_id"] for item in items],
         "high_risk_case_ids": [item["case_id"] for item in false_items],
+        "risk_slices": risk_slices,
+        "top_risk_slice": risk_slices[0] if risk_slices else None,
         "by_case_type": _false_support_group_summary(items, "case_type"),
         "by_evidence_scope": _false_support_group_summary(items, "evidence_scope"),
         "by_language": _false_support_group_summary(items, "lang"),
@@ -1542,6 +1545,80 @@ def compute_false_support_analysis(error_buckets: Dict[str, List[Dict[str, str]]
             "Review these cases before relaxing support thresholds or shipping a support backend."
         ),
     }
+
+
+def _false_support_risk_slices(items: List[Dict[str, str]]) -> List[Dict[str, Any]]:
+    """Return prioritized false-support overcall slices for agent triage."""
+
+    slice_specs = [
+        {
+            "id": "contradicted_overcalled",
+            "severity": "critical",
+            "risk_score": 100,
+            "recommended_action": "inspect_contradiction_before_accepting_support",
+            "description": "Cases whose gold label is contradicted but the backend overcalled support.",
+            "predicate": lambda item: item.get("gold") == "contradicted",
+        },
+        {
+            "id": "hard_negative_overcalled",
+            "severity": "critical",
+            "risk_score": 95,
+            "recommended_action": "rewrite_or_replace_evidence",
+            "description": "Hard-negative cases where a real or related source still does not support the claim.",
+            "predicate": lambda item: item.get("case_type") == "hard_negative",
+        },
+        {
+            "id": "full_text_boundary_overcalled",
+            "severity": "high",
+            "risk_score": 90,
+            "recommended_action": "inspect_full_text_or_find_stronger_citation",
+            "description": "Cases crossing a full-text boundary where abstract or metadata evidence is not enough.",
+            "predicate": lambda item: item.get("case_type") == "full_text_required"
+            or item.get("evidence_scope") in {"full_text", "mixed_with_full_text"},
+        },
+        {
+            "id": "test_split_overcalled",
+            "severity": "high",
+            "risk_score": 85,
+            "recommended_action": "block_release_until_reviewed",
+            "description": "Held-out test split overcalls that should be reviewed before release reporting.",
+            "predicate": lambda item: item.get("split") == "test",
+        },
+        {
+            "id": "non_english_overcalled",
+            "severity": "high",
+            "risk_score": 80,
+            "recommended_action": "review_language_specific_failure",
+            "description": "Non-English overcalls that may indicate language-specific support failures.",
+            "predicate": lambda item: item.get("lang") not in {"", "en", None},
+        },
+    ]
+
+    slices = []
+    for spec in slice_specs:
+        matches = [item for item in items if spec["predicate"](item)]
+        if not matches:
+            continue
+        slices.append(
+            {
+                "id": spec["id"],
+                "severity": spec["severity"],
+                "risk_score": spec["risk_score"],
+                "recommended_action": spec["recommended_action"],
+                "description": spec["description"],
+                "count": len(matches),
+                "false_support": sum(1 for item in matches if item.get("bucket") == "false_support"),
+                "weak_false_support": sum(1 for item in matches if item.get("bucket") == "weak_false_support"),
+                "case_ids": [item["case_id"] for item in matches],
+                "false_support_case_ids": [
+                    item["case_id"] for item in matches if item.get("bucket") == "false_support"
+                ],
+                "weak_false_support_case_ids": [
+                    item["case_id"] for item in matches if item.get("bucket") == "weak_false_support"
+                ],
+            }
+        )
+    return slices
 
 
 def _false_support_group_summary(items: List[Dict[str, str]], field_name: str) -> Dict[str, Dict[str, Any]]:

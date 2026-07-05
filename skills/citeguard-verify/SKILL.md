@@ -204,7 +204,12 @@ configured via environment variables.
   when the user wants the highest-risk support failures rather than a full
   report. Read `review_queue` first, then branch on
   `quality_gate.review_queue_case_ids` and
-  `quality_gate.critical_review_case_ids`.
+  `quality_gate.critical_review_case_ids`. Also read
+  `false_support_analysis.risk_slices` and
+  `false_support_analysis.top_risk_slice` before summarizing support overcalls:
+  prioritize `contradicted_overcalled`, `hard_negative_overcalled`, and
+  `full_text_boundary_overcalled` ahead of lower-risk abstention or recall
+  issues.
 - When the user asks for human review, benchmark labeling, or adjudication of
   those failures, generate a blinded annotation packet with
   `python3 scripts/prepare_support_label_sidecar.py --annotation-packet --from-review-queue --review-backend heuristic --split test`.
@@ -304,6 +309,7 @@ Use this quick routing table before choosing a tool:
 | User gives a claim with one cited paper | `check_claim_support_tool` after/with citation fields | Mention `evidence_scope`; never upgrade abstract/title evidence to full-text support |
 | User gives one claim backed by several papers | `check_claim_support_set_tool` or one `audit_claim_support_tool` item with `citations` | Preserve per-citation verdicts and aggregate risk; multiple weak sources remain tentative |
 | User gives many claim/citation rows | `audit_claim_support_tool` | Start with `review_summary.action_queues`, then compact risk table |
+| User asks for support benchmark or release-readiness triage | `scripts/eval_support.py --review-queue-only` | Start with `review_queue`, then call out `false_support_analysis.top_risk_slice` and support-overcall `risk_slices` |
 | Result is `ambiguous` | Ask for DOI/arXiv id, venue, full authors, or exact reference text | Do not choose a match silently |
 | Result is `metadata_mismatch` | Show `field_diffs` and `suggested_citation` | Ask before editing the bibliography |
 | Result is `not_found`, `source_unavailable`, or `timeout` | Use `next_action` / `recovery_code`; optionally run one source-health probe | Say inconclusive/high-risk, not fake or fabricated |

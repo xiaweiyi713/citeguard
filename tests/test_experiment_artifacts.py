@@ -131,6 +131,13 @@ class ExperimentArtifactTests(unittest.TestCase):
         self.assertFalse(payload["quality_gates_ok"])
         self.assertTrue(payload["comparison"][0]["quality_gate_ok"])
         self.assertTrue(payload["comparison"][1]["heuristic_limited"])
+        self.assertIn("false_support_risk_slices", payload["comparison"][1])
+        self.assertIn("top_false_support_risk_slice", payload["comparison"][1])
+        self.assertTrue(payload["comparison"][1]["false_support_risk_slices"])
+        self.assertEqual(
+            payload["comparison"][1]["top_false_support_risk_slice"]["id"],
+            payload["comparison"][1]["false_support_risk_slices"][0]["id"],
+        )
         self.assertIn("label_sidecar_gate", payload)
         self.assertEqual(artifact["run_id"], "support-baselines-smoke")
         self.assertEqual(result["comparison"], payload["comparison"])

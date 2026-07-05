@@ -285,6 +285,7 @@ def _review_queue_only_payload(result: Dict[str, object], args: argparse.Namespa
     overall = result.get("overall", {})
     quality_gate = result.get("quality_gate")
     label_sidecar_gate = result.get("label_sidecar_gate")
+    false_support_analysis = result.get("false_support_analysis", {})
     support_set_policy = result.get("support_set_policy", {})
     support_set_overall = support_set_policy.get("overall", {}) if isinstance(support_set_policy, dict) else {}
     payload: Dict[str, object] = {
@@ -301,6 +302,16 @@ def _review_queue_only_payload(result: Dict[str, object], args: argparse.Namespa
         "review_queue_summary": result.get("review_queue_summary", {}),
         "review_queue": list(result.get("review_queue", [])),
     }
+    if isinstance(false_support_analysis, dict):
+        payload["false_support_analysis"] = {
+            "false_support_count": false_support_analysis.get("false_support_count", 0),
+            "weak_false_support_count": false_support_analysis.get("weak_false_support_count", 0),
+            "total_overcall_count": false_support_analysis.get("total_overcall_count", 0),
+            "case_ids": list(false_support_analysis.get("case_ids", [])),
+            "high_risk_case_ids": list(false_support_analysis.get("high_risk_case_ids", [])),
+            "risk_slices": list(false_support_analysis.get("risk_slices", [])),
+            "top_risk_slice": false_support_analysis.get("top_risk_slice"),
+        }
     if isinstance(quality_gate, dict):
         payload["quality_gate"] = {
             "ok": quality_gate.get("ok"),

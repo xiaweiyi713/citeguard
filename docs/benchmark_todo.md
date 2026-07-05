@@ -28,13 +28,15 @@ benchmark claims.
   abstention rate, misjudged-support rate, contradiction recall, confusion
   matrices, case-type breakdowns, evidence-scope breakdowns, split breakdowns,
   per-case rows, `false_support_analysis` release-triage summaries,
-  including grouped `false_support_case_ids` and
-  `weak_false_support_case_ids`, diagnostics, a deterministic
+  including grouped `false_support_case_ids`,
+  `weak_false_support_case_ids`, and risk slices for contradicted, hard-negative,
+  full-text-boundary, test-split, and non-English support overcalls,
+  diagnostics, a deterministic
   `support_set_policy` fixture, and conservative quality gates.
 - `scripts/compare_support_baselines.py` compares deterministic fixture and
   heuristic support baselines, including total support-overcall counts and
-  high-risk false support case ids, and writes reproducible artifacts when an
-  output directory is provided.
+  high-risk false support case ids plus `false_support_risk_slices`, and writes
+  reproducible artifacts when an output directory is provided.
 - `scripts/prepare_support_label_sidecar.py --audit` checks label-sidecar
   coverage and human-review maturity, including `label_maturity`. Its optional
   `--fail-on-high-risk-unreviewed` gate exits non-zero while contradiction,

@@ -2080,6 +2080,8 @@ class SupportEvalTests(unittest.TestCase):
         self.assertEqual(report["false_support_analysis"]["weak_false_support_count"], 0)
         self.assertEqual(report["false_support_analysis"]["by_case_type"]["hard_negative"]["case_ids"], ["b"])
         self.assertEqual(report["false_support_analysis"]["by_language"]["zh"]["case_ids"], ["b"])
+        self.assertEqual(report["false_support_analysis"]["top_risk_slice"]["id"], "hard_negative_overcalled")
+        self.assertEqual(report["false_support_analysis"]["top_risk_slice"]["case_ids"], ["b"])
         self.assertEqual(report["by_case_type"]["direct_support"]["accuracy"], 1.0)
         self.assertEqual(report["by_case_type"]["direct_support"]["per_label"]["supported"]["f1"], 1.0)
         self.assertEqual(report["by_case_type"]["hard_negative"]["false_support_rate"], 1.0)
@@ -2223,6 +2225,17 @@ class SupportEvalTests(unittest.TestCase):
         self.assertIn("review_queue", payload)
         self.assertNotIn("cases", payload)
         self.assertEqual(payload["quality_gate"]["ok"], False)
+        self.assertIn("false_support_analysis", payload)
+        self.assertEqual(payload["false_support_analysis"]["total_overcall_count"], 1)
+        self.assertEqual(
+            payload["false_support_analysis"]["top_risk_slice"]["id"],
+            "contradicted_overcalled",
+        )
+        self.assertEqual(payload["false_support_analysis"]["top_risk_slice"]["case_ids"], ["s39"])
+        self.assertEqual(
+            payload["false_support_analysis"]["risk_slices"][0]["recommended_action"],
+            "inspect_contradiction_before_accepting_support",
+        )
         self.assertEqual(payload["quality_gate"]["review_queue_case_ids"][:5], ["s10", "s16", "s27", "s36", "s39"])
         self.assertEqual(payload["review_queue_summary"]["by_severity"]["high"], 5)
         self.assertEqual(
@@ -2394,6 +2407,21 @@ class SupportEvalTests(unittest.TestCase):
         self.assertEqual(analysis["by_split"]["test"]["case_ids"], ["a", "b"])
         self.assertEqual(analysis["by_split"]["test"]["false_support_case_ids"], ["a"])
         self.assertEqual(analysis["by_split"]["test"]["weak_false_support_case_ids"], ["b"])
+        self.assertEqual(
+            [item["id"] for item in analysis["risk_slices"]],
+            [
+                "contradicted_overcalled",
+                "hard_negative_overcalled",
+                "full_text_boundary_overcalled",
+                "test_split_overcalled",
+            ],
+        )
+        self.assertEqual(analysis["top_risk_slice"]["id"], "contradicted_overcalled")
+        self.assertEqual(analysis["top_risk_slice"]["case_ids"], ["b"])
+        self.assertEqual(analysis["top_risk_slice"]["weak_false_support_case_ids"], ["b"])
+        self.assertEqual(analysis["risk_slices"][1]["recommended_action"], "rewrite_or_replace_evidence")
+        self.assertEqual(analysis["risk_slices"][2]["false_support_case_ids"], ["c"])
+        self.assertEqual(analysis["risk_slices"][3]["case_ids"], ["a", "b"])
         self.assertIn("highest-risk", analysis["interpretation"])
 
     def test_support_review_queue_prioritizes_high_risk_support_failures(self):

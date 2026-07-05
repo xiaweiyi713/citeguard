@@ -44,7 +44,7 @@ schema；这不是模型质量指标。运行 `python3 scripts/eval_support.py -
 - `error_bucket_counts` / `error_buckets`: false support、weak false support、missed contradiction、incorrect abstention 等误差桶
 - `review_queue`: 将 false support、missed contradiction、weak false support、错误拒绝和错误 abstention 合并去重,按 severity / risk score 排序,并给出 `recommended_action`,供 agent 或 maintainer 优先复核最危险 case
 - `review_queue_summary`: 按 severity、bucket 和 `recommended_action` 汇总 `review_queue`,并列出 `top_case_ids` / `critical_case_ids`,供 agent 不遍历完整队列也能决策
-- `false_support_analysis`: 汇总 total overcall count、high-risk false-support case ids,并按 case type、evidence scope、language 和 split 分组；每个分组都列出 `false_support_case_ids` 与 `weak_false_support_case_ids`,用于发布前优先复核 test split 上的 supported 误报
+- `false_support_analysis`: 汇总 total overcall count、high-risk false-support case ids,并按 case type、evidence scope、language 和 split 分组；每个分组都列出 `false_support_case_ids` 与 `weak_false_support_case_ids`,同时提供 `risk_slices` / `top_risk_slice`,把 contradicted overcalls、hard negatives、full-text boundary、test split 和 non-English overcalls 排成机器可读的复核优先级,用于发布前优先复核最危险的 supported 误报
 - `diagnostics`: 当前 backend、是否处于 heuristic 限制模式、需要 NLI 复核的 missed contradiction case ids、false/weak false support case ids、以及面向 threshold/backend 选择的 warnings 和 recommendations
 - `quality_gate`: 如果传入 `--quality-gate`,报告会附带保守发布门禁结果,并在失败时以非零状态码退出；失败 payload 包含 `quality_gate.review_queue_case_ids` 和 `quality_gate.critical_review_case_ids`,便于 agent 先复核最高风险样本
 - `support_set_policy`: model-free citation-set 聚合边界报告,确认 multiple weak
@@ -83,9 +83,10 @@ python3 scripts/eval_support.py --backend production --report --split test
 的结果都会失败,任何 contradiction 漏检也会失败。对 heuristic 或 production
 backend 做探索时可以显式调宽阈值,但发布前的 test split 应先检查
 `quality_gate.failures` 和相关 case ids。`--review-queue-only` 会输出紧凑
-triage payload,包含 `review_queue_summary`、`review_queue`、`quality_gate.review_queue_case_ids` 和
+triage payload,包含 `review_queue_summary`、`review_queue`、`false_support_analysis.risk_slices` /
+`false_support_analysis.top_risk_slice`、`quality_gate.review_queue_case_ids` 和
 `quality_gate.critical_review_case_ids`,适合 agent 或发布脚本只读取最高风险
-case 队列。
+case 队列和 supported-overcall 优先级。
 
 需要保存可复现实验产物时,给离线 eval 脚本传入 `--output-dir` 和稳定的
 `--run-id`:
@@ -121,7 +122,7 @@ python3 scripts/compare_support_baselines.py \
 基线,不代表模型质量；`heuristic` 是零模型词面 baseline,用于暴露没有 NLI 时的
 限制。输出的 `comparison` 表汇总 accuracy、supported precision/recall/F1、
 abstention rate、false-support rate、contradiction recall、error bucket
-counts、`total_overcall_count`、high-risk false support case ids 和分组级
+counts、`total_overcall_count`、high-risk false support case ids、`false_support_risk_slices` / `top_false_support_risk_slice` 和分组级
 `false_support_case_ids` / `weak_false_support_case_ids`,以及
 `review_queue_case_ids` / `critical_review_case_ids`、`review_queue_by_severity`
 和 `review_queue_by_recommended_action`,并为每个 backend 附带 conservative

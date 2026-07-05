@@ -30,6 +30,7 @@ from scripts.release_package_gate import (
     _record_public_api_contract_gate,
     _record_security_compliance_contract_gate,
     _record_source_outage_safety_gate,
+    _record_support_baseline_comparison_gate,
     _record_support_label_sidecar_gate,
     _record_support_review_queue_gate,
     _record_support_review_queue_annotation_packet_gate,
@@ -412,9 +413,14 @@ License-File: LICENSE
             "evidence_source_field",
             "support_set_summary",
             "support_review_queue",
+            "support_baseline_comparison",
             "support_review_queue_annotation_packet",
             "_record_support_review_queue_gate",
+            "_record_support_baseline_comparison_gate",
             "_record_support_review_queue_annotation_packet_gate",
+            "false_support_triage_present",
+            "rows_missing_active_risk_slices",
+            "heuristic_top_false_support_risk_slice",
             "merge_report.adjudication_queue",
             "adjudication_template",
             "reviewer rationales",
@@ -1037,6 +1043,8 @@ License-File: LICENSE
             stdout=(
                 '{"case_count": 12, "review_queue": [], '
                 '"review_queue_summary": {"count": 0, "by_severity": {}}, '
+                '"false_support_analysis": {"total_overcall_count": 0, '
+                '"risk_slices": [], "top_risk_slice": null}, '
                 '"quality_gate": {"ok": true, "review_queue_case_ids": [], '
                 '"critical_review_case_ids": [], "failures": []}, '
                 '"support_set_policy": {"accuracy": 1.0}}'
@@ -1072,6 +1080,106 @@ License-File: LICENSE
         self.assertEqual(summary["steps"][0]["review_queue_count"], 0)
         self.assertEqual(summary["steps"][0]["review_queue_summary"], {"count": 0, "by_severity": {}})
         self.assertEqual(summary["steps"][0]["review_queue_case_ids"], [])
+        self.assertTrue(summary["steps"][0]["false_support_triage_present"])
+        self.assertEqual(summary["steps"][0]["false_support_analysis"]["risk_slices"], [])
+
+    def test_release_gate_records_support_baseline_comparison_contract(self):
+        summary = {"ok": True, "steps": []}
+        completed = mock.Mock(
+            stdout=json.dumps(
+                {
+                    "case_count": 13,
+                    "quality_gates_ok": False,
+                    "label_sidecar_gate": {"ok": True},
+                    "comparison": [
+                        {
+                            "backend": "fixture",
+                            "quality_gate_ok": True,
+                            "total_overcall_count": 0,
+                            "false_support_risk_slices": [],
+                            "top_false_support_risk_slice": None,
+                            "heuristic_limited": False,
+                        },
+                        {
+                            "backend": "heuristic",
+                            "quality_gate_ok": False,
+                            "total_overcall_count": 2,
+                            "false_support_risk_slices": [
+                                {
+                                    "id": "contradicted_overcalled",
+                                    "case_ids": ["s10"],
+                                }
+                            ],
+                            "top_false_support_risk_slice": {
+                                "id": "contradicted_overcalled",
+                                "case_ids": ["s10"],
+                            },
+                            "heuristic_limited": True,
+                        },
+                    ],
+                }
+            )
+        )
+        with mock.patch("scripts.release_package_gate._run", return_value=completed) as run:
+            _record_support_baseline_comparison_gate(
+                summary,
+                python="python3",
+                project_root=ROOT,
+                dataset="data/eval/support_eval.json",
+                label_sidecar="data/eval/support_eval_label_sidecar.json",
+                min_sidecar_coverage=1.0,
+                min_human_reviewed=0,
+                min_high_risk_reviewed=0,
+                min_high_risk_reviewed_by_language=["zh=0"],
+                min_dual_annotated=0,
+                max_unresolved_disagreements=0,
+                min_raw_dual_agreement_rate=None,
+                max_supported_disagreements=0,
+            )
+
+        run.assert_called_once()
+        self.assertEqual(
+            run.call_args.args[0],
+            [
+                "python3",
+                "scripts/compare_support_baselines.py",
+                "--dataset",
+                "data/eval/support_eval.json",
+                "--split",
+                "test",
+                "--label-sidecar",
+                "data/eval/support_eval_label_sidecar.json",
+                "--min-sidecar-coverage",
+                "1.0",
+                "--min-human-reviewed",
+                "0",
+                "--min-high-risk-reviewed",
+                "0",
+                "--min-dual-annotated",
+                "0",
+                "--max-unresolved-disagreements",
+                "0",
+                "--min-high-risk-reviewed-by-language",
+                "zh=0",
+                "--max-supported-disagreements",
+                "0",
+            ],
+        )
+        self.assertTrue(summary["ok"])
+        self.assertEqual(summary["steps"][0]["name"], "support_baseline_comparison")
+        self.assertEqual(summary["steps"][0]["status"], "passed")
+        self.assertEqual(summary["steps"][0]["quality_gates_ok"], False)
+        self.assertEqual(summary["steps"][0]["backends"], ["fixture", "heuristic"])
+        self.assertEqual(summary["steps"][0]["fixture_quality_gate_ok"], True)
+        self.assertEqual(summary["steps"][0]["heuristic_quality_gate_ok"], False)
+        self.assertEqual(summary["steps"][0]["heuristic_limited"], True)
+        self.assertEqual(summary["steps"][0]["heuristic_total_overcall_count"], 2)
+        self.assertEqual(
+            summary["steps"][0]["heuristic_top_false_support_risk_slice"]["id"],
+            "contradicted_overcalled",
+        )
+        self.assertEqual(summary["steps"][0]["rows_missing_risk_fields"], [])
+        self.assertEqual(summary["steps"][0]["rows_missing_active_risk_slices"], [])
 
     def test_release_gate_records_support_review_queue_annotation_packet_contract(self):
         summary = {"ok": True, "steps": []}
@@ -1436,10 +1544,11 @@ License-File: LICENSE
 
     def test_false_support_analysis_is_documented_for_release(self):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        cli_reference = (ROOT / "docs" / "cli_reference.md").read_text(encoding="utf-8")
         benchmark_design = (ROOT / "docs" / "benchmark_design.md").read_text(encoding="utf-8")
         benchmark_todo = (ROOT / "docs" / "benchmark_todo.md").read_text(encoding="utf-8")
         compare_script = (ROOT / "scripts" / "compare_support_baselines.py").read_text(encoding="utf-8")
-        combined = f"{readme}\n{benchmark_design}\n{benchmark_todo}\n{compare_script}"
+        combined = f"{readme}\n{cli_reference}\n{benchmark_design}\n{benchmark_todo}\n{compare_script}"
 
         required_phrases = [
             "per-label precision/recall/F1",
@@ -1454,6 +1563,14 @@ License-File: LICENSE
             "`recommended_action`",
             "false_support_analysis",
             "total_overcall_count",
+            "risk_slices",
+            "top_risk_slice",
+            "false_support_analysis.risk_slices",
+            "false_support_analysis.top_risk_slice",
+            "false_support_risk_slices",
+            "top_false_support_risk_slice",
+            "Support Eval Scripts",
+            "scripts/compare_support_baselines.py",
             "high-risk false support case ids",
             "high_risk_false_support_case_ids",
             "false_support_case_ids",
@@ -1676,6 +1793,13 @@ License-File: LICENSE
             "`review_queue`",
             "`quality_gate.review_queue_case_ids`",
             "`quality_gate.critical_review_case_ids`",
+            "false_support_analysis.risk_slices",
+            "false_support_analysis.top_risk_slice",
+            "contradicted_overcalled",
+            "hard_negative_overcalled",
+            "full_text_boundary_overcalled",
+            "support-overcall `risk_slices`",
+            "release-blocking triage",
             "source retry is inconclusive",
             "Scope / limitations",
             "## Scenario routing",

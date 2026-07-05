@@ -204,8 +204,41 @@ python3 scripts/eval_support.py --split test --backend heuristic --quality-gate 
 ```
 
 When this exits non-zero, read `quality_gate.review_queue_case_ids` before
-expanding full report rows. Present `review_queue` in order; do not treat
-heuristic missed contradictions as final scientific judgments.
+expanding full report rows. Also read
+`false_support_analysis.top_risk_slice` and
+`false_support_analysis.risk_slices` before summarizing support overcalls.
+Present `review_queue` in order, but call out the top supported-overcall slice
+first when it is present; do not treat heuristic missed contradictions as final
+scientific judgments.
+
+Compact false-support triage:
+
+```json
+{
+  "false_support_analysis": {
+    "total_overcall_count": 1,
+    "risk_slices": [
+      {
+        "id": "contradicted_overcalled",
+        "severity": "critical",
+        "recommended_action": "inspect_contradiction_before_accepting_support",
+        "case_ids": ["s39"]
+      }
+    ],
+    "top_risk_slice": {
+      "id": "contradicted_overcalled",
+      "case_ids": ["s39"]
+    }
+  }
+}
+```
+
+Safe wording:
+
+> The heuristic support baseline overcalled support on a contradicted case
+> (`s39`). Treat this as release-blocking triage: inspect the evidence or run
+> stronger NLI/human review before accepting any supported verdict from this
+> backend.
 
 Turn that queue into a blinded human annotation packet:
 

@@ -375,6 +375,40 @@ review-worthy aggregates; tune the number of candidates with
 `--counterevidence-top-k`. These candidates are leads only, not contradiction
 verdicts.
 
+## Support Eval Scripts
+
+```bash
+python scripts/eval_support.py --report --split test --quality-gate
+python scripts/eval_support.py --split test --backend heuristic --quality-gate --review-queue-only
+python scripts/compare_support_baselines.py --split test
+```
+
+The support-evaluation scripts are release and benchmark-triage interfaces, not
+normal citation-audit subcommands. They print JSON for agents and CI. With
+`--quality-gate`, `scripts/eval_support.py` adds a conservative
+`quality_gate` block that fails on false support, weak false support, and missed
+contradictions by default. Gate failures expose
+`quality_gate.review_queue_case_ids` and
+`quality_gate.critical_review_case_ids` so agents can inspect the riskiest
+support failures first.
+
+Use `--review-queue-only` when an agent or release script needs compact triage
+instead of a full per-case report. The compact payload includes
+`review_queue_summary`, ordered `review_queue` rows, `support_set_policy`, and
+`false_support_analysis`. That analysis includes `total_overcall_count`,
+`case_ids`, `high_risk_case_ids`, machine-readable `risk_slices`, and
+`top_risk_slice`. Treat `contradicted_overcalled`,
+`hard_negative_overcalled`, and `full_text_boundary_overcalled` as the most
+urgent supported-overcall review slices. These slices are release triage, not
+proof that a production model is calibrated.
+
+`scripts/compare_support_baselines.py` compares the deterministic fixture
+backend with the zero-model heuristic baseline by default. Each comparison row
+includes `quality_gate_ok`, support metrics, review queue case ids, and
+`false_support_risk_slices` / `top_false_support_risk_slice` when overcalls are
+present. The top-level `quality_gates_ok` summarizes all included backend and
+sidecar gates.
+
 ## Output
 
 Use `--compact` after any subcommand for single-line JSON:
