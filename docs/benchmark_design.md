@@ -106,7 +106,13 @@ python3 scripts/eval_support.py \
 每次运行会写入 `experiments/<run-id>/result.json`、`config.json` 和
 `manifest.json`。`result.json` 保存完整指标或报告,`config.json` 保存脚本、
 dataset、split、backend 和 quality-gate 阈值等配置快照,`manifest.json`
-提供 schema version、生成时间、文件索引和紧凑结果摘要。默认不写
+提供 schema version、生成时间、文件索引和紧凑结果摘要。support eval
+artifact 的摘要会保留 `false_support_total_overcall_count`、
+`false_support_risk_slice_count`、`false_support_top_risk_slice_id` 和
+`false_support_top_risk_slice_case_ids`;baseline comparison artifact 还会保留
+`false_support_overcall_backends` 和 `false_support_top_overcall_backend`,让
+agent 或 release reviewer 可以不展开完整 `result.json` 就发现哪次实验需要
+优先复核 supported-overcall 风险。默认不写
 `experiments/`,避免普通 CI 或本地 smoke 命令产生工作树噪音。
 
 生成可复现 baseline comparison table:

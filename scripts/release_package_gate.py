@@ -2191,9 +2191,21 @@ def _record_support_review_queue_gate(
         "--quality-gate",
         "--review-queue-only",
     ]
+    artifact_manifest: Dict[str, Any] = {}
+    manifest_errors: List[str] = []
     try:
-        completed = _run(cmd, cwd=project_root)
-        payload = json.loads(completed.stdout)
+        with tempfile.TemporaryDirectory(prefix="citeguard-support-review-") as tmpdir:
+            cmd.extend(
+                [
+                    "--output-dir",
+                    tmpdir,
+                    "--run-id",
+                    "release-support-review-queue",
+                ]
+            )
+            completed = _run(cmd, cwd=project_root)
+            payload = json.loads(completed.stdout)
+            artifact_manifest, manifest_errors = _load_experiment_artifact_manifest(payload)
     except subprocess.CalledProcessError as exc:
         payload = _json_payload_or_empty(exc.stdout or "")
         quality_gate = payload.get("quality_gate", {}) if isinstance(payload, dict) else {}
@@ -2217,8 +2229,20 @@ def _record_support_review_queue_gate(
                 "name": "support_review_queue",
                 "status": "failed",
                 "command": cmd,
-                "message": f"Could not parse eval_support.py review queue JSON output: {exc}",
-                "stdout_tail": _tail(completed.stdout),
+                "message": f"Could not parse eval_support.py review queue JSON output or artifact manifest: {exc}",
+                "stdout_tail": _tail(completed.stdout) if "completed" in locals() else [],
+            }
+        )
+        summary["ok"] = False
+        return
+    except (OSError, KeyError, TypeError) as exc:
+        summary["steps"].append(
+            {
+                "name": "support_review_queue",
+                "status": "failed",
+                "command": cmd,
+                "message": f"Could not read support review queue experiment artifact manifest: {exc}",
+                "stdout_tail": _tail(completed.stdout) if "completed" in locals() else [],
             }
         )
         summary["ok"] = False
@@ -2228,12 +2252,24 @@ def _record_support_review_queue_gate(
     review_queue = payload.get("review_queue", []) if isinstance(payload, dict) else []
     review_queue_summary = payload.get("review_queue_summary", {}) if isinstance(payload, dict) else {}
     false_support_analysis = payload.get("false_support_analysis", {}) if isinstance(payload, dict) else {}
+    manifest_result_summary = _artifact_manifest_result_summary(artifact_manifest, manifest_errors)
     has_false_support_triage = (
         isinstance(false_support_analysis, dict)
         and isinstance(false_support_analysis.get("risk_slices"), list)
         and "top_risk_slice" in false_support_analysis
     )
-    passed = isinstance(review_queue, list) and bool(quality_gate.get("ok")) and has_false_support_triage
+    manifest_false_support_triage_present, review_manifest_errors = _validate_support_review_manifest_summary(
+        manifest_result_summary,
+        false_support_analysis,
+    )
+    manifest_errors.extend(review_manifest_errors)
+    passed = (
+        isinstance(review_queue, list)
+        and bool(quality_gate.get("ok"))
+        and has_false_support_triage
+        and manifest_false_support_triage_present
+        and not manifest_errors
+    )
     summary["steps"].append(
         {
             "name": "support_review_queue",
@@ -2246,6 +2282,9 @@ def _record_support_review_queue_gate(
             "critical_review_case_ids": quality_gate.get("critical_review_case_ids", []),
             "false_support_analysis": false_support_analysis,
             "false_support_triage_present": has_false_support_triage,
+            "manifest_false_support_triage_present": manifest_false_support_triage_present,
+            "manifest_result_summary": manifest_result_summary,
+            "manifest_errors": manifest_errors,
             "failures": quality_gate.get("failures", []),
             "support_set_policy": payload.get("support_set_policy", {}) if isinstance(payload, dict) else {},
             "stdout_tail": _tail(completed.stdout),
@@ -2253,6 +2292,102 @@ def _record_support_review_queue_gate(
     )
     if not passed:
         summary["ok"] = False
+
+
+def _load_experiment_artifact_manifest(payload: Dict[str, Any]) -> tuple[Dict[str, Any], List[str]]:
+    if not isinstance(payload, dict):
+        return {}, ["missing_payload"]
+    artifact = payload.get("experiment_artifact")
+    if not isinstance(artifact, dict):
+        return {}, ["missing_experiment_artifact"]
+    files = artifact.get("files")
+    if not isinstance(files, dict) or not files.get("manifest"):
+        return {}, ["missing_manifest_file"]
+    manifest_path = Path(str(files["manifest"]))
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    if not isinstance(manifest, dict):
+        return {}, ["invalid_manifest_payload"]
+    return manifest, []
+
+
+def _artifact_manifest_result_summary(
+    artifact_manifest: Dict[str, Any],
+    manifest_errors: List[str],
+) -> Dict[str, Any]:
+    manifest_result_summary = (
+        artifact_manifest.get("result_summary", {}) if isinstance(artifact_manifest, dict) else {}
+    )
+    if not isinstance(manifest_result_summary, dict):
+        manifest_errors.append("manifest_result_summary_not_object")
+        return {}
+    return manifest_result_summary
+
+
+def _validate_support_review_manifest_summary(
+    manifest_result_summary: Dict[str, Any],
+    false_support_analysis: Dict[str, Any],
+) -> tuple[bool, List[str]]:
+    errors: List[str] = []
+    if manifest_result_summary.get("false_support_total_overcall_count") != int(
+        false_support_analysis.get("total_overcall_count", 0) or 0
+    ):
+        errors.append("manifest_total_overcall_count_mismatch")
+    if manifest_result_summary.get("false_support_risk_slice_count") != len(
+        false_support_analysis.get("risk_slices", []) or []
+    ):
+        errors.append("manifest_risk_slice_count_mismatch")
+    top_risk_slice = false_support_analysis.get("top_risk_slice")
+    if isinstance(top_risk_slice, dict):
+        if manifest_result_summary.get("false_support_top_risk_slice_id") != top_risk_slice.get("id"):
+            errors.append("manifest_top_risk_slice_id_mismatch")
+        if manifest_result_summary.get("false_support_top_risk_slice_case_ids") != list(
+            top_risk_slice.get("case_ids", []) or []
+        ):
+            errors.append("manifest_top_risk_slice_case_ids_mismatch")
+    else:
+        if manifest_result_summary.get("false_support_top_risk_slice_id") is not None:
+            errors.append("manifest_top_risk_slice_id_mismatch")
+        if manifest_result_summary.get("false_support_top_risk_slice_case_ids") != []:
+            errors.append("manifest_top_risk_slice_case_ids_mismatch")
+    present = (
+        "false_support_total_overcall_count" in manifest_result_summary
+        and "false_support_risk_slice_count" in manifest_result_summary
+        and "false_support_top_risk_slice_id" in manifest_result_summary
+        and isinstance(manifest_result_summary.get("false_support_top_risk_slice_case_ids"), list)
+    )
+    return present, errors
+
+
+def _validate_support_baseline_manifest_summary(
+    manifest_result_summary: Dict[str, Any],
+    rows: List[Dict[str, Any]],
+    heuristic_row: Dict[str, Any],
+) -> tuple[bool, List[str]]:
+    errors: List[str] = []
+    overcall_backends = [
+        str(row.get("backend", ""))
+        for row in rows
+        if int(row.get("total_overcall_count", 0) or 0) > 0
+    ]
+    if manifest_result_summary.get("false_support_overcall_backends") != overcall_backends:
+        errors.append("manifest_overcall_backends_mismatch")
+    heuristic_top_slice = heuristic_row.get("top_false_support_risk_slice")
+    if isinstance(heuristic_top_slice, dict):
+        if manifest_result_summary.get("false_support_top_overcall_backend") != "heuristic":
+            errors.append("manifest_top_overcall_backend_mismatch")
+        if manifest_result_summary.get("false_support_top_risk_slice_id") != heuristic_top_slice.get("id"):
+            errors.append("manifest_top_risk_slice_id_mismatch")
+        if manifest_result_summary.get("false_support_top_risk_slice_case_ids") != list(
+            heuristic_top_slice.get("case_ids", []) or []
+        ):
+            errors.append("manifest_top_risk_slice_case_ids_mismatch")
+    present = (
+        isinstance(manifest_result_summary.get("false_support_overcall_backends"), list)
+        and "false_support_top_overcall_backend" in manifest_result_summary
+        and "false_support_top_risk_slice_id" in manifest_result_summary
+        and isinstance(manifest_result_summary.get("false_support_top_risk_slice_case_ids"), list)
+    )
+    return present, errors
 
 
 def _record_support_baseline_comparison_gate(
@@ -2298,33 +2433,57 @@ def _record_support_baseline_comparison_gate(
     if max_supported_disagreements is not None:
         cmd.extend(["--max-supported-disagreements", str(max_supported_disagreements)])
 
-    try:
-        completed = _run(cmd, cwd=project_root)
-        payload = json.loads(completed.stdout)
-    except subprocess.CalledProcessError as exc:
-        summary["steps"].append(
-            {
-                "name": "support_baseline_comparison",
-                "status": "failed",
-                "command": cmd,
-                "stdout_tail": _tail(exc.stdout or ""),
-                "stderr_tail": _tail(exc.stderr or ""),
-            }
+    artifact_manifest: Dict[str, Any] = {}
+    manifest_errors: List[str] = []
+    with tempfile.TemporaryDirectory(prefix="citeguard-support-baselines-") as tmpdir:
+        cmd.extend(
+            [
+                "--output-dir",
+                tmpdir,
+                "--run-id",
+                "release-support-baseline-comparison",
+            ]
         )
-        summary["ok"] = False
-        return
-    except json.JSONDecodeError as exc:
-        summary["steps"].append(
-            {
-                "name": "support_baseline_comparison",
-                "status": "failed",
-                "command": cmd,
-                "message": f"Could not parse compare_support_baselines.py JSON output: {exc}",
-                "stdout_tail": _tail(completed.stdout),
-            }
-        )
-        summary["ok"] = False
-        return
+        try:
+            completed = _run(cmd, cwd=project_root)
+            payload = json.loads(completed.stdout)
+            artifact_manifest, manifest_errors = _load_experiment_artifact_manifest(payload)
+        except subprocess.CalledProcessError as exc:
+            summary["steps"].append(
+                {
+                    "name": "support_baseline_comparison",
+                    "status": "failed",
+                    "command": cmd,
+                    "stdout_tail": _tail(exc.stdout or ""),
+                    "stderr_tail": _tail(exc.stderr or ""),
+                }
+            )
+            summary["ok"] = False
+            return
+        except json.JSONDecodeError as exc:
+            summary["steps"].append(
+                {
+                    "name": "support_baseline_comparison",
+                    "status": "failed",
+                    "command": cmd,
+                    "message": f"Could not parse support baseline JSON or artifact manifest: {exc}",
+                    "stdout_tail": _tail(completed.stdout) if "completed" in locals() else [],
+                }
+            )
+            summary["ok"] = False
+            return
+        except (OSError, KeyError, TypeError) as exc:
+            summary["steps"].append(
+                {
+                    "name": "support_baseline_comparison",
+                    "status": "failed",
+                    "command": cmd,
+                    "message": f"Could not read support baseline experiment artifact manifest: {exc}",
+                    "stdout_tail": _tail(completed.stdout) if "completed" in locals() else [],
+                }
+            )
+            summary["ok"] = False
+            return
 
     comparison = payload.get("comparison", []) if isinstance(payload, dict) else []
     rows = [row for row in comparison if isinstance(row, dict)] if isinstance(comparison, list) else []
@@ -2347,6 +2506,13 @@ def _record_support_baseline_comparison_gate(
     fixture_row = row_by_backend.get("fixture", {})
     heuristic_row = row_by_backend.get("heuristic", {})
     sidecar_gate = payload.get("label_sidecar_gate", {}) if isinstance(payload, dict) else {}
+    manifest_result_summary = _artifact_manifest_result_summary(artifact_manifest, manifest_errors)
+    manifest_false_support_triage_present, baseline_manifest_errors = _validate_support_baseline_manifest_summary(
+        manifest_result_summary,
+        rows,
+        heuristic_row,
+    )
+    manifest_errors.extend(baseline_manifest_errors)
     passed = (
         bool(rows)
         and "fixture" in row_by_backend
@@ -2355,6 +2521,8 @@ def _record_support_baseline_comparison_gate(
         and bool(sidecar_gate.get("ok", True))
         and not rows_missing_risk_fields
         and not rows_missing_active_risk_slices
+        and manifest_false_support_triage_present
+        and not manifest_errors
     )
     summary["steps"].append(
         {
@@ -2371,6 +2539,9 @@ def _record_support_baseline_comparison_gate(
             "heuristic_top_false_support_risk_slice": heuristic_row.get("top_false_support_risk_slice"),
             "rows_missing_risk_fields": rows_missing_risk_fields,
             "rows_missing_active_risk_slices": rows_missing_active_risk_slices,
+            "manifest_false_support_triage_present": manifest_false_support_triage_present,
+            "manifest_result_summary": manifest_result_summary,
+            "manifest_errors": manifest_errors,
             "label_sidecar_gate_ok": sidecar_gate.get("ok") if isinstance(sidecar_gate, dict) else None,
             "stdout_tail": _tail(completed.stdout),
         }

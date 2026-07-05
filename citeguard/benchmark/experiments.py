@@ -80,4 +80,50 @@ def _result_summary(result: Dict[str, Any]) -> Dict[str, Any]:
         summary = {key: value for key, value in result.items() if isinstance(value, (int, float, str, bool))}
     if "quality_gate" in result and isinstance(result["quality_gate"], dict):
         summary["quality_gate_ok"] = bool(result["quality_gate"].get("ok"))
+    _add_false_support_triage_summary(summary, result)
     return summary
+
+
+def _add_false_support_triage_summary(summary: Dict[str, Any], result: Dict[str, Any]) -> None:
+    false_support_analysis = result.get("false_support_analysis")
+    if isinstance(false_support_analysis, dict):
+        top_risk_slice = false_support_analysis.get("top_risk_slice")
+        summary["false_support_total_overcall_count"] = int(
+            false_support_analysis.get("total_overcall_count", 0) or 0
+        )
+        summary["false_support_risk_slice_count"] = len(false_support_analysis.get("risk_slices", []) or [])
+        if isinstance(top_risk_slice, dict):
+            summary["false_support_top_risk_slice_id"] = top_risk_slice.get("id")
+            summary["false_support_top_risk_slice_case_ids"] = list(top_risk_slice.get("case_ids", []) or [])
+        else:
+            summary["false_support_top_risk_slice_id"] = None
+            summary["false_support_top_risk_slice_case_ids"] = []
+
+    comparison = result.get("comparison")
+    if isinstance(comparison, list):
+        summary["false_support_overcall_backends"] = [
+            row.get("backend")
+            for row in comparison
+            if isinstance(row, dict) and int(row.get("total_overcall_count", 0) or 0) > 0
+        ]
+        top_rows = [
+            row
+            for row in comparison
+            if isinstance(row, dict) and isinstance(row.get("top_false_support_risk_slice"), dict)
+        ]
+        if top_rows:
+            top_row = max(
+                top_rows,
+                key=lambda row: (
+                    int((row.get("top_false_support_risk_slice") or {}).get("risk_score", 0) or 0),
+                    int(row.get("total_overcall_count", 0) or 0),
+                ),
+            )
+            top_slice = top_row["top_false_support_risk_slice"]
+            summary["false_support_top_overcall_backend"] = top_row.get("backend")
+            summary["false_support_top_risk_slice_id"] = top_slice.get("id")
+            summary["false_support_top_risk_slice_case_ids"] = list(top_slice.get("case_ids", []) or [])
+        else:
+            summary.setdefault("false_support_top_overcall_backend", None)
+            summary.setdefault("false_support_top_risk_slice_id", None)
+            summary.setdefault("false_support_top_risk_slice_case_ids", [])

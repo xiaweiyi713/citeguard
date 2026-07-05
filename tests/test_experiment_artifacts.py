@@ -96,9 +96,41 @@ class ExperimentArtifactTests(unittest.TestCase):
         self.assertTrue(payload["quality_gate"]["ok"])
         self.assertEqual(artifact["run_id"], "support-smoke")
         self.assertEqual(manifest["result_summary"]["quality_gate_ok"], True)
+        self.assertEqual(manifest["result_summary"]["false_support_total_overcall_count"], 0)
+        self.assertEqual(manifest["result_summary"]["false_support_risk_slice_count"], 0)
+        self.assertIsNone(manifest["result_summary"]["false_support_top_risk_slice_id"])
+        self.assertEqual(manifest["result_summary"]["false_support_top_risk_slice_case_ids"], [])
         self.assertEqual(result["quality_gate"]["ok"], True)
         self.assertEqual(config["split"], "test")
         self.assertTrue(config["quality_gate"])
+
+    def test_baseline_manifest_keeps_stable_false_support_fields_without_overcalls(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            artifact = write_experiment_artifacts(
+                "support_baseline_comparison",
+                {
+                    "comparison": [
+                        {
+                            "backend": "fixture",
+                            "quality_gate_ok": True,
+                            "total_overcall_count": 0,
+                            "false_support_risk_slices": [],
+                            "top_false_support_risk_slice": None,
+                        }
+                    ]
+                },
+                {"script": "scripts/compare_support_baselines.py"},
+                output_dir=tmpdir,
+                run_id="no-overcall-baseline",
+            )
+
+            run_path = Path(artifact["path"])
+            manifest = json.loads((run_path / "manifest.json").read_text(encoding="utf-8"))
+
+        self.assertEqual(manifest["result_summary"]["false_support_overcall_backends"], [])
+        self.assertIsNone(manifest["result_summary"]["false_support_top_overcall_backend"])
+        self.assertIsNone(manifest["result_summary"]["false_support_top_risk_slice_id"])
+        self.assertEqual(manifest["result_summary"]["false_support_top_risk_slice_case_ids"], [])
 
     def test_compare_support_baselines_cli_writes_reproducible_table(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -123,6 +155,7 @@ class ExperimentArtifactTests(unittest.TestCase):
             payload = json.loads(completed.stdout)
             artifact = payload["experiment_artifact"]
             run_path = Path(artifact["path"])
+            manifest = json.loads((run_path / "manifest.json").read_text(encoding="utf-8"))
             result = json.loads((run_path / "result.json").read_text(encoding="utf-8"))
             config = json.loads((run_path / "config.json").read_text(encoding="utf-8"))
 
@@ -140,6 +173,16 @@ class ExperimentArtifactTests(unittest.TestCase):
         )
         self.assertIn("label_sidecar_gate", payload)
         self.assertEqual(artifact["run_id"], "support-baselines-smoke")
+        self.assertEqual(manifest["result_summary"]["false_support_overcall_backends"], ["heuristic"])
+        self.assertEqual(manifest["result_summary"]["false_support_top_overcall_backend"], "heuristic")
+        self.assertEqual(
+            manifest["result_summary"]["false_support_top_risk_slice_id"],
+            payload["comparison"][1]["top_false_support_risk_slice"]["id"],
+        )
+        self.assertEqual(
+            manifest["result_summary"]["false_support_top_risk_slice_case_ids"],
+            payload["comparison"][1]["top_false_support_risk_slice"]["case_ids"],
+        )
         self.assertEqual(result["comparison"], payload["comparison"])
         self.assertEqual(config["script"], "scripts/compare_support_baselines.py")
         self.assertEqual(config["backends"], ["fixture", "heuristic"])

@@ -400,14 +400,23 @@ instead of a full per-case report. The compact payload includes
 `top_risk_slice`. Treat `contradicted_overcalled`,
 `hard_negative_overcalled`, and `full_text_boundary_overcalled` as the most
 urgent supported-overcall review slices. These slices are release triage, not
-proof that a production model is calibrated.
+proof that a production model is calibrated. When `--output-dir` is used with
+this compact mode, the experiment `manifest.json` keeps
+`false_support_total_overcall_count`, `false_support_risk_slice_count`,
+`false_support_top_risk_slice_id`, and
+`false_support_top_risk_slice_case_ids` so release tooling can compare saved
+support-review runs without loading the full result payload.
 
 `scripts/compare_support_baselines.py` compares the deterministic fixture
 backend with the zero-model heuristic baseline by default. Each comparison row
 includes `quality_gate_ok`, support metrics, review queue case ids, and
 `false_support_risk_slices` / `top_false_support_risk_slice` when overcalls are
 present. The top-level `quality_gates_ok` summarizes all included backend and
-sidecar gates.
+sidecar gates. When `--output-dir` is used, the experiment `manifest.json`
+keeps compact false-support triage fields such as
+`false_support_overcall_backends`, `false_support_top_overcall_backend`, and
+`false_support_top_risk_slice_id` so release tooling can rank saved runs without
+loading the full result payload.
 
 ## Output
 

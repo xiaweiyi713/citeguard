@@ -5,6 +5,7 @@ from pathlib import Path
 import re
 import subprocess
 import sys
+import tempfile
 import unittest
 from unittest import mock
 
@@ -1039,28 +1040,60 @@ License-File: LICENSE
 
     def test_release_gate_records_support_review_queue_contract(self):
         summary = {"ok": True, "steps": []}
-        completed = mock.Mock(
-            stdout=(
-                '{"case_count": 12, "review_queue": [], '
-                '"review_queue_summary": {"count": 0, "by_severity": {}}, '
-                '"false_support_analysis": {"total_overcall_count": 0, '
-                '"risk_slices": [], "top_risk_slice": null}, '
-                '"quality_gate": {"ok": true, "review_queue_case_ids": [], '
-                '"critical_review_case_ids": [], "failures": []}, '
-                '"support_set_policy": {"accuracy": 1.0}}'
+        with tempfile.TemporaryDirectory() as tmpdir:
+            manifest_path = Path(tmpdir) / "manifest.json"
+            manifest_path.write_text(
+                json.dumps(
+                    {
+                        "result_summary": {
+                            "false_support_total_overcall_count": 0,
+                            "false_support_risk_slice_count": 0,
+                            "false_support_top_risk_slice_id": None,
+                            "false_support_top_risk_slice_case_ids": [],
+                        }
+                    }
+                ),
+                encoding="utf-8",
             )
-        )
-        with mock.patch("scripts.release_package_gate._run", return_value=completed) as run:
-            _record_support_review_queue_gate(
-                summary,
-                python="python3",
-                project_root=ROOT,
-                dataset="data/eval/support_eval.json",
+            completed = mock.Mock(
+                stdout=json.dumps(
+                    {
+                        "case_count": 12,
+                        "review_queue": [],
+                        "review_queue_summary": {"count": 0, "by_severity": {}},
+                        "false_support_analysis": {
+                            "total_overcall_count": 0,
+                            "risk_slices": [],
+                            "top_risk_slice": None,
+                        },
+                        "quality_gate": {
+                            "ok": True,
+                            "review_queue_case_ids": [],
+                            "critical_review_case_ids": [],
+                            "failures": [],
+                        },
+                        "support_set_policy": {"accuracy": 1.0},
+                        "experiment_artifact": {
+                            "files": {
+                                "manifest": str(manifest_path),
+                            }
+                        },
+                    }
+                )
             )
+            with mock.patch("scripts.release_package_gate._run", return_value=completed) as run:
+                _record_support_review_queue_gate(
+                    summary,
+                    python="python3",
+                    project_root=ROOT,
+                    dataset="data/eval/support_eval.json",
+                )
 
         run.assert_called_once()
+        called_cmd = run.call_args.args[0]
+        output_dir_index = called_cmd.index("--output-dir")
         self.assertEqual(
-            run.call_args.args[0],
+            called_cmd[:output_dir_index],
             [
                 "python3",
                 "scripts/eval_support.py",
@@ -1074,6 +1107,7 @@ License-File: LICENSE
                 "--review-queue-only",
             ],
         )
+        self.assertEqual(called_cmd[output_dir_index + 2 :], ["--run-id", "release-support-review-queue"])
         self.assertTrue(summary["ok"])
         self.assertEqual(summary["steps"][0]["name"], "support_review_queue")
         self.assertEqual(summary["steps"][0]["status"], "passed")
@@ -1082,64 +1116,135 @@ License-File: LICENSE
         self.assertEqual(summary["steps"][0]["review_queue_case_ids"], [])
         self.assertTrue(summary["steps"][0]["false_support_triage_present"])
         self.assertEqual(summary["steps"][0]["false_support_analysis"]["risk_slices"], [])
+        self.assertTrue(summary["steps"][0]["manifest_false_support_triage_present"])
+        self.assertEqual(summary["steps"][0]["manifest_errors"], [])
+        self.assertEqual(summary["steps"][0]["manifest_result_summary"]["false_support_risk_slice_count"], 0)
+
+    def test_release_gate_fails_on_support_review_manifest_mismatch(self):
+        summary = {"ok": True, "steps": []}
+        with tempfile.TemporaryDirectory() as tmpdir:
+            manifest_path = Path(tmpdir) / "manifest.json"
+            manifest_path.write_text(
+                json.dumps(
+                    {
+                        "result_summary": {
+                            "false_support_total_overcall_count": 1,
+                            "false_support_risk_slice_count": 0,
+                            "false_support_top_risk_slice_id": None,
+                            "false_support_top_risk_slice_case_ids": [],
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+            completed = mock.Mock(
+                stdout=json.dumps(
+                    {
+                        "case_count": 12,
+                        "review_queue": [],
+                        "review_queue_summary": {"count": 0},
+                        "false_support_analysis": {
+                            "total_overcall_count": 0,
+                            "risk_slices": [],
+                            "top_risk_slice": None,
+                        },
+                        "quality_gate": {"ok": True, "review_queue_case_ids": [], "critical_review_case_ids": []},
+                        "experiment_artifact": {"files": {"manifest": str(manifest_path)}},
+                    }
+                )
+            )
+            with mock.patch("scripts.release_package_gate._run", return_value=completed):
+                _record_support_review_queue_gate(
+                    summary,
+                    python="python3",
+                    project_root=ROOT,
+                    dataset="data/eval/support_eval.json",
+                )
+
+        self.assertFalse(summary["ok"])
+        self.assertEqual(summary["steps"][0]["name"], "support_review_queue")
+        self.assertEqual(summary["steps"][0]["status"], "failed")
+        self.assertIn("manifest_total_overcall_count_mismatch", summary["steps"][0]["manifest_errors"])
 
     def test_release_gate_records_support_baseline_comparison_contract(self):
         summary = {"ok": True, "steps": []}
-        completed = mock.Mock(
-            stdout=json.dumps(
-                {
-                    "case_count": 13,
-                    "quality_gates_ok": False,
-                    "label_sidecar_gate": {"ok": True},
-                    "comparison": [
-                        {
-                            "backend": "fixture",
-                            "quality_gate_ok": True,
-                            "total_overcall_count": 0,
-                            "false_support_risk_slices": [],
-                            "top_false_support_risk_slice": None,
-                            "heuristic_limited": False,
+        with tempfile.TemporaryDirectory() as tmpdir:
+            manifest_path = Path(tmpdir) / "manifest.json"
+            manifest_path.write_text(
+                json.dumps(
+                    {
+                        "result_summary": {
+                            "false_support_overcall_backends": ["heuristic"],
+                            "false_support_top_overcall_backend": "heuristic",
+                            "false_support_top_risk_slice_id": "contradicted_overcalled",
+                            "false_support_top_risk_slice_case_ids": ["s10"],
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+            completed = mock.Mock(
+                stdout=json.dumps(
+                    {
+                        "case_count": 13,
+                        "quality_gates_ok": False,
+                        "label_sidecar_gate": {"ok": True},
+                        "experiment_artifact": {
+                            "files": {
+                                "manifest": str(manifest_path),
+                            }
                         },
-                        {
-                            "backend": "heuristic",
-                            "quality_gate_ok": False,
-                            "total_overcall_count": 2,
-                            "false_support_risk_slices": [
-                                {
+                        "comparison": [
+                            {
+                                "backend": "fixture",
+                                "quality_gate_ok": True,
+                                "total_overcall_count": 0,
+                                "false_support_risk_slices": [],
+                                "top_false_support_risk_slice": None,
+                                "heuristic_limited": False,
+                            },
+                            {
+                                "backend": "heuristic",
+                                "quality_gate_ok": False,
+                                "total_overcall_count": 2,
+                                "false_support_risk_slices": [
+                                    {
+                                        "id": "contradicted_overcalled",
+                                        "case_ids": ["s10"],
+                                    }
+                                ],
+                                "top_false_support_risk_slice": {
                                     "id": "contradicted_overcalled",
                                     "case_ids": ["s10"],
-                                }
-                            ],
-                            "top_false_support_risk_slice": {
-                                "id": "contradicted_overcalled",
-                                "case_ids": ["s10"],
+                                },
+                                "heuristic_limited": True,
                             },
-                            "heuristic_limited": True,
-                        },
-                    ],
-                }
+                        ],
+                    }
+                )
             )
-        )
-        with mock.patch("scripts.release_package_gate._run", return_value=completed) as run:
-            _record_support_baseline_comparison_gate(
-                summary,
-                python="python3",
-                project_root=ROOT,
-                dataset="data/eval/support_eval.json",
-                label_sidecar="data/eval/support_eval_label_sidecar.json",
-                min_sidecar_coverage=1.0,
-                min_human_reviewed=0,
-                min_high_risk_reviewed=0,
-                min_high_risk_reviewed_by_language=["zh=0"],
-                min_dual_annotated=0,
-                max_unresolved_disagreements=0,
-                min_raw_dual_agreement_rate=None,
-                max_supported_disagreements=0,
-            )
+            with mock.patch("scripts.release_package_gate._run", return_value=completed) as run:
+                _record_support_baseline_comparison_gate(
+                    summary,
+                    python="python3",
+                    project_root=ROOT,
+                    dataset="data/eval/support_eval.json",
+                    label_sidecar="data/eval/support_eval_label_sidecar.json",
+                    min_sidecar_coverage=1.0,
+                    min_human_reviewed=0,
+                    min_high_risk_reviewed=0,
+                    min_high_risk_reviewed_by_language=["zh=0"],
+                    min_dual_annotated=0,
+                    max_unresolved_disagreements=0,
+                    min_raw_dual_agreement_rate=None,
+                    max_supported_disagreements=0,
+                )
 
         run.assert_called_once()
+        called_cmd = run.call_args.args[0]
+        output_dir_index = called_cmd.index("--output-dir")
         self.assertEqual(
-            run.call_args.args[0],
+            called_cmd[:output_dir_index],
             [
                 "python3",
                 "scripts/compare_support_baselines.py",
@@ -1165,6 +1270,7 @@ License-File: LICENSE
                 "0",
             ],
         )
+        self.assertEqual(called_cmd[output_dir_index + 2 :], ["--run-id", "release-support-baseline-comparison"])
         self.assertTrue(summary["ok"])
         self.assertEqual(summary["steps"][0]["name"], "support_baseline_comparison")
         self.assertEqual(summary["steps"][0]["status"], "passed")
@@ -1180,6 +1286,81 @@ License-File: LICENSE
         )
         self.assertEqual(summary["steps"][0]["rows_missing_risk_fields"], [])
         self.assertEqual(summary["steps"][0]["rows_missing_active_risk_slices"], [])
+        self.assertTrue(summary["steps"][0]["manifest_false_support_triage_present"])
+        self.assertEqual(summary["steps"][0]["manifest_errors"], [])
+        self.assertEqual(
+            summary["steps"][0]["manifest_result_summary"]["false_support_overcall_backends"],
+            ["heuristic"],
+        )
+
+    def test_release_gate_fails_on_support_baseline_manifest_mismatch(self):
+        summary = {"ok": True, "steps": []}
+        with tempfile.TemporaryDirectory() as tmpdir:
+            manifest_path = Path(tmpdir) / "manifest.json"
+            manifest_path.write_text(
+                json.dumps(
+                    {
+                        "result_summary": {
+                            "false_support_overcall_backends": [],
+                            "false_support_top_overcall_backend": "heuristic",
+                            "false_support_top_risk_slice_id": "contradicted_overcalled",
+                            "false_support_top_risk_slice_case_ids": ["s10"],
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+            completed = mock.Mock(
+                stdout=json.dumps(
+                    {
+                        "case_count": 13,
+                        "label_sidecar_gate": {"ok": True},
+                        "comparison": [
+                            {
+                                "backend": "fixture",
+                                "quality_gate_ok": True,
+                                "total_overcall_count": 0,
+                                "false_support_risk_slices": [],
+                                "top_false_support_risk_slice": None,
+                            },
+                            {
+                                "backend": "heuristic",
+                                "quality_gate_ok": False,
+                                "total_overcall_count": 1,
+                                "false_support_risk_slices": [
+                                    {"id": "contradicted_overcalled", "case_ids": ["s10"]}
+                                ],
+                                "top_false_support_risk_slice": {
+                                    "id": "contradicted_overcalled",
+                                    "case_ids": ["s10"],
+                                },
+                            },
+                        ],
+                        "experiment_artifact": {"files": {"manifest": str(manifest_path)}},
+                    }
+                )
+            )
+            with mock.patch("scripts.release_package_gate._run", return_value=completed):
+                _record_support_baseline_comparison_gate(
+                    summary,
+                    python="python3",
+                    project_root=ROOT,
+                    dataset="data/eval/support_eval.json",
+                    label_sidecar="data/eval/support_eval_label_sidecar.json",
+                    min_sidecar_coverage=1.0,
+                    min_human_reviewed=0,
+                    min_high_risk_reviewed=0,
+                    min_high_risk_reviewed_by_language=[],
+                    min_dual_annotated=0,
+                    max_unresolved_disagreements=0,
+                    min_raw_dual_agreement_rate=None,
+                    max_supported_disagreements=None,
+                )
+
+        self.assertFalse(summary["ok"])
+        self.assertEqual(summary["steps"][0]["name"], "support_baseline_comparison")
+        self.assertEqual(summary["steps"][0]["status"], "failed")
+        self.assertIn("manifest_overcall_backends_mismatch", summary["steps"][0]["manifest_errors"])
 
     def test_release_gate_records_support_review_queue_annotation_packet_contract(self):
         summary = {"ok": True, "steps": []}
@@ -1569,6 +1750,12 @@ License-File: LICENSE
             "false_support_analysis.top_risk_slice",
             "false_support_risk_slices",
             "top_false_support_risk_slice",
+            "false_support_total_overcall_count",
+            "false_support_risk_slice_count",
+            "false_support_top_risk_slice_id",
+            "false_support_top_risk_slice_case_ids",
+            "false_support_overcall_backends",
+            "false_support_top_overcall_backend",
             "Support Eval Scripts",
             "scripts/compare_support_baselines.py",
             "high-risk false support case ids",

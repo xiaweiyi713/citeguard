@@ -138,14 +138,20 @@ agent skill bundle.
   triage artifact for `quality_gate.review_queue_case_ids` and
   `quality_gate.critical_review_case_ids`, with `review_queue_summary` grouped by
   severity and recommended action plus compact `false_support_analysis.risk_slices`
-  / `false_support_analysis.top_risk_slice`, not a model-quality claim. The report should include `support_set_policy` so
+  / `false_support_analysis.top_risk_slice`, not a model-quality claim. The
+  release gate also writes a temporary support-eval artifact and fails if its
+  `manifest.json` lacks compact fields such as
+  `false_support_total_overcall_count` and `false_support_top_risk_slice_id`.
+  The report should include `support_set_policy` so
   citation-set aggregation boundaries are checked alongside evidence-level
   cases. The baseline comparison table should include at least the deterministic
   `fixture` row and the zero-model `heuristic` row, with heuristic limitations
   visible in the diagnostics, plus `false_support_risk_slices` and
   `top_false_support_risk_slice` for prioritized false-support triage. The
   consolidated release gate records this as `support_baseline_comparison`, and
-  fails if an active support overcall row lacks a top risk slice. The
+  fails if an active support overcall row lacks a top risk slice or if the saved
+  experiment `manifest.json` lacks compact triage summary fields such as
+  `false_support_overcall_backends` and `false_support_top_risk_slice_id`. The
   label-sidecar gate should report coverage
   `1.0`; keep `--min-human-reviewed`, `--min-high-risk-reviewed`, and
   `--min-dual-annotated` at `0` for the synthetic seed set, then raise them when

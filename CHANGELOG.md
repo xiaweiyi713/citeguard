@@ -77,6 +77,12 @@
   --review-queue-only` and the release-gate `support_review_queue` contract so
   agent triage payloads expose supported-overcall priority slices without
   expanding the full per-case report.
+- Added compact false-support overcall triage fields to experiment
+  `manifest.json` summaries so saved support eval and baseline runs expose the
+  top risk slice without loading full result payloads.
+- Extended the release gate to verify support review-queue and baseline
+  artifact manifest summaries keep false-support overcall counts, backend, and
+  top risk-slice fields.
 - Updated the packaged `citeguard-verify` skill examples to read
   `false_support_analysis.risk_slices` / `top_risk_slice` during support
   benchmark triage and to treat contradicted supported-overcalls as
