@@ -112,6 +112,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     _record_public_api_contract_gate(summary, project_root)
     _record_cache_replay_fixture_gate(summary, python=args.python, project_root=project_root)
     _record_error_codes_contract_gate(summary, project_root=project_root)
+    _record_mcp_stdio_smoke_contract_gate(summary, project_root=project_root)
     _record_cli_error_contract_gate(summary, python=args.python, project_root=project_root)
     _record_source_outage_safety_gate(summary, project_root=project_root)
     _record_security_compliance_contract_gate(summary, project_root=project_root)
@@ -621,6 +622,161 @@ def _check_error_codes_contract_gate(*, project_root: Path) -> Dict[str, Any]:
             "details_keys": sorted(probe_error.get("details", {})),
         },
         "policy": "stable error codes, recovery guidance, next_action mappings, and docs stay synchronized for agents",
+    }
+
+
+def _record_mcp_stdio_smoke_contract_gate(summary: Dict[str, Any], *, project_root: Path) -> None:
+    try:
+        details = _check_mcp_stdio_smoke_contract_gate(project_root=project_root)
+    except Exception as exc:
+        summary["steps"].append(
+            {
+                "name": "mcp_stdio_smoke_contract",
+                "status": "failed",
+                "message": str(exc),
+            }
+        )
+        summary["ok"] = False
+        return
+
+    summary["steps"].append(
+        {
+            "name": "mcp_stdio_smoke_contract",
+            "status": "passed",
+            **details,
+        }
+    )
+
+
+def _check_mcp_stdio_smoke_contract_gate(*, project_root: Path) -> Dict[str, Any]:
+    script = _read_required_text(project_root / "scripts" / "smoke_mcp.py")
+    docs = _read_required_text(project_root / "docs" / "mcp_setup.md")
+    checklist = _read_required_text(project_root / "docs" / "release_checklist.md")
+    readme = _read_required_text(project_root / "README.md")
+    normalized_script = _normalize_markdown_text(script)
+    normalized_docs = _normalize_markdown_text("\n".join([docs, checklist, readme]))
+
+    required_tools = [
+        "citeguard_status_tool",
+        "verify_citation_tool",
+        "audit_citations_tool",
+        "check_claim_support_tool",
+        "check_claim_support_set_tool",
+        "search_counterevidence_tool",
+        "audit_claim_support_tool",
+    ]
+    required_script_phrases = {
+        "initialize": "await session.initialize()",
+        "list_tools": "await session.list_tools()",
+        "tool_presence_helper": "_require_tool(tool_names,",
+        "offline_fixture_env": "CITEGUARD_FIXTURE_CITATIONS",
+        "memory_cache": '"CITEGUARD_CACHE": ":memory:"',
+        "status_call": 'session.call_tool("citeguard_status_tool"',
+        "status_payload": "_require_status_payload(status, fixture_path)",
+        "fixture_verify_call": 'session.call_tool(\n                        "verify_citation_tool"',
+        "verified_verdict": 'verify.get("verdict") != "verified"',
+        "audit_payload": "_require_audit_citations_payload(audit)",
+        "audit_high_risk": "_require_high_risk_filtered_payload(audit_high_risk, total=2, returned_indexes=[1])",
+        "claim_support": "_require_support_payload(support)",
+        "support_set": '"check_claim_support_set_tool"',
+        "support_audit_set": "_require_support_audit_set_payload(support_audit)",
+        "support_audit_high_risk": "_require_high_risk_filtered_payload(support_audit_high_risk, total=2, returned_indexes=[1])",
+        "counterevidence": "_require_counterevidence_payload(counterevidence)",
+        "source_outage_counterevidence": "_require_source_outage_counterevidence_payload(source_outage_counterevidence)",
+        "zh_source_outage_counterevidence": "zh_source_outage_counterevidence",
+        "structured_error_helper": "_require_error_payload",
+        "shape_error_helper": "_require_shape_error_payload",
+        "stable_next_actions": "STABLE_NEXT_ACTIONS",
+        "require_sdk_flag": "--require-sdk",
+        "missing_sdk_message": "MCP SDK is not installed",
+        "missing_sdk_skip": 'print(f"SKIP: {message}")',
+        "missing_sdk_fail": 'print(f"FAIL: {message}")',
+        "success_coverage": "OK: MCP stdio smoke passed",
+    }
+    structured_error_codes = [
+        "missing_citation_input",
+        "missing_claim",
+        "invalid_input",
+    ]
+    shape_error_fields = [
+        "field=\"citations\"",
+        "field=\"items\"",
+        "expected=\"non_empty_list\"",
+        "details.expected",
+        "details.received",
+    ]
+    success_terms = [
+        "initialize",
+        "list_tools",
+        "status",
+        "offline verify",
+        "offline audit",
+        "offline support",
+        "offline support-audit citation set",
+        "offline counter-evidence leads",
+        "source-outage safety counter-evidence leads",
+        "Chinese source-outage safety leads",
+        "high-risk-only batch filtering",
+        "source-health next_action",
+        "structured errors",
+        "batch shape error details",
+    ]
+    docs_phrases = [
+        "python scripts/smoke_mcp.py --require-sdk",
+        "mcp_stdio_smoke",
+        "MCP stdio smoke",
+    ]
+
+    errors = []
+    for tool in required_tools:
+        if script.count(f'"{tool}"') < 1:
+            errors.append(f"scripts/smoke_mcp.py missing required tool coverage: {tool}")
+    for label, phrase in required_script_phrases.items():
+        if _normalize_markdown_text(phrase) not in normalized_script:
+            errors.append(f"scripts/smoke_mcp.py missing required {label} coverage: {phrase}")
+    for code in structured_error_codes:
+        if code not in script:
+            errors.append(f"scripts/smoke_mcp.py missing structured error code coverage: {code}")
+    for phrase in shape_error_fields:
+        if phrase not in script:
+            errors.append(f"scripts/smoke_mcp.py missing batch shape error detail coverage: {phrase}")
+    for term in success_terms:
+        if term not in script:
+            errors.append(f"scripts/smoke_mcp.py success message missing coverage term: {term}")
+    for phrase in docs_phrases:
+        if _normalize_markdown_text(phrase) not in normalized_docs:
+            errors.append(f"MCP stdio release docs missing required phrase: {phrase}")
+    if errors:
+        raise RuntimeError("; ".join(errors))
+
+    return {
+        "script": "scripts/smoke_mcp.py",
+        "docs_checked": ["README.md", "docs/mcp_setup.md", "docs/release_checklist.md"],
+        "required_tools": required_tools,
+        "checked_behaviors": {
+            "initialize": True,
+            "list_tools": True,
+            "offline_fixture": True,
+            "status_payload": True,
+            "fixture_verify": True,
+            "audit_batch": True,
+            "audit_high_risk_filter": True,
+            "claim_support": True,
+            "claim_support_set": True,
+            "support_audit_citation_set": True,
+            "support_audit_high_risk_filter": True,
+            "counterevidence": True,
+            "source_outage_safety": True,
+            "zh_source_outage_safety": True,
+            "structured_errors": True,
+            "batch_shape_errors": True,
+            "missing_sdk_skip": True,
+            "require_sdk_fail": True,
+        },
+        "structured_error_codes": structured_error_codes,
+        "shape_error_fields": ["citations", "items", "citations"],
+        "success_terms": success_terms,
+        "policy": "MCP stdio smoke must cover initialize, list_tools, fixture-backed verification, status, high-risk filtering, and structured errors",
     }
 
 
@@ -1148,9 +1304,13 @@ def _check_agent_skill_contract_gate(*, project_root: Path) -> Dict[str, Any]:
     required_example_phrases = {
         "single_citation_example": '"tool": "verify_citation_tool"',
         "batch_audit_example": '"tool": "audit_citations_tool"',
+        "high_risk_only_example": '"high_risk_only": true',
+        "filtered_indexes_wording": "filtered.returned_indexes",
         "claim_support_example": '"tool": "check_claim_support_tool"',
         "support_set_example": '"tool": "check_claim_support_set_tool"',
         "claim_batch_example": '"tool": "audit_claim_support_tool"',
+        "shape_error_repair_example": "Malformed batch shape repair",
+        "structured_shape_error_details": "error.details.expected=list",
         "counterevidence_example": '"tool": "search_counterevidence_tool"',
         "ambiguous_wording": "do not choose one match",
         "metadata_mismatch_wording": "ask before editing the user's bibliography",
@@ -1181,7 +1341,8 @@ def _check_agent_skill_contract_gate(*, project_root: Path) -> Dict[str, Any]:
             "trigger_count": 3,
             "forbidden_behavior_count": 3,
             "client_setup_count": 3,
-            "tool_example_count": 6,
+            "tool_example_count": 8,
+            "structured_error_example_count": 1,
             "safe_wording_example_count": 4,
         },
         "policy": "agent skill must proactively audit citations without silent edits or source-outage fabrication overclaims",

@@ -431,6 +431,54 @@
       "case_type": "contradiction",
       "split": "test",
       "label_notes": "Chinese contradiction: not-found and rate-limit states must not be treated as fabrication evidence."
+    },
+    {
+      "id": "s37",
+      "claim": "The paper proves that citation-auditing alerts caused reviewers to reject more flawed manuscripts.",
+      "evidence": "The study reports that citation-auditing alerts were associated with reviewers opening more verification links during a simulated review task.",
+      "gold": "insufficient_evidence",
+      "lang": "en",
+      "evidence_scope": "abstract",
+      "label_source": "maintainer_synthetic",
+      "case_type": "hard_negative",
+      "split": "train",
+      "label_notes": "Related evaluation evidence, but association in a simulated task does not prove causal rejection outcomes."
+    },
+    {
+      "id": "s38",
+      "claim": "The abstract confirms that all excluded patients had prior treatment.",
+      "evidence": "The abstract summarizes primary outcomes and states that exclusion reasons are listed only in the supplementary methods.",
+      "gold": "insufficient_evidence",
+      "lang": "en",
+      "evidence_scope": "abstract",
+      "label_source": "maintainer_synthetic",
+      "case_type": "full_text_required",
+      "split": "dev",
+      "label_notes": "The exclusion-reason claim requires full text or supplementary methods; the abstract explicitly lacks the detail."
+    },
+    {
+      "id": "s39",
+      "claim": "来源暂时不可达证明该引用是伪造的。",
+      "evidence": "来源暂时不可达只说明当前检索失败，不能证明引用是伪造的；应稍后重试或检查其他来源。",
+      "gold": "contradicted",
+      "lang": "zh",
+      "evidence_scope": "metadata_snippet",
+      "label_source": "maintainer_synthetic",
+      "case_type": "contradiction",
+      "split": "test",
+      "label_notes": "Chinese contradiction: temporary source unavailability is not fabrication evidence."
+    },
+    {
+      "id": "s40",
+      "claim": "这篇真实论文支持该工具能自动替代人工审稿。",
+      "evidence": "论文介绍了一个参考文献核验工具，并建议高风险结果交由人工审查。",
+      "gold": "insufficient_evidence",
+      "lang": "zh",
+      "evidence_scope": "abstract",
+      "label_source": "maintainer_synthetic",
+      "case_type": "hard_negative",
+      "split": "dev",
+      "label_notes": "Chinese hard negative: a real, topically related paper recommends human review and does not support replacing reviewers."
     }
   ],
   "set_cases": [

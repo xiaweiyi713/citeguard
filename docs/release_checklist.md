@@ -57,9 +57,12 @@ agent skill bundle.
   distribution metadata contract, and runs PEP 517 `python -m build` plus
   `python -m twine check` when release tools are installed. The MCP extra gate
   records `mcp_extra_wheel_install_smoke` in the release summary and should be
-  run on Python 3.10+. The MCP stdio gate records `mcp_stdio_smoke` in the same
-  machine-readable summary; with `--require-mcp-stdio-smoke`, missing MCP
-  dependencies or Python <3.10 are release failures instead of local skips.
+  run on Python 3.10+. The default `mcp_stdio_smoke_contract` gate checks that
+  `scripts/smoke_mcp.py` still covers initialize, list_tools, fixture-backed
+  verification, status, high-risk filtering, and structured errors. The MCP
+  stdio gate records `mcp_stdio_smoke` in the same machine-readable summary;
+  with `--require-mcp-stdio-smoke`, missing MCP dependencies or Python <3.10 are
+  release failures instead of local skips.
   The published-package plan gate records `published_package_smoke_plan` and
   `published_mcp_smoke_plan` as dry-run JSON summaries so the post-publish
   PyPI/TestPyPI install commands are checked before artifacts are uploaded.

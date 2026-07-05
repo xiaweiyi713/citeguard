@@ -56,6 +56,31 @@ Batch citation audit:
 }
 ```
 
+High-risk-only batch citation audit:
+
+```json
+{
+  "tool": "audit_citations_tool",
+  "arguments": {
+    "high_risk_only": true,
+    "citations": [
+      {
+        "title": "Attention Is All You Need",
+        "arxiv_id": "1706.03762"
+      },
+      {
+        "raw_text": "A Missing Paper About Citation Teleportation. Imaginary Proceedings, 2024."
+      }
+    ]
+  }
+}
+```
+
+When `high_risk_only=true`, use `filtered.returned_indexes`,
+`filtered.omitted_indexes`, and `filtered.omitted_review_summary` to tell the
+user which original rows are shown, which rows were hidden, and what review
+queues were omitted.
+
 Claim support:
 
 ```json
@@ -142,6 +167,23 @@ Claim/citation batch:
   }
 }
 ```
+
+Malformed batch shape repair:
+
+```json
+{
+  "tool": "audit_claim_support_tool",
+  "arguments": {
+    "items": "not a list"
+  }
+}
+```
+
+If this returns `ok=false` with `error.code=invalid_input`,
+`error.details.field=items`, `error.details.expected=list`, and
+`error.details.received=str`, repair the MCP call by rebuilding `items` as an
+array of claim/citation objects. Do not ask the user to interpret validation
+prose when `error.details` gives a machine-readable repair path.
 
 Counter-evidence lead search:
 

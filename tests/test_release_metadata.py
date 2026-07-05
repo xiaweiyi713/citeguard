@@ -21,6 +21,7 @@ from scripts.release_package_gate import (
     _record_legacy_src_shim_contract,
     _record_mcp_extra_smoke,
     _record_mcp_stdio_smoke,
+    _record_mcp_stdio_smoke_contract_gate,
     _record_published_smoke_plan,
     _record_public_api_contract_gate,
     _record_security_compliance_contract_gate,
@@ -407,6 +408,11 @@ License-File: LICENSE
             "structured",
             "_MCP_EXTRA_SMOKE",
             "mcp_extra_wheel_install_smoke",
+            "mcp_stdio_smoke_contract",
+            "_record_mcp_stdio_smoke_contract_gate",
+            "MCP stdio smoke must cover initialize, list_tools",
+            "fixture-backed verification",
+            "structured_errors",
             "mcp_stdio_smoke",
             "published_package_smoke_plan",
             "published_mcp_smoke_plan",
@@ -529,6 +535,55 @@ License-File: LICENSE
         self.assertEqual(args[1], "mcp_stdio_smoke")
         self.assertEqual(args[2], ["python3.10", "scripts/smoke_mcp.py", "--require-sdk"])
         self.assertEqual(kwargs["cwd"], ROOT)
+
+    def test_release_gate_records_mcp_stdio_smoke_contract(self):
+        summary = {"ok": True, "steps": []}
+        _record_mcp_stdio_smoke_contract_gate(summary, project_root=ROOT)
+
+        self.assertTrue(summary["ok"])
+        self.assertEqual(summary["steps"][0]["name"], "mcp_stdio_smoke_contract")
+        self.assertEqual(summary["steps"][0]["status"], "passed")
+        self.assertEqual(summary["steps"][0]["script"], "scripts/smoke_mcp.py")
+        self.assertIn("README.md", summary["steps"][0]["docs_checked"])
+        self.assertEqual(
+            summary["steps"][0]["required_tools"],
+            [
+                "citeguard_status_tool",
+                "verify_citation_tool",
+                "audit_citations_tool",
+                "check_claim_support_tool",
+                "check_claim_support_set_tool",
+                "search_counterevidence_tool",
+                "audit_claim_support_tool",
+            ],
+        )
+        behaviors = summary["steps"][0]["checked_behaviors"]
+        for behavior in [
+            "initialize",
+            "list_tools",
+            "offline_fixture",
+            "status_payload",
+            "fixture_verify",
+            "audit_high_risk_filter",
+            "claim_support",
+            "claim_support_set",
+            "support_audit_citation_set",
+            "support_audit_high_risk_filter",
+            "counterevidence",
+            "source_outage_safety",
+            "zh_source_outage_safety",
+            "structured_errors",
+            "batch_shape_errors",
+            "missing_sdk_skip",
+            "require_sdk_fail",
+        ]:
+            with self.subTest(behavior=behavior):
+                self.assertTrue(behaviors[behavior])
+        self.assertIn("missing_citation_input", summary["steps"][0]["structured_error_codes"])
+        self.assertIn("missing_claim", summary["steps"][0]["structured_error_codes"])
+        self.assertEqual(summary["steps"][0]["shape_error_fields"], ["citations", "items", "citations"])
+        self.assertIn("initialize, list_tools", summary["steps"][0]["policy"])
+        self.assertIn("structured errors", summary["steps"][0]["policy"])
 
     def test_release_gate_records_published_smoke_plan(self):
         summary = {"ok": True, "steps": []}
@@ -698,8 +753,8 @@ License-File: LICENSE
         self.assertEqual(summary["steps"][0]["status"], "passed")
         self.assertEqual(summary["steps"][0]["dataset"], "data/eval/support_eval.json")
         self.assertEqual(summary["steps"][0]["label_sidecar"], "data/eval/support_eval_label_sidecar.json")
-        self.assertEqual(summary["steps"][0]["case_count"], 40)
-        self.assertEqual(summary["steps"][0]["sidecar_case_count"], 40)
+        self.assertEqual(summary["steps"][0]["case_count"], 44)
+        self.assertEqual(summary["steps"][0]["sidecar_case_count"], 44)
         self.assertEqual(summary["steps"][0]["human_reviewed"], 0)
         self.assertEqual(summary["steps"][0]["dual_annotated"], 0)
         self.assertEqual(summary["steps"][0]["published_benchmark"], 0)
@@ -881,7 +936,8 @@ License-File: LICENSE
         self.assertEqual(summary["steps"][0]["checked_contracts"]["trigger_count"], 3)
         self.assertEqual(summary["steps"][0]["checked_contracts"]["forbidden_behavior_count"], 3)
         self.assertEqual(summary["steps"][0]["checked_contracts"]["client_setup_count"], 3)
-        self.assertEqual(summary["steps"][0]["checked_contracts"]["tool_example_count"], 6)
+        self.assertEqual(summary["steps"][0]["checked_contracts"]["tool_example_count"], 8)
+        self.assertEqual(summary["steps"][0]["checked_contracts"]["structured_error_example_count"], 1)
         self.assertEqual(summary["steps"][0]["checked_contracts"]["safe_wording_example_count"], 4)
         self.assertIn("proactively audit citations", summary["steps"][0]["policy"])
         self.assertIn("without silent edits", summary["steps"][0]["policy"])
@@ -1291,24 +1347,34 @@ License-File: LICENSE
         combined = f"{readme}\n{changelog}\n{benchmark_todo}\n{support_eval}\n{sidecar}"
 
         required_phrases = [
-            "36 evidence-level cases",
+            "40 evidence-level cases",
             "benchmark provenance",
             "source-outage-to-fabrication inferences",
             "source outage",
             "Chinese source-outage/not-found safety benchmark cases",
             "eligibility criteria",
+            "simulated-review causal",
+            "reviewer-replacement overclaims",
             '"id": "s31"',
             '"id": "s32"',
             '"id": "s33"',
             '"id": "s34"',
             '"id": "s35"',
             '"id": "s36"',
+            '"id": "s37"',
+            '"id": "s38"',
+            '"id": "s39"',
+            '"id": "s40"',
             '"case_id": "s31"',
             '"case_id": "s32"',
             '"case_id": "s33"',
             '"case_id": "s34"',
             '"case_id": "s35"',
             '"case_id": "s36"',
+            '"case_id": "s37"',
+            '"case_id": "s38"',
+            '"case_id": "s39"',
+            '"case_id": "s40"',
         ]
         for phrase in required_phrases:
             with self.subTest(phrase=phrase):
@@ -1437,6 +1503,13 @@ License-File: LICENSE
             "check_claim_support_set_tool",
             "search_counterevidence_tool",
             "audit_claim_support_tool",
+            "High-risk-only batch citation audit:",
+            '"high_risk_only": true',
+            "filtered.returned_indexes",
+            "filtered.omitted_review_summary",
+            "Malformed batch shape repair:",
+            "error.details.expected=list",
+            "machine-readable repair path",
             "Ambiguous citation:",
             "Metadata mismatch:",
             "Claim/citation batch:",

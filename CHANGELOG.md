@@ -117,6 +117,9 @@
   release-facing docs cannot describe the synthetic support seed set as a
   human-reviewed benchmark while label provenance still reports
   `human_reviewed: 0`.
+- Added a default release-gate MCP stdio smoke contract so `scripts/smoke_mcp.py`
+  must keep initialize/list-tools, offline fixture verification, batch
+  high-risk filtering, source-outage safety, and structured error coverage.
 - Added language coverage and `by_language` support-eval reporting so English
   and Chinese false-support or missed-contradiction risks can be triaged
   separately.
@@ -150,13 +153,16 @@
 - Added language-specific high-risk audit failures for support-label sidecar
   readiness checks, so reviewer assignment can block on unreviewed Chinese or
   other language-specific high-risk cases.
-- Expanded the synthetic support eval seed set to 36 evidence-level cases with
+- Expanded the synthetic support eval seed set to 40 evidence-level cases with
   additional high-risk hard-negative, contradiction, and full-text-required
   boundaries for benchmark-provenance overclaims, source-outage fabrication
-  inferences, and abstract-only eligibility claims.
+  inferences, abstract-only eligibility claims, simulated-review causal
+  overclaims, and reviewer-replacement overclaims.
 - Added Chinese source-outage/not-found safety benchmark cases covering
   unsafe fabrication-confidence overclaims, Crossref timeout hard negatives,
   and rate-limit/not-found contradiction examples.
+- Expanded the CiteGuard agent skill examples with high-risk-only batch audit
+  payloads and structured MCP shape-error repair guidance for agents.
 - Added non-gold `review_focus` hints to support-label annotation packets so
   reviewers know which support boundary to inspect without seeing gold labels,
   adjudicated labels, or `label_notes`.

@@ -400,6 +400,50 @@
       "notes": "Synthetic Chinese contradiction: not-found and rate-limit states are not fabrication evidence."
     },
     {
+      "case_id": "s37",
+      "adjudication_status": "not_human_reviewed",
+      "annotator_count": 0,
+      "annotator_labels": [],
+      "adjudicated_label": "insufficient_evidence",
+      "disagreement": "not_applicable",
+      "adjudicator": "",
+      "source_locator": "",
+      "notes": "Synthetic hard negative: simulated alert usage does not prove causal manuscript rejection outcomes."
+    },
+    {
+      "case_id": "s38",
+      "adjudication_status": "not_human_reviewed",
+      "annotator_count": 0,
+      "annotator_labels": [],
+      "adjudicated_label": "insufficient_evidence",
+      "disagreement": "not_applicable",
+      "adjudicator": "",
+      "source_locator": "",
+      "notes": "Synthetic full-text-required case: exclusion reasons are absent from the abstract."
+    },
+    {
+      "case_id": "s39",
+      "adjudication_status": "not_human_reviewed",
+      "annotator_count": 0,
+      "annotator_labels": [],
+      "adjudicated_label": "contradicted",
+      "disagreement": "not_applicable",
+      "adjudicator": "",
+      "source_locator": "",
+      "notes": "Synthetic Chinese contradiction: temporary source unavailability does not prove fabrication."
+    },
+    {
+      "case_id": "s40",
+      "adjudication_status": "not_human_reviewed",
+      "annotator_count": 0,
+      "annotator_labels": [],
+      "adjudicated_label": "insufficient_evidence",
+      "disagreement": "not_applicable",
+      "adjudicator": "",
+      "source_locator": "",
+      "notes": "Synthetic Chinese hard negative: a real related tool paper recommends human review, not replacing reviewers."
+    },
+    {
       "case_id": "ss01",
       "adjudication_status": "not_human_reviewed",
       "annotator_count": 0,
