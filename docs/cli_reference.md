@@ -28,10 +28,11 @@ counts each status, lists `sources_configured`, `sources_checked`,
 `sources_responded`, `sources_unchecked`, `sources_available`,
 `sources_failed`, and `invalid_sources`, and exposes `degraded`,
 `all_checked_sources_failed`, summary-level `failure_count` and
-`failure_details`, stable `recovery_code` values such as `timeout`,
-`source_unavailable`, or `invalid_input`, and a stable `next_action` such as
-`continue`, `inspect_source_health`, `retry_or_check_source_health`, or
-`fix_configuration`. Use `--health-query` to override the
+`failure_details`, `failure_kind_counts`, and `failure_kind_sources`, stable
+`recovery_code` values such as `timeout`, `source_unavailable`, or
+`invalid_input`, and a stable `next_action` such as `continue`,
+`inspect_source_health`, `retry_or_check_source_health`, or `fix_configuration`.
+Use `--health-query` to override the
 probe query for a project-specific known paper. Status output also includes
 `remote_evidence_policy`, which exposes whether landing-page evidence harvesting
 is enabled, whether non-HTTP URLs are allowed, and which gated-source host

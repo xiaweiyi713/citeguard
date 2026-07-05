@@ -58,6 +58,8 @@ class MCPStdioSmokeCommandTests(unittest.TestCase):
                     "sources_failed": [],
                     "failure_count": 0,
                     "failure_details": [],
+                    "failure_kind_counts": {},
+                    "failure_kind_sources": {},
                     "degraded": False,
                     "next_action": "continue",
                 },

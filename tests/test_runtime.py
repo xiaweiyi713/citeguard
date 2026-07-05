@@ -6,6 +6,7 @@ import tempfile
 import unittest
 
 from citeguard.runtime import (
+    SOURCE_HEALTH_SCHEMA_VERSION,
     build_configured_source,
     environment_status,
     evidence_timeout,
@@ -49,8 +50,21 @@ class FakeHTTPDiagnostics:
     last_cache_hit = True
 
 
+class RateLimitedDiagnostics:
+    last_error_code = "source_unavailable"
+    last_error_kind = "rate_limited"
+    last_error = "HTTP Error 429: Too Many Requests"
+    last_status_code = 429
+    last_url = "https://api.semanticscholar.org/graph/v1/paper/search"
+    last_cache_hit = False
+
+
 class CachedHealthSource(FakeHealthSource):
     http_client = FakeHTTPDiagnostics()
+
+
+class RateLimitedHealthSource(FakeHealthSource):
+    http_client = RateLimitedDiagnostics()
 
 
 def fake_health_source_factory(names, **kwargs):
@@ -68,6 +82,13 @@ def fake_health_source_factory(names, **kwargs):
         )
     if name == "crossref":
         return FakeHealthSource(name)
+    raise TimeoutError("health probe timed out")
+
+
+def mixed_failure_health_source_factory(names, **kwargs):
+    name = names[0]
+    if name == "semantic_scholar":
+        return RateLimitedHealthSource(name)
     raise TimeoutError("health probe timed out")
 
 
@@ -145,12 +166,14 @@ class RuntimeConfigTests(unittest.TestCase):
         self.assertEqual(status["evidence_timeout_seconds"], 3)
         source_health = status["source_health"]
         self.assertEqual(source_health["mode"], "live")
-        self.assertEqual(source_health["schema_version"], 2)
+        self.assertEqual(source_health["schema_version"], SOURCE_HEALTH_SCHEMA_VERSION)
         self.assertFalse(source_health["live_check_performed"])
         self.assertEqual(source_health["summary"]["status_counts"]["configured_not_checked"], 2)
         self.assertFalse(source_health["summary"]["degraded"])
         self.assertEqual(source_health["summary"]["failure_count"], 0)
         self.assertEqual(source_health["summary"]["failure_details"], [])
+        self.assertEqual(source_health["summary"]["failure_kind_counts"], {})
+        self.assertEqual(source_health["summary"]["failure_kind_sources"], {})
         self.assertEqual(source_health["summary"]["sources_configured"], ["openalex", "semantic_scholar"])
         self.assertEqual(source_health["summary"]["sources_checked"], [])
         self.assertEqual(source_health["summary"]["sources_responded"], [])
@@ -265,8 +288,27 @@ class RuntimeConfigTests(unittest.TestCase):
         self.assertEqual(health["summary"]["failure_details"][0]["source"], "arxiv")
         self.assertEqual(health["summary"]["failure_details"][0]["code"], "timeout")
         self.assertFalse(health["summary"]["failure_details"][0]["cache_hit"])
+        self.assertEqual(health["summary"]["failure_kind_counts"], {"timeout": 1})
+        self.assertEqual(health["summary"]["failure_kind_sources"], {"timeout": ["arxiv"]})
         self.assertTrue(health["summary"]["degraded"])
         self.assertFalse(health["summary"]["all_checked_sources_failed"])
+        self.assertEqual(health["summary"]["recovery_code"], "timeout")
+        self.assertEqual(health["summary"]["next_action"], "retry_or_check_source_health")
+
+    def test_source_health_summarizes_failure_kinds_for_agent_branching(self):
+        health = source_health_status(
+            env={"CITEGUARD_SOURCES": "arxiv,semantic_scholar"},
+            check_live=True,
+            source_factory=mixed_failure_health_source_factory,
+        )
+
+        self.assertEqual(health["summary"]["sources_failed"], ["arxiv", "semantic_scholar"])
+        self.assertEqual(health["summary"]["failure_kind_counts"], {"timeout": 1, "rate_limited": 1})
+        self.assertEqual(
+            health["summary"]["failure_kind_sources"],
+            {"timeout": ["arxiv"], "rate_limited": ["semantic_scholar"]},
+        )
+        self.assertTrue(health["summary"]["all_checked_sources_failed"])
         self.assertEqual(health["summary"]["recovery_code"], "timeout")
         self.assertEqual(health["summary"]["next_action"], "retry_or_check_source_health")
 
@@ -311,6 +353,8 @@ class RuntimeConfigTests(unittest.TestCase):
         self.assertFalse(health["summary"]["degraded"])
         self.assertEqual(health["summary"]["failure_count"], 0)
         self.assertEqual(health["summary"]["failure_details"], [])
+        self.assertEqual(health["summary"]["failure_kind_counts"], {})
+        self.assertEqual(health["summary"]["failure_kind_sources"], {})
         self.assertEqual(health["summary"]["next_action"], "continue")
 
     def test_fixture_citations_enable_offline_source(self):
@@ -341,7 +385,7 @@ class RuntimeConfigTests(unittest.TestCase):
         self.assertEqual(source.all_records()[0].citation_id, "fixture-1")
         self.assertEqual(status["fixture_citations_path"], path)
         self.assertEqual(health["mode"], "fixture")
-        self.assertEqual(health["schema_version"], 2)
+        self.assertEqual(health["schema_version"], SOURCE_HEALTH_SCHEMA_VERSION)
         self.assertEqual(health["sources"][0]["status"], "offline_fixture")
         self.assertEqual(health["sources"][0]["polite_access"]["status"], "fixture_bypasses_live_sources")
         self.assertEqual(health["summary"]["mode"], "fixture")
@@ -350,6 +394,8 @@ class RuntimeConfigTests(unittest.TestCase):
         self.assertFalse(health["summary"]["degraded"])
         self.assertEqual(health["summary"]["failure_count"], 0)
         self.assertEqual(health["summary"]["failure_details"], [])
+        self.assertEqual(health["summary"]["failure_kind_counts"], {})
+        self.assertEqual(health["summary"]["failure_kind_sources"], {})
         self.assertEqual(health["summary"]["next_action"], "continue")
         self.assertTrue(status["polite_access"]["compliant"])
         self.assertEqual(status["polite_access"]["status"], "fixture_bypasses_live_sources")

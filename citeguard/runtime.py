@@ -21,7 +21,7 @@ from citeguard.verification import CachingMetadataSource, inspect_cache, source_
 DEFAULT_SOURCES = "openalex,crossref,arxiv"
 DEFAULT_MAILTO = "research@example.com"
 STATUS_SCHEMA_VERSION = 1
-SOURCE_HEALTH_SCHEMA_VERSION = 2
+SOURCE_HEALTH_SCHEMA_VERSION = 3
 POLITE_ACCESS_SCHEMA_VERSION = 1
 CONTACT_REQUIRED_SOURCES = {"openalex", "crossref"}
 SOURCE_ALIASES = {
@@ -311,6 +311,7 @@ def _source_health_summary(sources: List[dict], live_check_performed: bool, mode
         for item in sources
         if isinstance(item.get("failure"), dict)
     ]
+    failure_kind_counts, failure_kind_sources = _source_health_failure_kinds(failure_details)
     recovery_code = source_failure_recovery_code(failure_details)
     if not recovery_code and invalid_sources:
         recovery_code = "invalid_input"
@@ -337,11 +338,25 @@ def _source_health_summary(sources: List[dict], live_check_performed: bool, mode
         "invalid_sources": invalid_sources,
         "failure_details": failure_details,
         "failure_count": len(failure_details),
+        "failure_kind_counts": failure_kind_counts,
+        "failure_kind_sources": failure_kind_sources,
         "degraded": degraded,
         "all_checked_sources_failed": all_checked_failed,
         "recovery_code": recovery_code,
         "next_action": next_action,
     }
+
+
+def _source_health_failure_kinds(failure_details: List[dict]) -> tuple[dict, dict]:
+    counts: dict = {}
+    sources_by_kind: dict = {}
+    for detail in failure_details:
+        kind = str(detail.get("kind") or detail.get("code") or "unknown")
+        source = str(detail.get("source") or "")
+        counts[kind] = counts.get(kind, 0) + 1
+        if source and source not in sources_by_kind.setdefault(kind, []):
+            sources_by_kind[kind].append(source)
+    return counts, sources_by_kind
 
 
 def _source_polite_access(source_name: str, env: Mapping[str, str], fixture_mode: bool = False) -> dict:

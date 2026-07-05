@@ -26,6 +26,9 @@
 - Added source-level readiness reporting in `citeguard status` / `citeguard_status_tool`.
 - Added summary-level source health failure counts and failure details for agent
   retry/configuration decisions.
+- Added source health `failure_kind_counts` and `failure_kind_sources` summaries
+  so agents can branch on timeout, rate-limit, HTTP, and network failure modes
+  without parsing per-source detail lists.
 - Added short HTTP retries for transient scholarly source failures plus
   `CITEGUARD_HTTP_RETRIES` and `CITEGUARD_HTTP_RETRY_BACKOFF` status fields.
 - Added machine-readable HTTP/source failure diagnostics for timeouts, rate

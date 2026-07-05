@@ -333,6 +333,8 @@ def _require_status_payload(payload: dict, fixture_path: Path) -> None:
         raise RuntimeError(f"Expected no failed sources in offline fixture smoke, got: {payload!r}")
     if summary.get("failure_count") != 0 or summary.get("failure_details") != []:
         raise RuntimeError(f"Expected no source-health failures in offline fixture smoke, got: {payload!r}")
+    if summary.get("failure_kind_counts") != {} or summary.get("failure_kind_sources") != {}:
+        raise RuntimeError(f"Expected empty source-health failure-kind summary, got: {payload!r}")
     if summary.get("degraded") is not False:
         raise RuntimeError(f"Expected offline fixture status not to be degraded, got: {payload!r}")
 

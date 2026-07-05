@@ -108,8 +108,8 @@ contract. The `source_health.summary` block is the agent-friendly entry point:
 it reports status counts, configured/checked/responded/unchecked sources,
 available/failed sources, invalid source names, `degraded`,
 `all_checked_sources_failed`, summary-level `failure_count` and
-`failure_details`, a stable `recovery_code`, and a stable `next_action`
-(`continue`, `inspect_source_health`,
+`failure_details`, `failure_kind_counts`, `failure_kind_sources`, a stable
+`recovery_code`, and a stable `next_action` (`continue`, `inspect_source_health`,
 `retry_or_check_source_health`, or `fix_configuration`) for retry or
 configuration decisions.
 `cache_status` reports cache schema version, entry counts, entry-prefix counts,

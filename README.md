@@ -247,8 +247,9 @@ is bypassing live sources, whether gated-source host suffixes are blocked, and
 whether source-specific credentials such as `CITEGUARD_MAILTO` or
 `SEMANTIC_SCHOLAR_API_KEY` are configured. `source_health.summary` gives agents a
 compact `degraded` flag, status counts, available/failed source lists, stable
-`failure_count`, summary-level `failure_details`, `recovery_code`, and stable
-`next_action` for retry/configuration decisions.
+`failure_count`, summary-level `failure_details`, `failure_kind_counts`,
+`failure_kind_sources`, `recovery_code`, and stable `next_action` for
+retry/configuration decisions.
 `cache_status` gives agents cache schema version, entry counts, timestamp
 bounds, `inspect_ok`, and stable `next_action` without exposing raw cache
 queries.
@@ -386,7 +387,7 @@ CNKI (知网) and Wanfang (万方) are **not** integrated: they have no open/fre
 ## Tests & reproducibility
 
 ```bash
-python3 -m unittest discover -s tests -v   # full unit suite (330 tests; standard library only except optional MCP smoke)
+python3 -m unittest discover -s tests -v   # full unit suite (331 tests; standard library only except optional MCP smoke)
 python3 scripts/smoke_mcp.py               # optional MCP stdio smoke; skips without the MCP SDK
 python3 scripts/smoke_mcp.py --require-sdk # CI/release MCP stdio smoke; fails without the MCP SDK
 python3 scripts/eval_verification.py       # offline, deterministic existence/metadata eval
