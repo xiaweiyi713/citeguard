@@ -175,7 +175,8 @@ python3 scripts/prepare_support_label_sidecar.py \
   --priority high \
   --split test \
   --limit 10 \
-  --output experiments/support-label-packet-high-risk-test.json
+  --output experiments/support-label-packet-high-risk-test.json \
+  --instructions-output experiments/support-label-packet-high-risk-test-instructions.md
 ```
 
 The annotation packet includes claim/evidence context, evidence scope, case
@@ -183,6 +184,9 @@ type, split, priority, source locator, and blank annotation fields. It omits
 `gold`, `adjudicated_label`, `annotator_labels`, and `label_notes` so reviewers
 can label independently before adjudication. Use `--packet-format jsonl` when
 you want one case per line for spreadsheets or lightweight annotation tools.
+Use `--instructions-output` to write a reviewer-facing Markdown instruction
+sheet with the allowed labels, conservative labeling rule, required annotation
+fields, and fields that must not be modified.
 Reviewers must fill `annotation.annotator_id`; merge rejects missing annotator
 identity, and the same annotator cannot count twice for one case.
 After reviewers return completed packets, merge matching labels back into a

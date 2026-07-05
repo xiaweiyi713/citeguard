@@ -460,6 +460,47 @@ class SupportEvalTests(unittest.TestCase):
         self.assertNotIn("adjudicated_label", raw)
         self.assertNotIn("label_notes", raw)
 
+    def test_prepare_support_label_sidecar_writes_annotation_instructions(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            packet_path = os.path.join(tmpdir, "packet.json")
+            instructions_path = os.path.join(tmpdir, "instructions.md")
+            subprocess.run(
+                [
+                    sys.executable,
+                    "scripts/prepare_support_label_sidecar.py",
+                    "--dataset",
+                    os.path.join("data", "eval", "support_eval.json"),
+                    "--existing-sidecar",
+                    os.path.join("data", "eval", "support_eval_label_sidecar.json"),
+                    "--annotation-packet",
+                    "--case-id",
+                    "s04",
+                    "--output",
+                    packet_path,
+                    "--instructions-output",
+                    instructions_path,
+                ],
+                check=True,
+                cwd=os.getcwd(),
+                capture_output=True,
+                text=True,
+            )
+
+            with open(packet_path, encoding="utf-8") as handle:
+                packet = json.loads(handle.read())
+            with open(instructions_path, encoding="utf-8") as handle:
+                instructions = handle.read()
+
+        self.assertEqual(packet["n"], 1)
+        self.assertIn("CiteGuard Support Annotation Instructions", instructions)
+        self.assertIn("Use exactly one of", instructions)
+        self.assertIn("When unsure, choose the more conservative label", instructions)
+        self.assertIn("annotation.annotator_id", instructions)
+        self.assertIn("Do not edit `case_id`", instructions)
+        self.assertNotIn("adjudicated_label", instructions)
+        self.assertNotIn('"gold"', instructions)
+        self.assertNotIn("label_notes", instructions)
+
     def test_prepare_support_label_sidecar_writes_jsonl_annotation_packet(self):
         completed = subprocess.run(
             [

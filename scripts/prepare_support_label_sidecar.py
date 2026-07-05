@@ -108,6 +108,11 @@ def main(argv: Optional[list[str]] = None) -> int:
         help="Output format for --annotation-packet. JSON keeps packet metadata; JSONL writes one case per line.",
     )
     parser.add_argument(
+        "--instructions-output",
+        default="",
+        help="With --annotation-packet, also write a Markdown instruction sheet for independent annotators.",
+    )
+    parser.add_argument(
         "--fail-on-high-risk-unreviewed",
         action="store_true",
         help="With --audit, exit non-zero when contradiction, hard_negative, or full_text_required cases remain unreviewed.",
@@ -126,6 +131,8 @@ def main(argv: Optional[list[str]] = None) -> int:
         parser.error(
             "--audit, --annotation-packet, --merge-annotation-packet, and --apply-adjudications are mutually exclusive"
         )
+    if args.instructions_output and not args.annotation_packet:
+        parser.error("--instructions-output requires --annotation-packet")
 
     all_cases = load_support_label_cases(args.dataset)
     _validate_case_ids(args.case_id, all_cases, parser)
@@ -181,6 +188,8 @@ def main(argv: Optional[list[str]] = None) -> int:
             dataset_name=Path(args.dataset).name,
             filters=_filter_summary(args),
         )
+        if args.instructions_output:
+            Path(args.instructions_output).write_text(_format_annotation_instructions(packet), encoding="utf-8")
         text = _format_annotation_packet(packet, args.packet_format)
         if args.output:
             Path(args.output).write_text(text, encoding="utf-8")
@@ -592,6 +601,58 @@ def _format_annotation_packet(packet: dict, packet_format: str) -> str:
     if packet_format == "jsonl":
         return "".join(json.dumps(item, ensure_ascii=False) + "\n" for item in packet.get("cases", []))
     return json.dumps(packet, indent=2, ensure_ascii=False) + "\n"
+
+
+def _format_annotation_instructions(packet: dict) -> str:
+    label_options = ", ".join(f"`{label}`" for label in packet.get("label_options", []))
+    filters = json.dumps(packet.get("filters", {}), ensure_ascii=False, sort_keys=True)
+    return "\n".join(
+        [
+            "# CiteGuard Support Annotation Instructions",
+            "",
+            f"- Dataset: `{packet.get('dataset', '')}`",
+            f"- Packet type: `{packet.get('packet_type', '')}`",
+            f"- Case count: `{packet.get('n', 0)}`",
+            f"- Filters: `{filters}`",
+            "",
+            "## Task",
+            "",
+            "Label each claim/evidence pair using only the evidence text and evidence_scope in the packet.",
+            "Do not infer support from citation fame, venue prestige, source outage, or topical similarity alone.",
+            "",
+            "## Allowed Labels",
+            "",
+            f"Use exactly one of: {label_options}.",
+            "",
+            "- `supported`: the evidence directly entails the claim.",
+            "- `weakly_supported`: the evidence is relevant but weaker, narrower, or less precise than the claim.",
+            "- `insufficient_evidence`: the evidence does not justify the claim or the claim requires unavailable full text.",
+            "- `contradicted`: the evidence directly conflicts with the claim.",
+            "",
+            "When unsure, choose the more conservative label. In particular, avoid `supported` unless the evidence is explicit.",
+            "",
+            "## Fields To Fill",
+            "",
+            "- `annotation.annotator_id`: required stable reviewer id.",
+            "- `annotation.annotator_label`: required label from the allowed set.",
+            "- `annotation.rationale`: short explanation citing the evidence text.",
+            "- `annotation.confidence`: optional low/medium/high or numeric confidence.",
+            "- `annotation.notes`: optional ambiguity, scope, or full-text notes.",
+            "",
+            "## Do Not Modify",
+            "",
+            "Do not edit `case_id`, `claim`, `evidence`, `evidence_scope`, `case_type`, `split`, `priority`, or `source_locator`.",
+            "The packet intentionally omits dataset gold labels and adjudicated labels; do not request or reconstruct them before labeling.",
+            "",
+            "## Return Checklist",
+            "",
+            "- Every returned row has `annotation.annotator_id`.",
+            "- Every returned row has one valid `annotation.annotator_label`.",
+            "- Rationale is present for every `supported`, `weakly_supported`, or `contradicted` label.",
+            "- Claims needing unavailable full text are labeled `insufficient_evidence`, not guessed.",
+            "",
+        ]
+    )
 
 
 def _build_audit_report(

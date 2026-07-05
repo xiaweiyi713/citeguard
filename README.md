@@ -385,7 +385,7 @@ CNKI (知网) and Wanfang (万方) are **not** integrated: they have no open/fre
 ## Tests & reproducibility
 
 ```bash
-python3 -m unittest discover -s tests -v   # full unit suite (327 tests; standard library only except optional MCP smoke)
+python3 -m unittest discover -s tests -v   # full unit suite (328 tests; standard library only except optional MCP smoke)
 python3 scripts/smoke_mcp.py               # optional MCP stdio smoke; skips without the MCP SDK
 python3 scripts/smoke_mcp.py --require-sdk # CI/release MCP stdio smoke; fails without the MCP SDK
 python3 scripts/eval_verification.py       # offline, deterministic existence/metadata eval
@@ -462,11 +462,13 @@ python3 scripts/prepare_support_label_sidecar.py \
   --annotation-packet \
   --priority high \
   --split test \
-  --output experiments/support-label-packet-high-risk-test.json
+  --output experiments/support-label-packet-high-risk-test.json \
+  --instructions-output experiments/support-label-packet-high-risk-test-instructions.md
 ```
 
-Merge completed packets back conservatively; conflicts are reported instead of
-silently changing gold labels:
+The instruction sheet tells reviewers how to label conservatively without
+exposing hidden gold or adjudication fields. Merge completed packets back
+conservatively; conflicts are reported instead of silently changing gold labels:
 
 ```bash
 python3 scripts/prepare_support_label_sidecar.py \

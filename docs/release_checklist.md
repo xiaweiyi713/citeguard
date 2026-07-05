@@ -89,7 +89,7 @@ agent skill bundle.
   python scripts/eval_support.py --report --split test --quality-gate
   python scripts/eval_support.py --report --split test --quality-gate --output-dir experiments --run-id support-release-smoke
   python scripts/compare_support_baselines.py --split test --output-dir experiments --run-id support-baselines-release
-  python scripts/prepare_support_label_sidecar.py --existing-sidecar data/eval/support_eval_label_sidecar.json --annotation-packet --priority high --split test --limit 3 --output experiments/support-label-packet-high-risk-test-batch1.json
+  python scripts/prepare_support_label_sidecar.py --existing-sidecar data/eval/support_eval_label_sidecar.json --annotation-packet --priority high --split test --limit 3 --output experiments/support-label-packet-high-risk-test-batch1.json --instructions-output experiments/support-label-packet-high-risk-test-batch1-instructions.md
   python scripts/prepare_support_label_sidecar.py --existing-sidecar data/eval/support_eval_label_sidecar.json --merge-annotation-packet experiments/completed-support-label-packet-high-risk-test-batch1.json --output data/eval/support_eval_label_sidecar.merged.json
   python scripts/prepare_support_label_sidecar.py --existing-sidecar data/eval/support_eval_label_sidecar.merged.json --apply-adjudications experiments/resolved-support-label-adjudications.json --output data/eval/support_eval_label_sidecar.adjudicated.json
   python scripts/eval_support.py --validate-only --label-sidecar data/eval/support_eval_label_sidecar.json --min-sidecar-coverage 1.0 --min-human-reviewed 0 --min-dual-annotated 0 --max-unresolved-disagreements 0
@@ -107,7 +107,10 @@ agent skill bundle.
   `--max-unresolved-disagreements 0`; add `--min-raw-dual-agreement-rate` for
   release evidence once dual annotation exists. Annotation packets must be
   blinded (`--annotation-packet`) and must not expose dataset `gold` or
-  `adjudicated_label` fields to reviewers. Completed packets must include
+  `adjudicated_label` fields to reviewers. Generate an annotator instruction
+  sheet with `--instructions-output` for each reviewer batch so labeling rules,
+  required fields, and immutable fields are documented beside the packet.
+  Completed packets must include
   `annotation.annotator_id`; missing ids appear in `merge_report.skipped`, and
   repeated annotator ids for the same case appear as `duplicate_annotator`
   conflicts. Completed packets should be merged with `--merge-annotation-packet`;
@@ -121,8 +124,8 @@ agent skill bundle.
 
   ```bash
   python scripts/prepare_support_label_sidecar.py --existing-sidecar data/eval/support_eval_label_sidecar.json --audit
-  python scripts/prepare_support_label_sidecar.py --existing-sidecar data/eval/support_eval_label_sidecar.json --annotation-packet --priority high --split test --output experiments/support-label-packet-high-risk-test.json
-  python scripts/prepare_support_label_sidecar.py --existing-sidecar data/eval/support_eval_label_sidecar.json --annotation-packet --priority high --split test --limit 3 --output experiments/support-label-packet-high-risk-test-batch1.json
+  python scripts/prepare_support_label_sidecar.py --existing-sidecar data/eval/support_eval_label_sidecar.json --annotation-packet --priority high --split test --output experiments/support-label-packet-high-risk-test.json --instructions-output experiments/support-label-packet-high-risk-test-instructions.md
+  python scripts/prepare_support_label_sidecar.py --existing-sidecar data/eval/support_eval_label_sidecar.json --annotation-packet --priority high --split test --limit 3 --output experiments/support-label-packet-high-risk-test-batch1.json --instructions-output experiments/support-label-packet-high-risk-test-batch1-instructions.md
   python scripts/prepare_support_label_sidecar.py --existing-sidecar data/eval/support_eval_label_sidecar.json --merge-annotation-packet experiments/completed-support-label-packet-high-risk-test-batch1.json --output data/eval/support_eval_label_sidecar.merged.json
   python scripts/prepare_support_label_sidecar.py --existing-sidecar data/eval/support_eval_label_sidecar.merged.json --apply-adjudications experiments/resolved-support-label-adjudications.json --output data/eval/support_eval_label_sidecar.adjudicated.json
   python scripts/prepare_support_label_sidecar.py --existing-sidecar data/eval/support_eval_label_sidecar.json --audit --fail-on-high-risk-unreviewed

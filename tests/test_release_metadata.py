@@ -630,6 +630,8 @@ License-File: LICENSE
         self.assertIn("prepare_support_label_sidecar.py", checklist)
         self.assertIn("--audit", checklist)
         self.assertIn("--annotation-packet --priority high --split test", checklist)
+        self.assertIn("--instructions-output", checklist)
+        self.assertIn("annotator instruction", checklist)
         self.assertIn("--merge-annotation-packet", checklist)
         self.assertIn("merge_report.conflicts", checklist)
         self.assertIn("--apply-adjudications", checklist)

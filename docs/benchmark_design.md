@@ -209,13 +209,16 @@ python3 scripts/prepare_support_label_sidecar.py \
   --priority high \
   --split test \
   --limit 10 \
-  --output experiments/support-label-packet-high-risk-test.json
+  --output experiments/support-label-packet-high-risk-test.json \
+  --instructions-output experiments/support-label-packet-high-risk-test-instructions.md
 ```
 
 `--annotation-packet` 输出 claim、evidence、evidence_scope、case_type、split、
 priority、source locator 和空白 annotation 字段,但不会输出 `gold`、
 `adjudicated_label`、`annotator_labels` 或 `label_notes`。需要一行一个样本时可加
-`--packet-format jsonl`。标注员必须填写 `annotation.annotator_id`;缺失
+`--packet-format jsonl`。`--instructions-output` 会同时生成给独立标注员使用的
+Markdown instruction sheet,说明允许标签、保守标注规则和不可修改字段,但不暴露隐藏
+gold/adjudication 字段。标注员必须填写 `annotation.annotator_id`;缺失
 annotator id 的行会进入 `merge_report.skipped`,同一个 case 里重复的
 annotator id 会作为 `duplicate_annotator` conflict 报告,不能算作双人标注。
 标注员返回填好的 packet 后,用保守 merge 回填 sidecar:
@@ -271,7 +274,8 @@ python3 scripts/prepare_support_label_sidecar.py \
   --annotation-packet \
   --priority high \
   --split test \
-  --output experiments/support-label-packet-high-risk-test.json
+  --output experiments/support-label-packet-high-risk-test.json \
+  --instructions-output experiments/support-label-packet-high-risk-test-instructions.md
 ```
 
 `--priority` 可重复使用,取值为 `high`、`medium` 或 `normal`;`--split`
@@ -287,7 +291,8 @@ python3 scripts/prepare_support_label_sidecar.py \
   --priority high \
   --split test \
   --limit 3 \
-  --output experiments/support-label-packet-high-risk-test-batch1.json
+  --output experiments/support-label-packet-high-risk-test-batch1.json \
+  --instructions-output experiments/support-label-packet-high-risk-test-batch1-instructions.md
 ```
 
 过滤只影响导出的标注 packet 或 audit 视图,不会把未选中的 case 从原始
