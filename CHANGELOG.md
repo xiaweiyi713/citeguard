@@ -66,16 +66,25 @@
   full-text-required boundaries.
 - Added grouped `false_support_case_ids` and `weak_false_support_case_ids` in
   support false-overcall analysis for split/case-type/evidence-scope triage.
-- Expanded the synthetic support eval seed set to 33 evidence-level cases with
+- Added language coverage and `by_language` support-eval reporting so English
+  and Chinese false-support or missed-contradiction risks can be triaged
+  separately.
+- Expanded the synthetic support eval seed set to 36 evidence-level cases with
   additional high-risk hard-negative, contradiction, and full-text-required
   boundaries for benchmark-provenance overclaims, source-outage fabrication
   inferences, and abstract-only eligibility claims.
+- Added Chinese source-outage/not-found safety benchmark cases covering
+  unsafe fabrication-confidence overclaims, Crossref timeout hard negatives,
+  and rate-limit/not-found contradiction examples.
 - Added non-gold `review_focus` hints to support-label annotation packets so
   reviewers know which support boundary to inspect without seeing gold labels,
   adjudicated labels, or `label_notes`.
 - Added a `source_outage_safety` counter-evidence query role and
   `source_outage_safety_cue` candidate signal for claims that overinterpret
   source outages, timeouts, or `not_found` as fabrication evidence.
+- Extended source-outage safety counter-evidence probes to Chinese
+  source-outage/not-found overclaims while keeping the same stable role and
+  signal fields.
 - Expanded the CiteGuard agent skill with client-specific MCP setup notes,
   structured-error recovery guidance, and safe wording examples for ambiguous,
   metadata-mismatch, not-found, outage, and claim-support results.

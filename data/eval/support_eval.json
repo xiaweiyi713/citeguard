@@ -395,6 +395,42 @@
       "case_type": "full_text_required",
       "split": "train",
       "label_notes": "Eligibility-criteria details require full text; the abstract only points to methods."
+    },
+    {
+      "id": "s34",
+      "claim": "源不可达会提高引用被判定为伪造的置信度。",
+      "evidence": "源不可达和未找到结果只会降低核验置信度，不能证明引用是伪造的，应检查来源健康或稍后重试。",
+      "gold": "contradicted",
+      "lang": "zh",
+      "evidence_scope": "metadata_snippet",
+      "label_source": "maintainer_synthetic",
+      "case_type": "contradiction",
+      "split": "train",
+      "label_notes": "Chinese source-outage safety case: the evidence explicitly contradicts increasing fabrication confidence from source failures."
+    },
+    {
+      "id": "s35",
+      "claim": "这条引用已经被证实为伪造，因为 Crossref 查询超时。",
+      "evidence": "Crossref 查询超时只说明该来源暂时不可用；当前记录没有来自其他来源的匹配结果或人工复核结论。",
+      "gold": "insufficient_evidence",
+      "lang": "zh",
+      "evidence_scope": "metadata_snippet",
+      "label_source": "maintainer_synthetic",
+      "case_type": "hard_negative",
+      "split": "dev",
+      "label_notes": "Chinese hard negative: a source timeout is related evidence but cannot prove that a citation is fabricated."
+    },
+    {
+      "id": "s36",
+      "claim": "未找到和限流可以作为引用伪造的证据。",
+      "evidence": "未找到结果和限流是来源健康或覆盖范围问题，不是引用伪造证据；应重试、换源或人工复核。",
+      "gold": "contradicted",
+      "lang": "zh",
+      "evidence_scope": "metadata_snippet",
+      "label_source": "maintainer_synthetic",
+      "case_type": "contradiction",
+      "split": "test",
+      "label_notes": "Chinese contradiction: not-found and rate-limit states must not be treated as fabrication evidence."
     }
   ],
   "set_cases": [

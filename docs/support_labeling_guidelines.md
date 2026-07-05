@@ -188,19 +188,21 @@ python3 scripts/prepare_support_label_sidecar.py \
   --annotation-packet \
   --priority high \
   --split test \
+  --lang zh \
   --limit 10 \
   --output experiments/support-label-packet-high-risk-test.json \
   --instructions-output experiments/support-label-packet-high-risk-test-instructions.md
 ```
 
 The annotation packet includes claim/evidence context, evidence scope, case
-type, split, priority, source locator, a non-gold `review_focus` boundary hint,
-and blank annotation fields. It omits `gold`, `adjudicated_label`,
+type, split, language, priority, source locator, a non-gold `review_focus`
+boundary hint, and blank annotation fields. It omits `gold`, `adjudicated_label`,
 `annotator_labels`, and `label_notes` so reviewers can label independently
 before adjudication. `review_focus` tells reviewers what support boundary to
 inspect, for example full-text gaps or topical overclaims, but it is not a
 label hint. Use `--packet-format jsonl` when you want one case per line for
-spreadsheets or lightweight annotation tools.
+spreadsheets or lightweight annotation tools. Use repeated `--lang` values to
+prepare language-specific review batches, such as Chinese high-risk cases.
 Use `--instructions-output` to write a reviewer-facing Markdown instruction
 sheet with the allowed labels, conservative labeling rule, required annotation
 fields, and fields that must not be modified.
@@ -252,10 +254,11 @@ python3 scripts/prepare_support_label_sidecar.py \
   --audit
 ```
 
-The audit reports coverage, human-reviewed count, unreviewed cases by split and
-case type, and a risk-sorted `high_risk_unreviewed` list. Review contradiction,
-hard-negative, and full-text-required cases first because those most directly
-test false support and overclaiming.
+The audit reports coverage, human-reviewed count, unreviewed cases by split,
+language, and case type, plus a risk-sorted `high_risk_unreviewed` list and
+`high_risk_unreviewed_by_language`. Review contradiction, hard-negative, and
+full-text-required cases first because those most directly test false support
+and overclaiming.
 
 ## Disagreement Handling
 

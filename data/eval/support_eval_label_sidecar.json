@@ -367,6 +367,39 @@
       "notes": "Synthetic full-text-required case: eligibility criteria are absent from the abstract."
     },
     {
+      "case_id": "s34",
+      "adjudication_status": "not_human_reviewed",
+      "annotator_count": 0,
+      "annotator_labels": [],
+      "adjudicated_label": "contradicted",
+      "disagreement": "not_applicable",
+      "adjudicator": "",
+      "source_locator": "",
+      "notes": "Synthetic Chinese contradiction: source failures lower confidence and must not increase fabrication confidence."
+    },
+    {
+      "case_id": "s35",
+      "adjudication_status": "not_human_reviewed",
+      "annotator_count": 0,
+      "annotator_labels": [],
+      "adjudicated_label": "insufficient_evidence",
+      "disagreement": "not_applicable",
+      "adjudicator": "",
+      "source_locator": "",
+      "notes": "Synthetic Chinese hard negative: a Crossref timeout does not prove a citation is fabricated."
+    },
+    {
+      "case_id": "s36",
+      "adjudication_status": "not_human_reviewed",
+      "annotator_count": 0,
+      "annotator_labels": [],
+      "adjudicated_label": "contradicted",
+      "disagreement": "not_applicable",
+      "adjudicator": "",
+      "source_locator": "",
+      "notes": "Synthetic Chinese contradiction: not-found and rate-limit states are not fabrication evidence."
+    },
+    {
       "case_id": "ss01",
       "adjudication_status": "not_human_reviewed",
       "annotator_count": 0,

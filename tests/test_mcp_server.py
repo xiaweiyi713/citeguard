@@ -529,6 +529,34 @@ class MCPServerHelperTests(unittest.TestCase):
         self.assertIn("source_outage_safety", report["candidates"][0]["matched_query_roles"])
         self.assertIn("review leads", report["interpretation"])
 
+    def test_search_counterevidence_tool_returns_chinese_source_outage_safety_candidates(self):
+        source = InMemoryMetadataSource(
+            [
+                CitationRecord(
+                    citation_id="zh-source-outage-safety",
+                    title="源不可达不能证明引用伪造",
+                    abstract=(
+                        "源不可达和未找到结果只会降低核验置信度，不能证明引用是伪造的，"
+                        "应检查来源健康或稍后重试。"
+                    ),
+                    year=2026,
+                    source="memory",
+                ),
+            ]
+        )
+        with mock.patch.object(self.server, "_source", return_value=source):
+            report = self.server.search_counterevidence_tool(
+                "源不可达会提高引用被判定为伪造的置信度。",
+                top_k=1,
+            )
+
+        self.assertEqual(report["candidate_count"], 1)
+        self.assertEqual(report["candidates"][0]["signal"], "source_outage_safety_cue")
+        self.assertIn("source_outage_safety", {item["role"] for item in report["query_plan"]})
+        self.assertIn("source_outage_safety", report["candidates"][0]["matched_query_roles"])
+        self.assertIn("不能证明引用是伪造的", report["candidates"][0]["abstract_snippet"])
+        self.assertEqual(report["next_action"], "review_counterevidence_leads")
+
     def test_mcp_tools_return_structured_errors_for_expected_input_errors(self):
         missing_verify = self.server.verify_citation_tool()
         self.assertFalse(missing_verify["ok"])

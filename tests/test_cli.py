@@ -1667,6 +1667,45 @@ class CLITests(unittest.TestCase):
         self.assertIn("source_outage_safety", payload["candidates"][0]["matched_query_roles"])
         self.assertEqual(payload["next_action"], "review_counterevidence_leads")
 
+    def test_counterevidence_search_flags_chinese_source_outage_safety_leads(self):
+        source = InMemoryMetadataSource(
+            [
+                self.record,
+                CitationRecord(
+                    citation_id="zh-source-outage-safety",
+                    title="源不可达不能证明引用伪造",
+                    abstract=(
+                        "源不可达和未找到结果只会降低核验置信度，不能证明引用是伪造的，"
+                        "应检查来源健康或稍后重试。"
+                    ),
+                    year=2026,
+                    source="memory",
+                ),
+            ]
+        )
+        stdout = io.StringIO()
+
+        code = run(
+            [
+                "counterevidence",
+                "--claim",
+                "源不可达会提高引用被判定为伪造的置信度。",
+                "--top-k",
+                "1",
+            ],
+            stdout=stdout,
+            source=source,
+        )
+
+        self.assertEqual(code, 0)
+        payload = json.loads(stdout.getvalue())
+        self.assertEqual(payload["candidate_count"], 1)
+        self.assertEqual(payload["candidates"][0]["signal"], "source_outage_safety_cue")
+        self.assertIn("source_outage_safety", {item["role"] for item in payload["query_plan"]})
+        self.assertIn("source_outage_safety", payload["candidates"][0]["matched_query_roles"])
+        self.assertIn("不能证明引用是伪造的", payload["candidates"][0]["abstract_snippet"])
+        self.assertEqual(payload["next_action"], "review_counterevidence_leads")
+
     def test_counterevidence_requires_claim_and_valid_top_k(self):
         stderr = io.StringIO()
         missing = run(["counterevidence", "--claim", ""], stderr=stderr, source=self.source)

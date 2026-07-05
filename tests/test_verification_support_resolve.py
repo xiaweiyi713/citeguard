@@ -416,6 +416,35 @@ class CheckClaimSupportTests(unittest.TestCase):
         self.assertIn("not_found results lower confidence", payload["candidates"][0]["abstract_snippet"])
         self.assertEqual(payload["next_action"], "review_counterevidence_leads")
 
+    def test_search_counterevidence_candidates_flags_chinese_source_outage_safety_leads(self):
+        safety_record = CitationRecord(
+            citation_id="zh-source-outage-safety",
+            title="源不可达不能证明引用伪造",
+            abstract=(
+                "源不可达和未找到结果只会降低核验置信度，不能证明引用是伪造的，"
+                "应检查来源健康或稍后重试。"
+            ),
+            authors=["A. Auditor"],
+            year=2026,
+            source="memory",
+        )
+        source = InMemoryMetadataSource([self.paper, safety_record])
+
+        report = search_counterevidence_candidates(
+            "源不可达会提高引用被判定为伪造的置信度。",
+            source,
+            top_k=1,
+        )
+        payload = report.to_dict()
+
+        self.assertEqual(payload["candidate_count"], 1)
+        self.assertEqual(payload["candidates"][0]["title"], "源不可达不能证明引用伪造")
+        self.assertEqual(payload["candidates"][0]["signal"], "source_outage_safety_cue")
+        self.assertIn("source_outage_safety", {item["role"] for item in payload["query_plan"]})
+        self.assertIn("source_outage_safety", payload["candidates"][0]["matched_query_roles"])
+        self.assertIn("不能证明引用是伪造的", payload["candidates"][0]["abstract_snippet"])
+        self.assertEqual(payload["next_action"], "review_counterevidence_leads")
+
     def test_search_counterevidence_candidates_reports_source_outage(self):
         report = search_counterevidence_candidates("Method M improves task T.", _FailingMetadataSource())
         payload = report.to_dict()

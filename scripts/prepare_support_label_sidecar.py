@@ -61,6 +61,12 @@ def main(argv: Optional[list[str]] = None) -> int:
         help="Only include cases with this case_type; repeat for multiple case types.",
     )
     parser.add_argument(
+        "--lang",
+        action="append",
+        default=None,
+        help="Only include cases with this language code; repeat for multiple languages.",
+    )
+    parser.add_argument(
         "--case-id",
         action="append",
         default=None,
@@ -147,6 +153,7 @@ def main(argv: Optional[list[str]] = None) -> int:
         priorities=args.priority,
         splits=args.split,
         case_types=args.case_type,
+        languages=args.lang,
         case_ids=args.case_id,
         limit=args.limit,
     )
@@ -684,6 +691,7 @@ def _build_audit_report(
             "gold": case.gold,
             "case_type": case.case_type,
             "evidence_scope": case.evidence_scope,
+            "lang": case.lang,
             "split": case.split,
             "label_notes": case.label_notes,
         }
@@ -709,7 +717,9 @@ def _build_audit_report(
         "unreviewed_count": len(unreviewed),
         "high_risk_unreviewed_count": len(high_risk_unreviewed),
         "unreviewed_by_case_type": _count_by(unreviewed, "case_type"),
+        "unreviewed_by_language": _count_by(unreviewed, "lang"),
         "unreviewed_by_split": _count_by(unreviewed, "split"),
+        "high_risk_unreviewed_by_language": _count_by(high_risk_unreviewed, "lang"),
         "high_risk_unreviewed": high_risk_unreviewed,
         "unreviewed": unreviewed,
         "next_actions": _next_actions(unreviewed),
@@ -741,6 +751,7 @@ def _filter_cases(
     priorities: Optional[list[str]] = None,
     splits: Optional[list[str]] = None,
     case_types: Optional[list[str]] = None,
+    languages: Optional[list[str]] = None,
     case_ids: Optional[list[str]] = None,
     limit: Optional[int] = None,
 ) -> list:
@@ -748,6 +759,7 @@ def _filter_cases(
     priorities_set = set(priorities or [])
     splits_set = set(splits or [])
     case_types_set = set(case_types or [])
+    languages_set = set(languages or [])
     case_ids_set = set(case_ids or [])
     for case in cases:
         if priorities_set and _case_priority_label(case) not in priorities_set:
@@ -755,6 +767,8 @@ def _filter_cases(
         if splits_set and case.split not in splits_set:
             continue
         if case_types_set and case.case_type not in case_types_set:
+            continue
+        if languages_set and case.lang not in languages_set:
             continue
         if case_ids_set and case.case_id not in case_ids_set:
             continue
@@ -787,6 +801,8 @@ def _filter_summary(args: argparse.Namespace) -> dict:
         filters["split"] = list(args.split)
     if args.case_type:
         filters["case_type"] = list(args.case_type)
+    if args.lang:
+        filters["lang"] = list(args.lang)
     if args.case_id:
         filters["case_id"] = list(args.case_id)
     if args.limit is not None:

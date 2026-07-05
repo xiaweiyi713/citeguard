@@ -531,6 +531,8 @@ License-File: LICENSE
         self.assertIn("source_outage_safety", smoke)
         self.assertIn("source_outage_safety_cue", smoke)
         self.assertIn("source-outage safety counter-evidence leads", smoke)
+        self.assertIn("Chinese source-outage safety leads", smoke)
+        self.assertIn("源不可达会提高引用被判定为伪造的置信度", smoke)
         self.assertIn("input_mode", smoke)
         self.assertIn("citation_set", smoke)
         self.assertIn("installed `citeguard-mcp`", setup_doc)
@@ -578,6 +580,8 @@ License-File: LICENSE
         self.assertIn("source_outage_safety", combined_counterevidence_contract)
         self.assertIn("source_outage_safety_cue", combined_counterevidence_contract)
         self.assertIn("not_found", combined_counterevidence_contract)
+        self.assertIn("Chinese source-outage/not-found overclaims", combined_counterevidence_contract)
+        self.assertIn("源不可达", combined_counterevidence_contract)
 
     def test_cli_reference_documents_status_schema_contract(self):
         cli_reference = (ROOT / "docs" / "cli_reference.md").read_text(encoding="utf-8")
@@ -751,6 +755,8 @@ License-File: LICENSE
             "high_risk_false_support_case_ids",
             "false_support_case_ids",
             "weak_false_support_case_ids",
+            "by_language",
+            "language 覆盖",
             "test split",
         ]
         for phrase in required_phrases:
@@ -766,17 +772,24 @@ License-File: LICENSE
         combined = f"{readme}\n{changelog}\n{benchmark_todo}\n{support_eval}\n{sidecar}"
 
         required_phrases = [
-            "33 evidence-level cases",
+            "36 evidence-level cases",
             "benchmark provenance",
             "source-outage-to-fabrication inferences",
             "source outage",
+            "Chinese source-outage/not-found safety benchmark cases",
             "eligibility criteria",
             '"id": "s31"',
             '"id": "s32"',
             '"id": "s33"',
+            '"id": "s34"',
+            '"id": "s35"',
+            '"id": "s36"',
             '"case_id": "s31"',
             '"case_id": "s32"',
             '"case_id": "s33"',
+            '"case_id": "s34"',
+            '"case_id": "s35"',
+            '"case_id": "s36"',
         ]
         for phrase in required_phrases:
             with self.subTest(phrase=phrase):
@@ -818,9 +831,11 @@ License-File: LICENSE
         self.assertIn("high-risk test packet", benchmark_design)
         self.assertIn("--case-type", benchmark_design)
         self.assertIn("--case-id", benchmark_design)
+        self.assertIn("--lang", benchmark_design)
         self.assertIn("--limit", benchmark_design)
         self.assertIn("--limit 3", checklist)
         self.assertIn("label_maturity", combined)
+        self.assertIn("high_risk_unreviewed_by_language", combined)
         self.assertIn("raw_dual_agreement_rate", combined)
         self.assertIn("unresolved_disagreement_count", combined)
         self.assertIn("dual_disagreement_label_pair_counts", combined)

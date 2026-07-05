@@ -73,6 +73,20 @@ FIXTURE_RECORDS = [
             "that a citation is fabricated."
         ),
     },
+    {
+        "citation_id": "fixture-zh-source-outage-safety",
+        "title": "源不可达不能证明引用伪造",
+        "authors": ["A. Auditor"],
+        "year": 2026,
+        "venue": "CiteGuard Fixtures",
+        "doi": "",
+        "arxiv_id": "",
+        "source": "fixture",
+        "abstract": (
+            "源不可达和未找到结果只会降低核验置信度，不能证明引用是伪造的，"
+            "应检查来源健康或稍后重试。"
+        ),
+    },
 ]
 
 
@@ -276,6 +290,21 @@ async def _run_smoke(command: str, server_args: List[str], require_sdk: bool = F
                 )
                 _require_source_outage_counterevidence_payload(source_outage_counterevidence)
 
+                zh_source_outage_counterevidence = _coerce_tool_payload(
+                    await session.call_tool(
+                        "search_counterevidence_tool",
+                        {
+                            "claim": "源不可达会提高引用被判定为伪造的置信度。",
+                            "top_k": 1,
+                        },
+                    )
+                )
+                _require_source_outage_counterevidence_payload(
+                    zh_source_outage_counterevidence,
+                    expected_claim="源不可达会提高引用被判定为伪造的置信度。",
+                    expected_snippet="不能证明引用是伪造的",
+                )
+
                 missing_input = _coerce_tool_payload(
                     await session.call_tool("verify_citation_tool", {})
                 )
@@ -343,7 +372,7 @@ async def _run_smoke(command: str, server_args: List[str], require_sdk: bool = F
         "OK: MCP stdio smoke passed "
         "(initialize, list_tools, status, offline verify, offline audit, offline support, "
         "offline support-audit citation set, offline counter-evidence leads, "
-        "source-outage safety counter-evidence leads, "
+        "source-outage safety counter-evidence leads, Chinese source-outage safety leads, "
         "high-risk-only batch filtering, source-health next_action, structured errors, "
         "batch shape error details)."
     )
@@ -665,8 +694,11 @@ def _require_counterevidence_payload(payload: dict) -> None:
     _require_stable_next_action(payload, expected="review_counterevidence_leads")
 
 
-def _require_source_outage_counterevidence_payload(payload: dict) -> None:
-    expected_claim = "A source outage increases confidence that a citation is fabricated."
+def _require_source_outage_counterevidence_payload(
+    payload: dict,
+    expected_claim: str = "A source outage increases confidence that a citation is fabricated.",
+    expected_snippet: str = "",
+) -> None:
     if payload.get("claim") != expected_claim:
         raise RuntimeError(f"Unexpected source-outage counter-evidence claim, got: {payload!r}")
     if payload.get("candidate_count") != 1:
@@ -677,6 +709,8 @@ def _require_source_outage_counterevidence_payload(payload: dict) -> None:
     candidate = candidates[0]
     if candidate.get("signal") != "source_outage_safety_cue":
         raise RuntimeError(f"Expected source_outage_safety_cue lead, got: {payload!r}")
+    if expected_snippet and expected_snippet not in str(candidate.get("abstract_snippet", "")):
+        raise RuntimeError(f"Expected source-outage safety snippet {expected_snippet!r}, got: {payload!r}")
     if "source_outage_safety" not in set(candidate.get("matched_query_roles", [])):
         raise RuntimeError(f"Expected source_outage_safety query role, got: {payload!r}")
     query_plan = payload.get("query_plan")

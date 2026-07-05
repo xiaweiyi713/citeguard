@@ -230,7 +230,8 @@ configured via environment variables.
   support verdict and label them as "possible counter-evidence to review"; branch
   on `next_action=review_counterevidence_leads`, not on candidate prose.
   `signal=source_outage_safety_cue` means the lead may help rebut unsafe
-  source-outage-to-fabrication wording; it is still a review lead, not a verdict.
+  source-outage-to-fabrication wording, including Chinese "源不可达/未找到证明伪造"
+  claims; it is still a review lead, not a verdict.
 - For `check_claim_support_set_tool`, mention `support_mode` when it is not
   `single_strong_support`. In particular, `multiple_weak_support` means several
   citations are related or partial; it is still tentative, not full support.

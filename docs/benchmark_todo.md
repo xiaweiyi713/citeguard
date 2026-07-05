@@ -41,8 +41,9 @@ benchmark claims.
   hard-negative, or full-text-required cases still lack human review. Use
   `--priority high --split test --include-context` to produce a compact
   maintainer review draft, or `--annotation-packet --priority high --split test`
-  to produce a blinded annotator packet for the riskiest held-out cases without
-  leaking dataset gold labels or claiming they have already been reviewed.
+  with optional `--lang zh` to produce a blinded annotator packet for the
+  riskiest held-out or Chinese cases without leaking dataset gold labels or
+  claiming they have already been reviewed.
   Completed packets can be merged back with `--merge-annotation-packet`; label
   conflicts are reported instead of silently overwriting gold labels. Resolved
   conflicts can be applied with `--apply-adjudications`, which requires an
@@ -85,6 +86,7 @@ run:
 ```bash
 python scripts/prepare_support_label_sidecar.py --existing-sidecar data/eval/support_eval_label_sidecar.json --audit
 python scripts/prepare_support_label_sidecar.py --existing-sidecar data/eval/support_eval_label_sidecar.json --annotation-packet --priority high --split test --limit 3 --output experiments/support-label-packet-high-risk-test-batch1.json
+python scripts/prepare_support_label_sidecar.py --existing-sidecar data/eval/support_eval_label_sidecar.json --annotation-packet --priority high --split test --lang zh --limit 3 --output experiments/support-label-packet-high-risk-test-zh-batch1.json
 python scripts/prepare_support_label_sidecar.py --existing-sidecar data/eval/support_eval_label_sidecar.json --merge-annotation-packet experiments/completed-support-label-packet-high-risk-test-batch1.json --output data/eval/support_eval_label_sidecar.merged.json
 python scripts/prepare_support_label_sidecar.py --existing-sidecar data/eval/support_eval_label_sidecar.merged.json --apply-adjudications experiments/resolved-support-label-adjudications.json --output data/eval/support_eval_label_sidecar.adjudicated.json
 python scripts/prepare_support_label_sidecar.py --existing-sidecar data/eval/support_eval_label_sidecar.json --audit --fail-on-high-risk-unreviewed

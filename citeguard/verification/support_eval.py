@@ -237,11 +237,13 @@ def validate_support_eval_dataset(data: Dict[str, Any]) -> Dict[str, Any]:
     case_types = set()
     evidence_scopes = set()
     gold_labels = set()
+    languages = set()
     label_sources = set()
     splits = set()
     test_case_types = set()
     test_evidence_scopes = set()
     test_gold_labels = set()
+    test_languages = set()
     notes_missing_for_risky_cases: List[str] = []
     for index, case in enumerate(raw_cases, start=1):
         if not isinstance(case, dict):
@@ -260,6 +262,7 @@ def validate_support_eval_dataset(data: Dict[str, Any]) -> Dict[str, Any]:
                 errors.append(f"case {case_id or index} field {field!r} is required")
 
         gold = str(case.get("gold", "")).strip()
+        lang = str(case.get("lang", "")).strip()
         scope = str(case.get("evidence_scope", "")).strip()
         case_type = str(case.get("case_type", "")).strip()
         label_source = str(case.get("label_source", "")).strip()
@@ -278,6 +281,8 @@ def validate_support_eval_dataset(data: Dict[str, Any]) -> Dict[str, Any]:
             label_sources.add(label_source)
         if gold:
             gold_labels.add(gold)
+        if lang:
+            languages.add(lang)
         if scope:
             evidence_scopes.add(scope)
         if case_type:
@@ -287,6 +292,8 @@ def validate_support_eval_dataset(data: Dict[str, Any]) -> Dict[str, Any]:
         if split == "test":
             if gold:
                 test_gold_labels.add(gold)
+            if lang:
+                test_languages.add(lang)
             if scope:
                 test_evidence_scopes.add(scope)
             if case_type:
@@ -378,6 +385,7 @@ def validate_support_eval_dataset(data: Dict[str, Any]) -> Dict[str, Any]:
         "case_types": {case_type: sum(1 for case in raw_cases if isinstance(case, dict) and case.get("case_type") == case_type) for case_type in sorted(case_types)},
         "evidence_scopes": {scope: sum(1 for case in raw_cases if isinstance(case, dict) and case.get("evidence_scope") == scope) for scope in sorted(evidence_scopes)},
         "gold_labels": {label: sum(1 for case in raw_cases if isinstance(case, dict) and case.get("gold") == label) for label in sorted(gold_labels)},
+        "languages": {lang: sum(1 for case in raw_cases if isinstance(case, dict) and case.get("lang") == lang) for lang in sorted(languages)},
         "splits": {split: sum(1 for case in raw_cases if isinstance(case, dict) and case.get("split") == split) for split in sorted(splits)},
         "test_split": {
             "case_types": {
@@ -409,6 +417,16 @@ def validate_support_eval_dataset(data: Dict[str, Any]) -> Dict[str, Any]:
                     and case.get("gold") == label
                 )
                 for label in sorted(test_gold_labels)
+            },
+            "languages": {
+                lang: sum(
+                    1
+                    for case in raw_cases
+                    if isinstance(case, dict)
+                    and case.get("split") == "test"
+                    and case.get("lang") == lang
+                )
+                for lang in sorted(test_languages)
             },
             "required_case_types": sorted(REQUIRED_TEST_CASE_TYPES),
             "required_gold_labels": sorted(REQUIRED_TEST_GOLD_LABELS),
@@ -1080,6 +1098,7 @@ def run_support_set_policy_fixture_report(cases: List[SupportSetCase]) -> Dict[s
         "dataset": {
             "n": len(cases),
             "case_types": _count_by_attr(cases, "case_type"),
+            "languages": _count_by_attr(cases, "lang"),
             "splits": _count_by_attr(cases, "split"),
             "gold_labels": {label: sum(1 for case in cases if case.gold == label) for label in sorted(ALLOWED_SUPPORT_LABELS)},
         },
@@ -1094,6 +1113,7 @@ def run_support_set_policy_fixture_report(cases: List[SupportSetCase]) -> Dict[s
                 "predicted": prediction,
                 "correct": case.gold == prediction,
                 "case_type": case.case_type,
+                "lang": case.lang,
                 "split": case.split,
                 "label_source": case.label_source,
                 "label_notes": case.label_notes,
@@ -1243,6 +1263,7 @@ def compute_support_report(
         "confusion_matrix": compute_support_confusion_matrix(overall_preds),
         "by_case_type": _compute_grouped_metrics(cases, predictions, "case_type"),
         "by_evidence_scope": _compute_grouped_metrics(cases, predictions, "evidence_scope"),
+        "by_language": _compute_grouped_metrics(cases, predictions, "lang"),
         "by_split": _compute_grouped_metrics(cases, predictions, "split"),
         "error_bucket_counts": error_bucket_counts,
         "error_buckets": error_buckets,
@@ -1256,6 +1277,7 @@ def compute_support_report(
                 "correct": case.gold == pred,
                 "case_type": case.case_type,
                 "evidence_scope": case.evidence_scope,
+                "lang": case.lang,
                 "split": case.split,
                 "label_source": case.label_source,
             }
@@ -1279,6 +1301,7 @@ def compute_false_support_analysis(error_buckets: Dict[str, List[Dict[str, str]]
         "high_risk_case_ids": [item["case_id"] for item in false_items],
         "by_case_type": _false_support_group_summary(items, "case_type"),
         "by_evidence_scope": _false_support_group_summary(items, "evidence_scope"),
+        "by_language": _false_support_group_summary(items, "lang"),
         "by_split": _false_support_group_summary(items, "split"),
         "interpretation": (
             "False-support overcalls are the highest-risk support failures. "
@@ -1317,6 +1340,7 @@ def summarize_support_cases(cases: List[SupportCase]) -> Dict[str, Any]:
         "case_types": _count_cases_by(cases, "case_type"),
         "evidence_scopes": _count_cases_by(cases, "evidence_scope"),
         "gold_labels": _count_cases_by(cases, "gold"),
+        "languages": _count_cases_by(cases, "lang"),
         "splits": _count_cases_by(cases, "split"),
         "label_sources": sorted({case.label_source for case in cases if case.label_source}),
     }
@@ -1439,6 +1463,7 @@ def _error_bucket_row(case: SupportCase, prediction: str) -> Dict[str, str]:
         "predicted": prediction,
         "case_type": case.case_type,
         "evidence_scope": case.evidence_scope,
+        "lang": case.lang,
         "split": case.split,
         "label_source": case.label_source,
     }

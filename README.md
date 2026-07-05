@@ -212,8 +212,9 @@ include `next_action`, `query_plan`, `query_results`, and per-candidate
 `matched_query_roles` so agents can explain whether a lead came from the
 original claim search, a negation probe, an exception probe, or a
 `source_outage_safety` probe for overclaims that treat source failures as
-fabrication evidence. `signal=source_outage_safety_cue` is still only a review
-lead, not a contradiction verdict.
+fabrication evidence, including Chinese claims such as "源不可达/未找到证明引用伪造".
+`signal=source_outage_safety_cue` is still only a review lead, not a
+contradiction verdict.
 Support-set reports include `support_mode` and per-evidence citation `index` so
 agents can distinguish a single strong citation from multiple weak citations
 without overstating tentative corroboration.
@@ -426,14 +427,15 @@ python3 scripts/smoke_published_package.py --version 0.1.0  # dry-run post-publi
 
 The unit suite, verification eval, support fixture eval, and support dataset
 validation are network-free and run in CI. Eval datasets live in [`data/eval/`](data/eval/).
-The claim-support seed eval includes 33 evidence-level cases plus citation-set
+The claim-support seed eval includes 36 evidence-level cases plus citation-set
 policy cases. It reports accuracy, supported precision/recall/F1, abstention
 rate, false-support rate, contradiction recall, optional breakdowns by
-`case_type` and `evidence_scope`, a confusion matrix, high-risk error buckets
-such as false support and missed contradiction, and provenance fields for each
-synthetic seed case. Reports also include `false_support_analysis`, which
-summarizes total support overcalls, high-risk false-support case ids, and
-breakdowns by case type, evidence scope, and split for release triage.
+`case_type`, `evidence_scope`, language, and split, a confusion matrix,
+high-risk error buckets such as false support and missed contradiction, and
+provenance fields for each synthetic seed case. Reports also include
+`false_support_analysis`, which summarizes total support overcalls, high-risk
+false-support case ids, and breakdowns by case type, evidence scope, language,
+and split for release triage.
 `--quality-gate` turns the report into a conservative
 release gate: by default, any false support, weak false support, or missed
 contradiction fails the command with a machine-readable `quality_gate` block.

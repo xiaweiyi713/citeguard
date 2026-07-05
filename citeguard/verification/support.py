@@ -48,6 +48,32 @@ class SupportDecisionPolicy:
 DEFAULT_SUPPORT_POLICY = SupportDecisionPolicy()
 
 
+_ZH_SOURCE_OUTAGE_TERMS = (
+    "源不可达",
+    "来源不可达",
+    "数据源不可达",
+    "源失败",
+    "来源失败",
+    "源故障",
+    "来源故障",
+    "检索失败",
+    "查询失败",
+    "超时",
+    "限流",
+    "未找到",
+    "找不到",
+)
+_ZH_FABRICATION_TERMS = ("伪造", "虚假", "编造", "幻觉", "捏造")
+_ZH_CONFIDENCE_TERMS = ("提高", "增加", "提升", "证明", "证据", "置信", "确信")
+_ZH_CONFIDENCE_REDUCTION_TERMS = ("降低", "下调", "减少")
+_ZH_CERTAINTY_TERMS = ("置信", "可信", "确定")
+_ZH_PROOF_DENIAL_TERMS = ("不能证明", "无法证明", "不可证明")
+_ZH_EVIDENCE_DENIAL_TERMS = ("不是证据", "并非证据", "不构成证据", "不能作为证据")
+_ZH_CLASSIFICATION_DENIAL_TERMS = ("不应", "不能", "不可")
+_ZH_CLASSIFICATION_TERMS = ("指控", "判定", "标记", "归类")
+_ZH_RETRY_OR_HEALTH_TERMS = ("来源健康", "源健康", "稍后重试", "人工复核")
+
+
 @dataclass(frozen=True)
 class SupportResult:
     """Result of a claim-support check."""
@@ -446,15 +472,21 @@ def _source_outage_safety_pattern(claim: str, evidence: str) -> bool:
         r"\b(?:source|sources|outage|outages|unavailable|timeout|timeouts|not_found|not\s+found|missing)\b",
         claim_text,
     )
+    zh_outage_claim = any(term in claim_text for term in _ZH_SOURCE_OUTAGE_TERMS)
     fabrication_claim = re.search(r"\b(?:fabricated|fake|false|hallucinated|forged)\b", claim_text)
+    zh_fabrication_claim = any(term in claim_text for term in _ZH_FABRICATION_TERMS)
     confidence_claim = re.search(r"\b(?:increase|raises?|boosts?|proves?|evidence|confidence)\b", claim_text)
-    if not outage_claim or not (fabrication_claim or confidence_claim):
+    zh_confidence_claim = any(term in claim_text for term in _ZH_CONFIDENCE_TERMS)
+    if not (outage_claim or zh_outage_claim) or not (
+        fabrication_claim or zh_fabrication_claim or confidence_claim or zh_confidence_claim
+    ):
         return False
 
     outage_evidence = re.search(
         r"\b(?:source|sources|outage|outages|unavailable|timeout|timeouts|not_found|not\s+found|missing)\b",
         evidence_text,
     )
+    zh_outage_evidence = any(term in evidence_text for term in _ZH_SOURCE_OUTAGE_TERMS)
     safety_evidence = re.search(
         r"\b(?:lower|lowers|reduced?|decrease[sd]?|inconclusive|retry|source[-\s]?health)\b.*"
         r"\b(?:confidence|certainty|inspection|check)\b"
@@ -462,7 +494,27 @@ def _source_outage_safety_pattern(claim: str, evidence: str) -> bool:
         r"|\bmust\s+not\b.*\b(?:fabricated|fake|false|hallucinated|forged)\b",
         evidence_text,
     )
-    return bool(outage_evidence and safety_evidence)
+    zh_safety_evidence = (
+        (
+            any(term in evidence_text for term in _ZH_CONFIDENCE_REDUCTION_TERMS)
+            and any(term in evidence_text for term in _ZH_CERTAINTY_TERMS)
+        )
+        or (
+            any(term in evidence_text for term in _ZH_PROOF_DENIAL_TERMS)
+            and any(term in evidence_text for term in _ZH_FABRICATION_TERMS)
+        )
+        or (
+            any(term in evidence_text for term in _ZH_EVIDENCE_DENIAL_TERMS)
+            and any(term in evidence_text for term in _ZH_FABRICATION_TERMS)
+        )
+        or (
+            any(term in evidence_text for term in _ZH_CLASSIFICATION_DENIAL_TERMS)
+            and any(term in evidence_text for term in _ZH_CLASSIFICATION_TERMS)
+            and any(term in evidence_text for term in _ZH_FABRICATION_TERMS)
+        )
+        or any(term in evidence_text for term in _ZH_RETRY_OR_HEALTH_TERMS)
+    )
+    return bool((outage_evidence or zh_outage_evidence) and (safety_evidence or zh_safety_evidence))
 
 
 def _chinese_contradiction_pattern(claim: str, evidence: str) -> bool:
@@ -1212,12 +1264,21 @@ def _counterevidence_query_plan(claim: str) -> List[Dict[str, str]]:
     if re.search(
         r"\b(source|sources|outage|outages|unavailable|timeout|timeouts|not_found|not\s+found|fabricated|fake|hallucinated)\b",
         normalized,
-    ):
+    ) or any(term in normalized for term in _ZH_SOURCE_OUTAGE_TERMS + _ZH_FABRICATION_TERMS):
+        zh_safety_terms = " ".join(
+            _ZH_SOURCE_OUTAGE_TERMS
+            + _ZH_PROOF_DENIAL_TERMS
+            + _ZH_EVIDENCE_DENIAL_TERMS
+            + _ZH_CONFIDENCE_REDUCTION_TERMS
+            + _ZH_CERTAINTY_TERMS
+            + _ZH_FABRICATION_TERMS
+            + _ZH_RETRY_OR_HEALTH_TERMS
+        )
         queries.append(
             {
                 "query": (
                     f"{claim} source outage unavailable timeout not found "
-                    "not evidence fabricated lower confidence inconclusive"
+                    f"not evidence fabricated lower confidence inconclusive {zh_safety_terms}"
                 ),
                 "role": "source_outage_safety",
                 "rationale": (
