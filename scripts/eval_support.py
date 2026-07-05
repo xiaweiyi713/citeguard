@@ -88,6 +88,15 @@ def main() -> None:
         help="Minimum required human-reviewed labels when --label-sidecar is provided.",
     )
     parser.add_argument(
+        "--min-high-risk-reviewed",
+        type=int,
+        default=0,
+        help=(
+            "Minimum required human-reviewed high-risk labels when --label-sidecar is provided. "
+            "High-risk cases include contradiction, hard_negative, full_text_required, and contradiction_set."
+        ),
+    )
+    parser.add_argument(
         "--min-dual-annotated",
         type=int,
         default=0,
@@ -136,6 +145,7 @@ def main() -> None:
                 validation["label_sidecar"],
                 min_coverage=args.min_sidecar_coverage,
                 min_human_reviewed=args.min_human_reviewed,
+                min_high_risk_reviewed=args.min_high_risk_reviewed,
                 min_dual_annotated=args.min_dual_annotated,
                 max_unresolved_disagreements=args.max_unresolved_disagreements,
                 min_raw_dual_agreement_rate=args.min_raw_dual_agreement_rate,
@@ -168,6 +178,7 @@ def main() -> None:
             sidecar_summary,
             min_coverage=args.min_sidecar_coverage,
             min_human_reviewed=args.min_human_reviewed,
+            min_high_risk_reviewed=args.min_high_risk_reviewed,
             min_dual_annotated=args.min_dual_annotated,
             max_unresolved_disagreements=args.max_unresolved_disagreements,
             min_raw_dual_agreement_rate=args.min_raw_dual_agreement_rate,
@@ -202,6 +213,7 @@ def main() -> None:
                     "min_contradiction_recall": args.min_contradiction_recall,
                     "min_sidecar_coverage": args.min_sidecar_coverage,
                     "min_human_reviewed": args.min_human_reviewed,
+                    "min_high_risk_reviewed": args.min_high_risk_reviewed,
                     "min_dual_annotated": args.min_dual_annotated,
                     "max_unresolved_disagreements": args.max_unresolved_disagreements,
                     "min_raw_dual_agreement_rate": args.min_raw_dual_agreement_rate,

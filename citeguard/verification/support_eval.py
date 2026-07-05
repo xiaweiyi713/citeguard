@@ -79,6 +79,13 @@ REQUIRED_SEED_EVIDENCE_SCOPES = {
     "full_text",
 }
 
+HIGH_RISK_SUPPORT_CASE_TYPES = {
+    "contradiction",
+    "contradiction_set",
+    "hard_negative",
+    "full_text_required",
+}
+
 
 class SupportEvalValidationError(ValueError):
     """Raised when a support eval dataset violates the benchmark contract."""
@@ -538,6 +545,7 @@ def validate_support_label_sidecar(data: Dict[str, Any], cases: List[SupportCase
 
     coverage = round(len(seen_ids & case_ids) / len(case_ids), 4) if case_ids else 0.0
     label_maturity = summarize_support_label_maturity(raw_items, dataset_case_count=len(case_ids))
+    high_risk_review = summarize_support_high_risk_review(raw_items, cases)
     summary = {
         "ok": not errors,
         "schema_version": data.get("schema_version"),
@@ -550,11 +558,43 @@ def validate_support_label_sidecar(data: Dict[str, Any], cases: List[SupportCase
             for status in sorted(statuses)
         },
         "label_maturity": label_maturity,
+        "high_risk_review": high_risk_review,
         "warnings": warnings,
     }
     if errors:
         raise SupportLabelSidecarValidationError("; ".join(errors))
     return summary
+
+
+def summarize_support_high_risk_review(raw_items: List[Any], cases: List[SupportCase]) -> Dict[str, Any]:
+    """Summarize human-review coverage for the highest-risk support cases."""
+
+    sidecar_by_id = {
+        str(item.get("case_id", "")).strip(): item
+        for item in raw_items
+        if isinstance(item, dict) and str(item.get("case_id", "")).strip()
+    }
+    reviewed_case_ids: List[str] = []
+    unreviewed_case_ids: List[str] = []
+    unreviewed_by_case_type: Dict[str, int] = {}
+    high_risk_cases = [case for case in cases if case.case_type in HIGH_RISK_SUPPORT_CASE_TYPES]
+    for case in high_risk_cases:
+        item = sidecar_by_id.get(case.case_id, {})
+        if item.get("adjudication_status") != "not_human_reviewed" and item:
+            reviewed_case_ids.append(case.case_id)
+            continue
+        unreviewed_case_ids.append(case.case_id)
+        unreviewed_by_case_type[case.case_type] = unreviewed_by_case_type.get(case.case_type, 0) + 1
+
+    return {
+        "case_types": sorted(HIGH_RISK_SUPPORT_CASE_TYPES),
+        "case_count": len(high_risk_cases),
+        "reviewed_count": len(reviewed_case_ids),
+        "unreviewed_count": len(unreviewed_case_ids),
+        "reviewed_case_ids": reviewed_case_ids,
+        "unreviewed_case_ids": unreviewed_case_ids,
+        "unreviewed_by_case_type": dict(sorted(unreviewed_by_case_type.items())),
+    }
 
 
 def _sidecar_status_consistency_errors(
@@ -715,6 +755,7 @@ def compute_support_label_sidecar_gate(
     summary: Dict[str, Any],
     min_coverage: float = 1.0,
     min_human_reviewed: int = 0,
+    min_high_risk_reviewed: int = 0,
     min_dual_annotated: int = 0,
     max_unresolved_disagreements: int = 0,
     min_raw_dual_agreement_rate: Optional[float] = None,
@@ -727,6 +768,12 @@ def compute_support_label_sidecar_gate(
     maturity = summary.get("label_maturity", {})
     if not isinstance(maturity, dict):
         maturity = {}
+    high_risk_review = summary.get("high_risk_review", {})
+    if not isinstance(high_risk_review, dict):
+        high_risk_review = {}
+    high_risk_reviewed = _safe_int(high_risk_review.get("reviewed_count", 0))
+    high_risk_unreviewed = _safe_int(high_risk_review.get("unreviewed_count", 0))
+    high_risk_case_count = _safe_int(high_risk_review.get("case_count", 0))
     dual_annotated = _safe_int(maturity.get("dual_annotated_count", 0))
     unresolved_disagreements = _safe_int(maturity.get("unresolved_disagreement_count", 0))
     supported_disagreements = _safe_int(maturity.get("supported_disagreement_count", 0))
@@ -748,6 +795,16 @@ def compute_support_label_sidecar_gate(
                 "message": "Human-reviewed support label count is below the configured threshold.",
                 "actual": human_reviewed,
                 "threshold": min_human_reviewed,
+            }
+        )
+    if high_risk_reviewed < min_high_risk_reviewed:
+        failures.append(
+            {
+                "code": "sidecar_high_risk_reviewed",
+                "message": "Human-reviewed high-risk support label count is below the configured threshold.",
+                "actual": high_risk_reviewed,
+                "threshold": min_high_risk_reviewed,
+                "unreviewed_case_ids": list(high_risk_review.get("unreviewed_case_ids", [])),
             }
         )
     if dual_annotated < min_dual_annotated:
@@ -803,6 +860,7 @@ def compute_support_label_sidecar_gate(
         "thresholds": {
             "min_coverage": min_coverage,
             "min_human_reviewed": min_human_reviewed,
+            "min_high_risk_reviewed": min_high_risk_reviewed,
             "min_dual_annotated": min_dual_annotated,
             "max_unresolved_disagreements": max_unresolved_disagreements,
             "min_raw_dual_agreement_rate": min_raw_dual_agreement_rate,
@@ -811,6 +869,9 @@ def compute_support_label_sidecar_gate(
         "metrics": {
             "coverage": coverage,
             "human_reviewed": human_reviewed,
+            "high_risk_case_count": high_risk_case_count,
+            "high_risk_reviewed": high_risk_reviewed,
+            "high_risk_unreviewed": high_risk_unreviewed,
             "dual_annotated": dual_annotated,
             "unresolved_disagreements": unresolved_disagreements,
             "supported_disagreements": supported_disagreements,

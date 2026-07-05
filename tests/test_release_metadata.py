@@ -204,6 +204,7 @@ License-File: LICENSE
         self.assertIn("--label-sidecar data/eval/support_eval_label_sidecar.json", workflow)
         self.assertIn("--min-sidecar-coverage 1.0", workflow)
         self.assertIn("--min-human-reviewed 0", workflow)
+        self.assertIn("--min-high-risk-reviewed 0", workflow)
         self.assertIn("python scripts/smoke_package.py --install-mode wheel", workflow)
         self.assertIn("python scripts/smoke_package.py --install-mode sdist", workflow)
         self.assertIn(
@@ -664,6 +665,8 @@ License-File: LICENSE
         self.assertIn("unresolved_disagreement_count", combined)
         self.assertIn("dual_disagreement_label_pair_counts", combined)
         self.assertIn("supported_disagreement_case_ids", combined)
+        self.assertIn("high_risk_review", combined)
+        self.assertIn("--min-high-risk-reviewed", combined)
         self.assertIn("--min-dual-annotated", combined)
         self.assertIn("--max-unresolved-disagreements", combined)
         self.assertIn("--min-raw-dual-agreement-rate", combined)

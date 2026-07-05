@@ -92,7 +92,7 @@ agent skill bundle.
   python scripts/prepare_support_label_sidecar.py --existing-sidecar data/eval/support_eval_label_sidecar.json --annotation-packet --priority high --split test --limit 3 --output experiments/support-label-packet-high-risk-test-batch1.json --instructions-output experiments/support-label-packet-high-risk-test-batch1-instructions.md
   python scripts/prepare_support_label_sidecar.py --existing-sidecar data/eval/support_eval_label_sidecar.json --merge-annotation-packet experiments/completed-support-label-packet-high-risk-test-batch1.json --output data/eval/support_eval_label_sidecar.merged.json
   python scripts/prepare_support_label_sidecar.py --existing-sidecar data/eval/support_eval_label_sidecar.merged.json --apply-adjudications experiments/resolved-support-label-adjudications.json --output data/eval/support_eval_label_sidecar.adjudicated.json
-  python scripts/eval_support.py --validate-only --label-sidecar data/eval/support_eval_label_sidecar.json --min-sidecar-coverage 1.0 --min-human-reviewed 0 --min-dual-annotated 0 --max-unresolved-disagreements 0 --max-supported-disagreements 0
+  python scripts/eval_support.py --validate-only --label-sidecar data/eval/support_eval_label_sidecar.json --min-sidecar-coverage 1.0 --min-human-reviewed 0 --min-high-risk-reviewed 0 --min-dual-annotated 0 --max-unresolved-disagreements 0 --max-supported-disagreements 0
   ```
 
   The quality gate should stay conservative for release candidates: false
@@ -102,9 +102,11 @@ agent skill bundle.
   cases. The baseline comparison table should include at least the deterministic
   `fixture` row and the zero-model `heuristic` row, with heuristic limitations
   visible in the diagnostics. The label-sidecar gate should report coverage
-  `1.0`; keep `--min-human-reviewed` and `--min-dual-annotated` at `0` for the
-  synthetic seed set, then raise them when a human-reviewed subset exists. Keep
-  `--max-unresolved-disagreements 0`; add `--min-raw-dual-agreement-rate` for
+  `1.0`; keep `--min-human-reviewed`, `--min-high-risk-reviewed`, and
+  `--min-dual-annotated` at `0` for the synthetic seed set, then raise them when
+  a human-reviewed subset exists. Raise `--min-high-risk-reviewed` first for
+  contradiction, hard-negative, full-text-required, and contradiction-set cases.
+  Keep `--max-unresolved-disagreements 0`; add `--min-raw-dual-agreement-rate` for
   release evidence once dual annotation exists. Use
   `--max-supported-disagreements 0` for release-grade benchmark claims and inspect
   `dual_disagreement_label_pair_counts` and `supported_disagreement_case_ids`

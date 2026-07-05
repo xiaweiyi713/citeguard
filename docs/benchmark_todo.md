@@ -59,7 +59,8 @@ benchmark claims.
 
 1. Build a human-reviewed subset with at least two annotators for ambiguous and
    high-risk claim/evidence pairs.
-2. Raise the release gate from `--min-human-reviewed 0` once that subset exists.
+2. Raise the release gate from `--min-high-risk-reviewed 0` and
+   `--min-human-reviewed 0` once that subset exists.
 3. Add reviewer disagreement examples instead of silently collapsing labels.
 4. Expand domain coverage beyond the current synthetic seed set, especially for
    review-writing claims, CS systems papers, and biomedical abstracts.
@@ -85,6 +86,7 @@ python scripts/eval_support.py --validate-only \
   --label-sidecar data/eval/support_eval_label_sidecar.json \
   --min-sidecar-coverage 1.0 \
   --min-human-reviewed <required-count> \
+  --min-high-risk-reviewed <required-high-risk-count> \
   --min-dual-annotated <required-count> \
   --max-unresolved-disagreements 0 \
   --min-raw-dual-agreement-rate <threshold> \

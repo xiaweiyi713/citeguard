@@ -157,6 +157,7 @@ python3 scripts/eval_support.py \
   --validate-only \
   --label-sidecar data/eval/support_eval_label_sidecar.json \
   --min-human-reviewed 10 \
+  --min-high-risk-reviewed 5 \
   --min-dual-annotated 10 \
   --max-unresolved-disagreements 0 \
   --min-raw-dual-agreement-rate 0.8 \
@@ -171,12 +172,15 @@ sidecar 用于保存不适合塞进 compact seed case 的标注元数据,例如
 `resolved_disagreement_count`、`unresolved_disagreement_count`、
 `dual_label_pair_counts`、`dual_disagreement_label_pair_counts` 和
 `supported_disagreement_case_ids`,用于判断人工标注成熟度而不只看 coverage。
+validation 同时输出 `high_risk_review`,统计 contradiction、hard_negative、
+full_text_required 和 contradiction_set 的 reviewed/unreviewed 覆盖情况。
 任何 supported-label disagreement 都应优先复核,因为把不充分证据误标成
 `supported` 是最危险的 benchmark 误差。`label_sidecar_gate` 可显式要求
-`--min-dual-annotated`、`--max-unresolved-disagreements`、
-`--min-raw-dual-agreement-rate` 和 `--max-supported-disagreements`,让发布报告
-在双标不足、分歧未解决、一致率过低或 supported-label 分歧未清零时以机器可读
-failure code 失败。validation 还会检查 status consistency:
+`--min-high-risk-reviewed`、`--min-dual-annotated`、
+`--max-unresolved-disagreements`、`--min-raw-dual-agreement-rate` 和
+`--max-supported-disagreements`,让发布报告在高风险样本评审不足、双标不足、
+分歧未解决、一致率过低或 supported-label 分歧未清零时以机器可读 failure code
+失败。validation 还会检查 status consistency:
 `not_human_reviewed` 不能携带 annotator label,`dual_annotator_agreed` 的
 annotator labels 必须一致,`dual_annotator_adjudicated` 必须记录 resolved
 disagreement 和 adjudicator,`published_benchmark` 必须有 source locator,避免
@@ -315,7 +319,8 @@ python3 scripts/prepare_support_label_sidecar.py \
 
 当前 synthetic seed set 会因为高风险样本未人工审阅而失败；这是有意设计,
 用于防止把未审 seed set 误称为 human-reviewed benchmark。开始真实标注后,
-先清掉 high-risk 未审样本,再提高 `eval_support.py --min-human-reviewed` 门槛。
+先清掉 high-risk 未审样本,再提高 `eval_support.py --min-high-risk-reviewed`
+和 `--min-human-reviewed` 门槛。
 
 ## 推荐任务构成
 

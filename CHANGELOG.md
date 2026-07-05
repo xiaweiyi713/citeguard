@@ -43,6 +43,8 @@
   pairs and supported-label disagreement case ids.
 - Added a release gate option for blocking benchmark claims when supported-label
   disagreements remain unresolved.
+- Added high-risk support-label review coverage metrics and a
+  `--min-high-risk-reviewed` sidecar gate for release readiness checks.
 - Expanded the CiteGuard agent skill with client-specific MCP setup notes,
   structured-error recovery guidance, and safe wording examples for ambiguous,
   metadata-mismatch, not-found, outage, and claim-support results.

@@ -52,9 +52,11 @@ def main(argv: List[str] | None = None) -> int:
     )
     parser.add_argument("--min-sidecar-coverage", type=float, default=1.0)
     parser.add_argument("--min-human-reviewed", type=int, default=0)
+    parser.add_argument("--min-high-risk-reviewed", type=int, default=0)
     parser.add_argument("--min-dual-annotated", type=int, default=0)
     parser.add_argument("--max-unresolved-disagreements", type=int, default=0)
     parser.add_argument("--min-raw-dual-agreement-rate", type=float, default=None)
+    parser.add_argument("--max-supported-disagreements", type=int, default=None)
     parser.add_argument("--max-false-support-rate", type=float, default=0.0)
     parser.add_argument("--max-false-support-count", type=int, default=0)
     parser.add_argument("--max-weak-false-support-count", type=int, default=0)
@@ -109,9 +111,11 @@ def main(argv: List[str] | None = None) -> int:
             sidecar_summary,
             min_coverage=args.min_sidecar_coverage,
             min_human_reviewed=args.min_human_reviewed,
+            min_high_risk_reviewed=args.min_high_risk_reviewed,
             min_dual_annotated=args.min_dual_annotated,
             max_unresolved_disagreements=args.max_unresolved_disagreements,
             min_raw_dual_agreement_rate=args.min_raw_dual_agreement_rate,
+            max_supported_disagreements=args.max_supported_disagreements,
         )
 
     result["quality_gates_ok"] = _all_gates_ok(result)
@@ -134,9 +138,11 @@ def main(argv: List[str] | None = None) -> int:
                     "min_contradiction_recall": args.min_contradiction_recall,
                     "min_sidecar_coverage": args.min_sidecar_coverage,
                     "min_human_reviewed": args.min_human_reviewed,
+                    "min_high_risk_reviewed": args.min_high_risk_reviewed,
                     "min_dual_annotated": args.min_dual_annotated,
                     "max_unresolved_disagreements": args.max_unresolved_disagreements,
                     "min_raw_dual_agreement_rate": args.min_raw_dual_agreement_rate,
+                    "max_supported_disagreements": args.max_supported_disagreements,
                 },
                 "case_count": len(cases),
             },

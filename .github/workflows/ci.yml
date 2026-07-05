@@ -30,10 +30,10 @@ jobs:
         run: python scripts/eval_verification.py
 
       - name: Validate support eval dataset
-        run: python scripts/eval_support.py --validate-only --label-sidecar data/eval/support_eval_label_sidecar.json --min-sidecar-coverage 1.0 --min-human-reviewed 0
+        run: python scripts/eval_support.py --validate-only --label-sidecar data/eval/support_eval_label_sidecar.json --min-sidecar-coverage 1.0 --min-human-reviewed 0 --min-high-risk-reviewed 0
 
       - name: Run deterministic support eval report quality gate
-        run: python scripts/eval_support.py --report --split test --label-sidecar data/eval/support_eval_label_sidecar.json --min-sidecar-coverage 1.0 --min-human-reviewed 0 --quality-gate
+        run: python scripts/eval_support.py --report --split test --label-sidecar data/eval/support_eval_label_sidecar.json --min-sidecar-coverage 1.0 --min-human-reviewed 0 --min-high-risk-reviewed 0 --quality-gate
 
       - name: Run deterministic support baseline comparison
         run: python scripts/compare_support_baselines.py --split test

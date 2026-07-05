@@ -144,16 +144,20 @@ python3 scripts/eval_support.py --validate-only \
   --label-sidecar data/eval/support_eval_label_sidecar.draft.json \
   --min-sidecar-coverage 1.0 \
   --min-human-reviewed 10 \
+  --min-high-risk-reviewed 5 \
   --min-dual-annotated 10 \
   --max-unresolved-disagreements 0 \
   --min-raw-dual-agreement-rate 0.8 \
   --max-supported-disagreements 0
 ```
 
-Use `--max-supported-disagreements 0` for release-grade benchmark claims. It
-fails with `sidecar_supported_disagreements` when any dual-annotation
-disagreement includes a `supported` label, forcing explicit adjudication before
-the benchmark can be described as mature.
+Use `--min-high-risk-reviewed` to require human review for contradiction,
+hard-negative, full-text-required, and contradiction-set cases before making
+benchmark maturity claims. Use `--max-supported-disagreements 0` for
+release-grade benchmark claims. It fails with
+`sidecar_supported_disagreements` when any dual-annotation disagreement includes
+a `supported` label, forcing explicit adjudication before the benchmark can be
+described as mature.
 
 Generate a complete sidecar template before an annotation pass:
 

@@ -212,6 +212,61 @@ class SupportEvalTests(unittest.TestCase):
         self.assertEqual(summary["label_maturity"]["supported_disagreement_count"], 1)
         self.assertEqual(summary["label_maturity"]["supported_disagreement_case_ids"], ["b"])
 
+    def test_support_label_sidecar_summarizes_high_risk_review_coverage(self):
+        cases = [
+            SupportCase("a", "claim", "evidence", "contradicted", case_type="contradiction"),
+            SupportCase("b", "claim", "evidence", "insufficient_evidence", case_type="hard_negative"),
+            SupportCase("c", "claim", "evidence", "supported", case_type="direct_support"),
+            SupportCase(
+                "d",
+                "claim",
+                "citation_verdicts: supported, contradicted",
+                "contradicted",
+                case_type="contradiction_set",
+            ),
+        ]
+        sidecar = {
+            "schema_version": 1,
+            "cases": [
+                {
+                    "case_id": "a",
+                    "adjudication_status": "single_annotator",
+                    "annotator_count": 1,
+                    "annotator_labels": ["contradicted"],
+                    "adjudicated_label": "contradicted",
+                    "disagreement": "none",
+                },
+                {
+                    "case_id": "b",
+                    "adjudication_status": "not_human_reviewed",
+                    "annotator_count": 0,
+                    "annotator_labels": [],
+                    "adjudicated_label": "insufficient_evidence",
+                    "disagreement": "not_applicable",
+                },
+                {
+                    "case_id": "c",
+                    "adjudication_status": "not_human_reviewed",
+                    "annotator_count": 0,
+                    "annotator_labels": [],
+                    "adjudicated_label": "supported",
+                    "disagreement": "not_applicable",
+                },
+            ],
+        }
+
+        summary = validate_support_label_sidecar(sidecar, cases)
+
+        self.assertEqual(summary["high_risk_review"]["case_count"], 3)
+        self.assertEqual(summary["high_risk_review"]["reviewed_count"], 1)
+        self.assertEqual(summary["high_risk_review"]["unreviewed_count"], 2)
+        self.assertEqual(summary["high_risk_review"]["reviewed_case_ids"], ["a"])
+        self.assertEqual(summary["high_risk_review"]["unreviewed_case_ids"], ["b", "d"])
+        self.assertEqual(
+            summary["high_risk_review"]["unreviewed_by_case_type"],
+            {"contradiction_set": 1, "hard_negative": 1},
+        )
+
     def test_support_label_sidecar_gate_checks_coverage_and_human_review(self):
         passing = compute_support_label_sidecar_gate(
             {
@@ -219,6 +274,11 @@ class SupportEvalTests(unittest.TestCase):
                 "human_reviewed": 2,
                 "dataset_cases": 4,
                 "n": 4,
+                "high_risk_review": {
+                    "case_count": 2,
+                    "reviewed_count": 1,
+                    "unreviewed_count": 1,
+                },
                 "label_maturity": {
                     "dual_annotated_count": 1,
                     "unresolved_disagreement_count": 0,
@@ -227,22 +287,39 @@ class SupportEvalTests(unittest.TestCase):
             },
             min_coverage=1.0,
             min_human_reviewed=2,
+            min_high_risk_reviewed=1,
             min_dual_annotated=1,
             max_unresolved_disagreements=0,
             min_raw_dual_agreement_rate=0.8,
         )
         failing = compute_support_label_sidecar_gate(
-            {"coverage": 0.5, "human_reviewed": 0, "dataset_cases": 4, "n": 2},
+            {
+                "coverage": 0.5,
+                "human_reviewed": 0,
+                "dataset_cases": 4,
+                "n": 2,
+                "high_risk_review": {
+                    "case_count": 2,
+                    "reviewed_count": 0,
+                    "unreviewed_count": 2,
+                    "unreviewed_case_ids": ["b", "d"],
+                },
+            },
             min_coverage=1.0,
             min_human_reviewed=1,
+            min_high_risk_reviewed=1,
         )
 
         self.assertTrue(passing["ok"])
         self.assertFalse(failing["ok"])
         self.assertEqual(
             {failure["code"] for failure in failing["failures"]},
-            {"sidecar_coverage", "sidecar_human_reviewed"},
+            {"sidecar_coverage", "sidecar_human_reviewed", "sidecar_high_risk_reviewed"},
         )
+        high_risk = next(
+            failure for failure in failing["failures"] if failure["code"] == "sidecar_high_risk_reviewed"
+        )
+        self.assertEqual(high_risk["unreviewed_case_ids"], ["b", "d"])
 
     def test_support_label_sidecar_gate_checks_maturity_thresholds(self):
         gate = compute_support_label_sidecar_gate(
@@ -1363,6 +1440,8 @@ class SupportEvalTests(unittest.TestCase):
                 os.path.join("data", "eval", "support_eval_label_sidecar.json"),
                 "--min-human-reviewed",
                 "1",
+                "--min-high-risk-reviewed",
+                "1",
                 "--min-dual-annotated",
                 "1",
                 "--min-raw-dual-agreement-rate",
@@ -1381,6 +1460,7 @@ class SupportEvalTests(unittest.TestCase):
             {failure["code"] for failure in payload["label_sidecar_gate"]["failures"]},
             {
                 "sidecar_human_reviewed",
+                "sidecar_high_risk_reviewed",
                 "sidecar_dual_annotated",
                 "sidecar_raw_dual_agreement_rate",
             },
