@@ -102,6 +102,10 @@
   `next_action=retry_or_check_source_health`, while source-health summaries keep
   `sources_checked`, `sources_responded`, `sources_failed`, and timeout failure
   kinds separate for agents.
+- Added a default release-gate live-source health contract so OpenAlex,
+  Crossref, arXiv, and Semantic Scholar aliases, checks, responded/failed
+  source lists, timeout/rate-limit failure-kind summaries, and Semantic Scholar
+  API-key status stay stable for agent integrations.
 - Added a default release-gate security/compliance contract so docs, polite
   `CITEGUARD_MAILTO` status, fixture bypass behavior, gated-source host blocks,
   and disabled-by-default remote evidence policy stay machine-checkable.

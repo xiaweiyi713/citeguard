@@ -19,6 +19,7 @@ from scripts.release_package_gate import (
     _record_cli_error_contract_gate,
     _record_error_codes_contract_gate,
     _record_legacy_src_shim_contract,
+    _record_live_source_health_contract_gate,
     _record_mcp_extra_smoke,
     _record_mcp_stdio_smoke,
     _record_mcp_stdio_smoke_contract_gate,
@@ -378,6 +379,12 @@ License-File: LICENSE
             "all_sources_failed",
             "outage_limited",
             "retry_or_check_source_health",
+            "live_source_health_contract",
+            "_record_live_source_health_contract_gate",
+            "release gate enforces source-level health for OpenAlex, Crossref, arXiv, and Semantic Scholar",
+            "semantic-scholar",
+            "api_key_configured",
+            "rate_limited",
             "security_compliance_contract",
             "_record_security_compliance_contract_gate",
             "fixture_bypasses_live_sources",
@@ -882,6 +889,41 @@ License-File: LICENSE
         self.assertEqual(health["failure_kind_sources"], {"timeout": ["openalex"]})
         self.assertEqual(health["next_action"], "retry_or_check_source_health")
         self.assertFalse(health["all_checked_sources_failed"])
+
+    def test_release_gate_records_live_source_health_contract(self):
+        summary = {"ok": True, "steps": []}
+
+        _record_live_source_health_contract_gate(summary, project_root=ROOT)
+
+        self.assertTrue(summary["ok"])
+        self.assertEqual(summary["steps"][0]["name"], "live_source_health_contract")
+        self.assertEqual(summary["steps"][0]["status"], "passed")
+        self.assertEqual(
+            summary["steps"][0]["docs_checked"],
+            ["README.md", "docs/cli_reference.md", "docs/release_checklist.md", "docs/security_compliance.md"],
+        )
+        self.assertEqual(
+            summary["steps"][0]["aliases_checked"],
+            ["OpenAlex", "crossref", "arxiv", "semantic-scholar", "s2"],
+        )
+        self.assertEqual(
+            summary["steps"][0]["canonical_sources"],
+            ["openalex", "crossref", "arxiv", "semantic_scholar"],
+        )
+        self.assertEqual(
+            summary["steps"][0]["sources_checked"],
+            ["openalex", "crossref", "arxiv", "semantic_scholar"],
+        )
+        self.assertEqual(summary["steps"][0]["sources_responded"], ["crossref", "arxiv"])
+        self.assertEqual(summary["steps"][0]["sources_failed"], ["openalex", "semantic_scholar"])
+        self.assertEqual(summary["steps"][0]["failure_kind_counts"], {"timeout": 1, "rate_limited": 1})
+        self.assertEqual(
+            summary["steps"][0]["failure_kind_sources"],
+            {"timeout": ["openalex"], "rate_limited": ["semantic_scholar"]},
+        )
+        self.assertTrue(summary["steps"][0]["semantic_scholar"]["api_key_configured"])
+        self.assertEqual(summary["steps"][0]["semantic_scholar"]["polite_access"]["status"], "not_required")
+        self.assertIn("OpenAlex, Crossref, arXiv, and Semantic Scholar", summary["steps"][0]["policy"])
 
     def test_release_gate_records_security_compliance_contract(self):
         summary = {"ok": True, "steps": []}

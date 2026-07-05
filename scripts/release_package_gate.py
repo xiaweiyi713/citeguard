@@ -115,6 +115,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     _record_mcp_stdio_smoke_contract_gate(summary, project_root=project_root)
     _record_cli_error_contract_gate(summary, python=args.python, project_root=project_root)
     _record_source_outage_safety_gate(summary, project_root=project_root)
+    _record_live_source_health_contract_gate(summary, project_root=project_root)
     _record_security_compliance_contract_gate(summary, project_root=project_root)
     _record_agent_skill_contract_gate(summary, project_root=project_root)
     _record_batch_workflow_examples_gate(summary, python=args.python, project_root=project_root)
@@ -1079,6 +1080,155 @@ def _check_source_outage_safety_gate(*, project_root: Path) -> Dict[str, Any]:
     }
 
 
+def _record_live_source_health_contract_gate(summary: Dict[str, Any], *, project_root: Path) -> None:
+    try:
+        details = _check_live_source_health_contract_gate(project_root=project_root)
+    except Exception as exc:
+        summary["steps"].append(
+            {
+                "name": "live_source_health_contract",
+                "status": "failed",
+                "message": str(exc),
+            }
+        )
+        summary["ok"] = False
+        return
+
+    summary["steps"].append(
+        {
+            "name": "live_source_health_contract",
+            "status": "passed",
+            **details,
+        }
+    )
+
+
+def _check_live_source_health_contract_gate(*, project_root: Path) -> Dict[str, Any]:
+    from citeguard.retrieval.scholarly_clients import InMemoryMetadataSource
+    from citeguard.runtime import SOURCE_HEALTH_SCHEMA_VERSION, canonical_source_names, source_health_status
+    from citeguard.verification import CitationRecord
+
+    docs = {
+        "README.md": _read_required_text(project_root / "README.md"),
+        "docs/cli_reference.md": _read_required_text(project_root / "docs" / "cli_reference.md"),
+        "docs/release_checklist.md": _read_required_text(project_root / "docs" / "release_checklist.md"),
+        "docs/security_compliance.md": _read_required_text(project_root / "docs" / "security_compliance.md"),
+    }
+    combined_docs = "\n".join(docs.values())
+    required_doc_phrases = {
+        "openalex": "OpenAlex",
+        "crossref": "Crossref",
+        "arxiv": "arXiv",
+        "semantic_scholar": "Semantic Scholar",
+        "source_health_summary": "sources_checked",
+        "source_health_failures": "sources_failed",
+        "api_key": "SEMANTIC_SCHOLAR_API_KEY",
+    }
+
+    errors = []
+    for name, phrase in required_doc_phrases.items():
+        if phrase not in combined_docs:
+            errors.append(f"live-source health docs missing {name}: {phrase}")
+
+    canonical = canonical_source_names(["OpenAlex", "crossref", "arxiv", "semantic-scholar", "s2"])
+    if canonical != ["openalex", "crossref", "arxiv", "semantic_scholar"]:
+        errors.append("source aliases should canonicalize and deduplicate four live source families")
+
+    healthy_record = CitationRecord(
+        citation_id="live-source-health-1",
+        title="Release Gate Live Source Health Control",
+        authors=["CiteGuard Maintainer"],
+        year=2026,
+        venue="Release Gate",
+        source="release_fixture",
+    )
+
+    def source_factory(names: List[str], **_: Any) -> object:
+        name = names[0]
+        if name == "openalex":
+            raise TimeoutError("openalex timed out during release gate source-health probe")
+        if name == "crossref":
+            return InMemoryMetadataSource([healthy_record])
+        if name == "arxiv":
+            return InMemoryMetadataSource([])
+        if name == "semantic_scholar":
+            return _ReleaseGateDiagnosticSource(
+                "semantic_scholar",
+                code="source_unavailable",
+                kind="rate_limited",
+                status_code=429,
+                url="https://api.semanticscholar.org/graph/v1/paper/search",
+                error="HTTP Error 429: Too Many Requests",
+            )
+        raise RuntimeError(f"unexpected source: {name}")
+
+    health = source_health_status(
+        env={
+            "CITEGUARD_SOURCES": "openalex,crossref,arxiv,semantic-scholar",
+            "CITEGUARD_MAILTO": "release-gate@example.com",
+            "SEMANTIC_SCHOLAR_API_KEY": "release-gate-key",
+            "CITEGUARD_HTTP_TIMEOUT": "1",
+            "CITEGUARD_HTTP_RETRIES": "0",
+        },
+        check_live=True,
+        health_query="Release Gate Live Source Health Control",
+        source_factory=source_factory,
+    )
+    summary = health.get("summary", {})
+    sources = {source.get("name"): source for source in health.get("sources", [])}
+
+    if health.get("schema_version") != SOURCE_HEALTH_SCHEMA_VERSION:
+        errors.append("live source health schema_version mismatch")
+    if health.get("mode") != "live" or health.get("live_check_performed") is not True:
+        errors.append("live source health contract should exercise live check mode")
+    if summary.get("sources_configured") != ["openalex", "crossref", "arxiv", "semantic_scholar"]:
+        errors.append("source health should report all four configured live source families")
+    if summary.get("sources_checked") != ["openalex", "crossref", "arxiv", "semantic_scholar"]:
+        errors.append("source health should check all four live source families")
+    if summary.get("sources_responded") != ["crossref", "arxiv"]:
+        errors.append("source health should distinguish responded sources from failed sources")
+    if summary.get("sources_available") != ["crossref", "arxiv"]:
+        errors.append("source health should treat empty arxiv responses as available source responses")
+    if summary.get("sources_failed") != ["openalex", "semantic_scholar"]:
+        errors.append("source health should report failed sources separately")
+    if summary.get("failure_kind_counts") != {"timeout": 1, "rate_limited": 1}:
+        errors.append("source health should summarize timeout and rate-limit failure kinds")
+    if summary.get("failure_kind_sources") != {"timeout": ["openalex"], "rate_limited": ["semantic_scholar"]}:
+        errors.append("source health should map each failure kind to its source")
+    if summary.get("next_action") != "retry_or_check_source_health":
+        errors.append("source health should route degraded live checks to retry_or_check_source_health")
+    if summary.get("all_checked_sources_failed") is not False:
+        errors.append("partial live-source outage should not set all_checked_sources_failed")
+    if sources.get("semantic_scholar", {}).get("api_key_configured") is not True:
+        errors.append("semantic_scholar source health should expose api_key_configured")
+    if sources.get("semantic_scholar", {}).get("polite_access", {}).get("status") != "not_required":
+        errors.append("semantic_scholar polite access should not require CITEGUARD_MAILTO")
+    if sources.get("openalex", {}).get("mailto_configured") is not True:
+        errors.append("openalex source health should expose configured mailto")
+    if sources.get("crossref", {}).get("mailto_configured") is not True:
+        errors.append("crossref source health should expose configured mailto")
+
+    if errors:
+        raise RuntimeError("; ".join(errors))
+
+    return {
+        "docs_checked": sorted(docs),
+        "schema_version": health.get("schema_version"),
+        "aliases_checked": ["OpenAlex", "crossref", "arxiv", "semantic-scholar", "s2"],
+        "canonical_sources": canonical,
+        "sources_checked": summary.get("sources_checked"),
+        "sources_responded": summary.get("sources_responded"),
+        "sources_failed": summary.get("sources_failed"),
+        "failure_kind_counts": summary.get("failure_kind_counts"),
+        "failure_kind_sources": summary.get("failure_kind_sources"),
+        "semantic_scholar": {
+            "api_key_configured": sources.get("semantic_scholar", {}).get("api_key_configured"),
+            "polite_access": sources.get("semantic_scholar", {}).get("polite_access", {}),
+        },
+        "policy": "release gate enforces source-level health for OpenAlex, Crossref, arXiv, and Semantic Scholar",
+    }
+
+
 class _ReleaseGateTimeoutSource:
     def __init__(self, name: str) -> None:
         self.name = name
@@ -1091,6 +1241,55 @@ class _ReleaseGateTimeoutSource:
 
     def lookup(self, candidate: Any) -> Any:
         raise TimeoutError(f"{self.name} timed out during release gate lookup")
+
+
+class _ReleaseGateHTTPDiagnostics:
+    def __init__(
+        self,
+        *,
+        code: str,
+        kind: str,
+        status_code: Optional[int],
+        url: str,
+        error: str,
+        cache_hit: bool = False,
+    ) -> None:
+        self.last_error_code = code
+        self.last_error_kind = kind
+        self.last_status_code = status_code
+        self.last_url = url
+        self.last_error = error
+        self.last_cache_hit = cache_hit
+
+
+class _ReleaseGateDiagnosticSource:
+    def __init__(
+        self,
+        name: str,
+        *,
+        code: str,
+        kind: str,
+        status_code: Optional[int],
+        url: str,
+        error: str,
+    ) -> None:
+        self.name = name
+        self.http_client = _ReleaseGateHTTPDiagnostics(
+            code=code,
+            kind=kind,
+            status_code=status_code,
+            url=url,
+            error=error,
+        )
+
+    def all_records(self) -> List[Any]:
+        return []
+
+    def search(self, query: str, top_k: int = 5) -> List[Any]:
+        return []
+
+    def lookup(self, candidate: Any) -> Any:
+        return None
 
 
 def _record_security_compliance_contract_gate(summary: Dict[str, Any], *, project_root: Path) -> None:

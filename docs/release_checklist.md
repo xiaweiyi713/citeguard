@@ -39,6 +39,10 @@ agent skill bundle.
   `support_audit_invalid_jsonl`, records `source_outage_safety` so all-source
   failures stay `not_found`, low-confidence, `outage_limited`, and routed to
   `retry_or_check_source_health` instead of fabrication overclaims, records
+  `live_source_health_contract` so OpenAlex, Crossref, arXiv, and Semantic
+  Scholar health summaries keep `sources_checked`, `sources_responded`,
+  `sources_failed`, failure-kind counts, aliases, and Semantic Scholar API-key
+  status stable for agents, records
   `security_compliance_contract` so security docs, `CITEGUARD_MAILTO` polite
   access states, fixture bypass status, blocked gated-source suffixes, and the
   disabled-by-default remote evidence policy remain machine-checkable, records

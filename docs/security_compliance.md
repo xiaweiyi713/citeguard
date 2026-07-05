@@ -36,6 +36,10 @@ integrity tribunal, or substitute for human review.
   `last_error_kind`, `last_status_code`, `last_url`, and `last_cache_hit`) so
   agents can distinguish timeout, rate-limit, HTTP, network, and cached-response
   states without parsing prose.
+- `citeguard status --check-sources` exposes source-level health for OpenAlex,
+  Crossref, arXiv, and Semantic Scholar, including `sources_checked`,
+  `sources_responded`, `sources_failed`, failure-kind counts, and Semantic
+  Scholar `SEMANTIC_SCHOLAR_API_KEY` configuration status.
 
 ## Interpretation Policy
 
