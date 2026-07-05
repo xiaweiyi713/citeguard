@@ -164,6 +164,19 @@ class RuntimeConfigTests(unittest.TestCase):
         self.assertEqual(source_health["sources"][1]["polite_access"]["status"], "not_required")
         self.assertTrue(source_health["sources"][1]["api_key_configured"])
 
+    def test_missing_cache_parent_is_ok_when_ancestor_is_writable(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = os.path.join(tmpdir, "missing", "verification_cache.sqlite")
+            status = environment_status(env={"CITEGUARD_CACHE": path})
+
+        cache_status = status["cache_status"]
+        self.assertEqual(cache_status["path"], path)
+        self.assertFalse(cache_status["exists"])
+        self.assertFalse(cache_status["parent_exists"])
+        self.assertTrue(cache_status["parent_writable"])
+        self.assertEqual(cache_status["next_action"], "continue")
+        self.assertTrue(any("will create it on first verification" in warning for warning in status["warnings"]))
+
     def test_invalid_timeout_is_reported_by_status(self):
         status = environment_status(
             env={

@@ -659,9 +659,7 @@ def environment_status(
     configured_remote_evidence = remote_evidence_enabled(active_env)
     cache_parent = "" if cache == ":memory:" else os.path.dirname(os.path.abspath(cache))
     cache_parent_exists = cache == ":memory:" or os.path.isdir(cache_parent)
-    cache_parent_writable = cache == ":memory:" or (
-        cache_parent_exists and os.access(cache_parent, os.W_OK)
-    )
+    cache_parent_writable = cache == ":memory:" or _cache_parent_writable(cache_parent)
     cache_status = _cache_status(cache, parent_exists=cache_parent_exists, parent_writable=cache_parent_writable)
 
     reranker = active_env.get("CITEGUARD_RERANKER_MODEL", "")
@@ -753,6 +751,21 @@ def _cache_status(cache: str, parent_exists: bool, parent_writable: bool) -> dic
     status["parent_exists"] = parent_exists
     status["parent_writable"] = parent_writable
     status["next_action"] = stable_next_action(
-        "continue" if parent_exists and parent_writable else "fix_configuration"
+        "continue" if parent_writable else "fix_configuration"
     )
     return status
+
+
+def _cache_parent_writable(cache_parent: str) -> bool:
+    if not cache_parent:
+        return True
+    if os.path.isdir(cache_parent):
+        return os.access(cache_parent, os.W_OK)
+
+    current = os.path.abspath(cache_parent)
+    while current and not os.path.exists(current):
+        parent = os.path.dirname(current)
+        if parent == current:
+            break
+        current = parent
+    return bool(current and os.path.isdir(current) and os.access(current, os.W_OK))

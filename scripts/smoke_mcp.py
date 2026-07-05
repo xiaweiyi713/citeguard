@@ -21,7 +21,7 @@ from _bootstrap import ensure_project_root
 
 ensure_project_root()
 
-from citeguard.verification import STABLE_NEXT_ACTIONS
+from citeguard.verification import CACHE_SCHEMA_VERSION, STABLE_NEXT_ACTIONS
 
 
 FIXTURE_RECORDS = [
@@ -308,8 +308,8 @@ def _require_status_payload(payload: dict, fixture_path: Path) -> None:
         raise RuntimeError(f"Expected structured cache_status, got: {payload!r}")
     if cache_status.get("path") != ":memory:" or cache_status.get("inspect_ok") is not True:
         raise RuntimeError(f"Expected in-memory cache_status, got: {payload!r}")
-    if cache_status.get("schema_version") != 1:
-        raise RuntimeError(f"Expected cache_status schema_version=1, got: {payload!r}")
+    if cache_status.get("schema_version") != CACHE_SCHEMA_VERSION:
+        raise RuntimeError(f"Expected cache_status schema_version={CACHE_SCHEMA_VERSION}, got: {payload!r}")
     _require_stable_next_action(cache_status, expected="continue")
 
     source_health = payload.get("source_health")
