@@ -1359,7 +1359,7 @@ def _check_security_compliance_contract_gate(*, project_root: Path) -> Dict[str,
     )
     health = source_health_status(
         env={
-            "CITEGUARD_SOURCES": "openalex,crossref,arxiv",
+            "CITEGUARD_SOURCES": "openalex,crossref,arxiv,semantic-scholar",
         },
         check_live=False,
     )
@@ -1403,6 +1403,12 @@ def _check_security_compliance_contract_gate(*, project_root: Path) -> Dict[str,
             missing.append(f"{source_name} source health should expose missing_contact_email polite access")
         if polite.get("next_action") != "fix_configuration":
             missing.append(f"{source_name} source health should expose fix_configuration next_action")
+    for source_name in ["arxiv", "semantic_scholar"]:
+        polite = sources.get(source_name, {}).get("polite_access", {})
+        if polite.get("status") != "not_required":
+            missing.append(f"{source_name} source health should expose not_required polite access")
+        if polite.get("next_action") != "continue":
+            missing.append(f"{source_name} source health should expose continue next_action")
 
     remote_policy = env_status.get("remote_evidence_policy", {})
     blocked_suffixes = list(BLOCKED_EVIDENCE_HOST_SUFFIXES)
@@ -1441,7 +1447,7 @@ def _check_security_compliance_contract_gate(*, project_root: Path) -> Dict[str,
         },
         "source_health_polite_access": {
             name: sources.get(name, {}).get("polite_access", {})
-            for name in ["openalex", "crossref", "arxiv"]
+            for name in ["openalex", "crossref", "arxiv", "semantic_scholar"]
         },
         "remote_evidence_policy": {
             "enabled": remote_policy.get("enabled"),

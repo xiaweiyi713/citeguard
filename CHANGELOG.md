@@ -106,6 +106,9 @@
   Crossref, arXiv, and Semantic Scholar aliases, checks, responded/failed
   source lists, timeout/rate-limit failure-kind summaries, and Semantic Scholar
   API-key status stay stable for agent integrations.
+- Extended the security/compliance release gate to include Semantic Scholar
+  source-health polite-access state, keeping optional API-key configuration
+  separate from OpenAlex/Crossref mailto requirements.
 - Added a default release-gate security/compliance contract so docs, polite
   `CITEGUARD_MAILTO` status, fixture bypass behavior, gated-source host blocks,
   and disabled-by-default remote evidence policy stay machine-checkable.

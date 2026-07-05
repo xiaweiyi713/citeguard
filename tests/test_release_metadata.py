@@ -389,6 +389,8 @@ License-File: LICENSE
             "_record_security_compliance_contract_gate",
             "fixture_bypasses_live_sources",
             "missing_contact_email",
+            "semantic_scholar",
+            "not_required",
             "blocked_gated_source_suffixes",
             "remote_evidence_policy",
             "agent_skill_contract",
@@ -958,6 +960,8 @@ License-File: LICENSE
         self.assertEqual(polite_access["openalex"]["status"], "missing_contact_email")
         self.assertEqual(polite_access["crossref"]["status"], "missing_contact_email")
         self.assertEqual(polite_access["arxiv"]["status"], "not_required")
+        self.assertEqual(polite_access["semantic_scholar"]["status"], "not_required")
+        self.assertEqual(polite_access["semantic_scholar"]["next_action"], "continue")
         self.assertFalse(summary["steps"][0]["remote_evidence_policy"]["default_enabled"])
         self.assertFalse(summary["steps"][0]["remote_evidence_policy"]["non_http_urls_allowed"])
         self.assertIn("no gated-source/paywall bypass", summary["steps"][0]["policy"])

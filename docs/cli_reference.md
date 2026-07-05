@@ -48,7 +48,9 @@ the current mode is `compliant`, and a stable `next_action` (`continue` or
 `fix_configuration`). Each source item also includes `polite_access.status`, so
 agents can ask the user to configure a real contact email before live
 OpenAlex/Crossref runs without treating this as citation evidence.
-When `CITEGUARD_MAILTO` is configured, it includes that contact
+Semantic Scholar source items expose `api_key_configured` for
+`SEMANTIC_SCHOLAR_API_KEY` so agents can distinguish missing credentials from a
+source outage. When `CITEGUARD_MAILTO` is configured, it includes that contact
 email.
 When optional landing-page evidence harvesting is enabled, publisher or DOI page
 timeouts are record-level evidence provenance, not source-level citation
