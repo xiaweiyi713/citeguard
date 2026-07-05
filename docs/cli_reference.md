@@ -178,9 +178,9 @@ timestamps, export timestamp, output path, and exported record count, while the
 file contains records only. Exported records include
 `metadata.cache_provenance` with the cache operation, source, query, timestamp,
 and raw match score. Use `--deterministic` with `--output` to strip timestamp-only
-record provenance while preserving source, query, and raw match score, producing
-a stable records-only replay fixture. `cache clear` deletes cached lookup/search
-rows and preserves cache metadata.
+record provenance and timestamp-only manifest fields while preserving source,
+query, and raw match score, producing a stable records-only replay fixture.
+`cache clear` deletes cached lookup/search rows and preserves cache metadata.
 
 ## support
 

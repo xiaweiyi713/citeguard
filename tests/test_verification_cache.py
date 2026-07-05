@@ -173,10 +173,15 @@ class CacheTests(unittest.TestCase):
             cached = CachingMetadataSource(self.inner, db_path=path)
             cached.search("citation hallucination", top_k=5)
             exported = export_cache_records(path, deterministic=True)
+            exported_again = export_cache_records(path, deterministic=True)
 
         metadata = exported["records"][0]["metadata"]
         provenance = metadata["cache_provenance"]
         self.assertTrue(exported["deterministic"])
+        self.assertEqual(exported, exported_again)
+        self.assertIsNone(exported["exported_at"])
+        self.assertIsNone(exported["cache_oldest_entry_timestamp"])
+        self.assertIsNone(exported["cache_newest_entry_timestamp"])
         self.assertNotIn("cache_updated_at", metadata)
         self.assertNotIn("timestamp", provenance)
         self.assertEqual(provenance["operation"], "search")

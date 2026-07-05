@@ -188,6 +188,10 @@ citeguard cache export --deterministic --output replay_fixture.json
 CITEGUARD_FIXTURE_CITATIONS=replay_fixture.json citeguard verify --title "Attention Is All You Need"
 ```
 
+`--deterministic` strips timestamp-only record provenance and timestamp-only
+manifest fields while preserving source, query, and raw match score metadata, so
+the replay fixture and export manifest can be compared across runs.
+
 When `CITEGUARD_FIXTURE_CITATIONS` is set, `citeguard_status_tool` reports
 fixture mode and live scholarly sources are bypassed.
 

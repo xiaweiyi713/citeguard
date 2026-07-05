@@ -514,6 +514,7 @@ License-File: LICENSE
             "cache export --deterministic --output",
             "deterministic records-only fixture",
             "strip timestamp-only",
+            "timestamp-only manifest fields",
             "raw match score",
         ]
         for phrase in required_phrases:

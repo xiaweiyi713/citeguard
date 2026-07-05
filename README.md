@@ -342,8 +342,9 @@ replayed offline with `CITEGUARD_FIXTURE_CITATIONS=replay_fixture.json`; stdout 
 manifest with schema version, cache entry counts, cache timestamp bounds, export
 timestamp, output path, and exported record count. Exported records include a
 `metadata.cache_provenance` block for reproducibility; `--deterministic` strips
-timestamp-only provenance from the records file while keeping source, query, and
-raw match score. Partial source outages are not cached.
+timestamp-only provenance from the records file and timestamp-only manifest
+fields while keeping source, query, and raw match score. Partial source outages
+are not cached.
 
 If `CITEGUARD_SOURCES` contains an unknown source name, the MCP server now fails
 with a clear configuration error instead of silently ignoring the typo. The

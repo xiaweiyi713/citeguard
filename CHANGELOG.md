@@ -23,6 +23,8 @@
 - Added `citeguard cache export` for deterministic offline replay fixtures.
 - Added cache export provenance for source, query, timestamp, operation, and raw
   match score.
+- Made deterministic cache exports strip timestamp-only manifest fields as well
+  as record provenance so full JSON payloads are reproducible.
 - Added source-level readiness reporting in `citeguard status` / `citeguard_status_tool`.
 - Added summary-level source health failure counts and failure details for agent
   retry/configuration decisions.

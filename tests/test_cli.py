@@ -279,6 +279,9 @@ class CLITests(unittest.TestCase):
 
         self.assertEqual(outputs[0], outputs[1])
         self.assertTrue(manifests[0]["deterministic"])
+        self.assertIsNone(manifests[0]["exported_at"])
+        self.assertIsNone(manifests[0]["cache_oldest_entry_timestamp"])
+        self.assertIsNone(manifests[0]["cache_newest_entry_timestamp"])
         metadata = outputs[0][0]["metadata"]
         self.assertNotIn("cache_updated_at", metadata)
         self.assertNotIn("timestamp", metadata["cache_provenance"])

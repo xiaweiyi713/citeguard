@@ -189,7 +189,7 @@ def export_cache_records(db_path: str, deterministic: bool = False) -> dict:
 
     if db_path == ":memory:" or not Path(db_path).exists():
         return {
-            **_empty_cache_export_info(db_path, exists=db_path == ":memory:"),
+            **_empty_cache_export_info(db_path, exists=db_path == ":memory:", deterministic=deterministic),
             "deterministic": deterministic,
             "records": [],
             "record_count": 0,
@@ -214,9 +214,9 @@ def export_cache_records(db_path: str, deterministic: bool = False) -> dict:
         "schema_version": cache_info["schema_version"],
         "cache_entry_count": cache_info["entries"],
         "cache_entry_prefixes": cache_info["entry_prefixes"],
-        "cache_oldest_entry_timestamp": cache_info["oldest_entry_timestamp"],
-        "cache_newest_entry_timestamp": cache_info["newest_entry_timestamp"],
-        "exported_at": time.time(),
+        "cache_oldest_entry_timestamp": None if deterministic else cache_info["oldest_entry_timestamp"],
+        "cache_newest_entry_timestamp": None if deterministic else cache_info["newest_entry_timestamp"],
+        "exported_at": None if deterministic else time.time(),
         "deterministic": deterministic,
         "record_count": len(records),
         "records": [_record_to_export_dict(record, deterministic=deterministic) for record in records],
@@ -398,7 +398,7 @@ def _empty_cache_info(db_path: str, exists: bool) -> dict:
     }
 
 
-def _empty_cache_export_info(db_path: str, exists: bool) -> dict:
+def _empty_cache_export_info(db_path: str, exists: bool, deterministic: bool = False) -> dict:
     return {
         "path": db_path,
         "exists": exists,
@@ -407,5 +407,5 @@ def _empty_cache_export_info(db_path: str, exists: bool) -> dict:
         "cache_entry_prefixes": {"search": 0, "lookup": 0, "other": 0},
         "cache_oldest_entry_timestamp": None,
         "cache_newest_entry_timestamp": None,
-        "exported_at": time.time(),
+        "exported_at": None if deterministic else time.time(),
     }
