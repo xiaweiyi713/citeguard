@@ -562,6 +562,7 @@ def _build_annotation_packet(
                 "case_type": case.case_type,
                 "split": case.split,
                 "lang": case.lang,
+                "review_focus": _review_focus(case),
                 "review_status": sidecar_item.get("adjudication_status", "not_human_reviewed"),
                 "source_locator": sidecar_item.get("source_locator", ""),
                 "annotation": {
@@ -592,6 +593,7 @@ def _build_annotation_packet(
             "Use only the evidence text and evidence_scope shown in this packet.",
             "Prefer conservative labels when support is uncertain.",
             "Do not infer support from citation fame, source outage, or topical similarity alone.",
+            "Use review_focus as non-gold guidance about the boundary to inspect; it is not a label hint.",
         ],
         "cases": packet_cases,
     }
@@ -638,10 +640,11 @@ def _format_annotation_instructions(packet: dict) -> str:
             "- `annotation.rationale`: short explanation citing the evidence text.",
             "- `annotation.confidence`: optional low/medium/high or numeric confidence.",
             "- `annotation.notes`: optional ambiguity, scope, or full-text notes.",
+            "- `review_focus`: non-gold guidance about the support boundary to inspect; do not treat it as a label hint.",
             "",
             "## Do Not Modify",
             "",
-            "Do not edit `case_id`, `claim`, `evidence`, `evidence_scope`, `case_type`, `split`, `priority`, or `source_locator`.",
+            "Do not edit `case_id`, `claim`, `evidence`, `evidence_scope`, `case_type`, `split`, `priority`, `review_focus`, or `source_locator`.",
             "The packet intentionally omits dataset gold labels and adjudicated labels; do not request or reconstruct them before labeling.",
             "",
             "## Return Checklist",
@@ -816,6 +819,35 @@ def _case_priority_label(case) -> str:
     if case.case_type in {"weak_support", "weak_set_boundary", "direct_support", "set_aggregation"}:
         return "medium"
     return "normal"
+
+
+def _review_focus(case) -> str:
+    focus_by_type = {
+        "contradiction": "Check whether the evidence directly conflicts with the claim.",
+        "contradiction_set": "Check whether any cited evidence conflicts with the claim and should dominate the aggregate.",
+        "hard_negative": "Check whether related evidence actually supports the stronger claim or only discusses a nearby topic.",
+        "full_text_required": "Check whether the claim requires methods, eligibility, safety, or follow-up details absent from the shown evidence.",
+        "weak_support": "Check whether topical relevance is too weak, narrow, or title-only for full support.",
+        "weak_set_boundary": "Check whether multiple weak citations remain tentative instead of becoming full support.",
+        "metadata_only": "Check whether metadata fields prove the claim or merely describe source/status context.",
+        "unrelated_negative": "Check whether the evidence is unrelated to the claim.",
+        "direct_support": "Check whether the evidence explicitly entails every important part of the claim.",
+        "set_aggregation": "Check how the citation-level verdicts combine without hiding unresolved items.",
+    }
+    scope_suffix = {
+        "title": " Treat title-only evidence as weak unless the claim is only topical.",
+        "abstract": " Do not infer methods or full-text details from the abstract.",
+        "metadata": " Do not infer claim support from metadata alone.",
+        "metadata_snippet": " Treat source snippets as evidence only for the exact fact they state.",
+        "full_text": " Use the provided lawful full-text excerpt, not unstated outside content.",
+        "mixed": " Keep each citation's scope visible when aggregating.",
+        "mixed_with_full_text": " Distinguish abstract evidence from the provided full-text excerpt.",
+        "none": " Abstain unless another shown field supplies evidence.",
+    }
+    return focus_by_type.get(case.case_type, "Check whether the evidence explicitly supports the claim.") + scope_suffix.get(
+        case.evidence_scope,
+        "",
+    )
 
 
 def _count_by(items: list, field: str) -> dict:

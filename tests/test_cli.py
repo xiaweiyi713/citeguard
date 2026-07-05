@@ -1629,6 +1629,44 @@ class CLITests(unittest.TestCase):
         self.assertEqual(payload["source_failure_mode"], "none")
         self.assertEqual(payload["next_action"], "review_counterevidence_leads")
 
+    def test_counterevidence_search_flags_source_outage_safety_leads(self):
+        source = InMemoryMetadataSource(
+            [
+                self.record,
+                CitationRecord(
+                    citation_id="source-outage-safety",
+                    title="Source Outages Are Not Fabrication Evidence",
+                    abstract=(
+                        "Source outages and not_found results lower confidence and are not evidence "
+                        "that a citation is fabricated."
+                    ),
+                    year=2026,
+                    source="memory",
+                ),
+            ]
+        )
+        stdout = io.StringIO()
+
+        code = run(
+            [
+                "counterevidence",
+                "--claim",
+                "A source outage increases confidence that a citation is fabricated.",
+                "--top-k",
+                "1",
+            ],
+            stdout=stdout,
+            source=source,
+        )
+
+        self.assertEqual(code, 0)
+        payload = json.loads(stdout.getvalue())
+        self.assertEqual(payload["candidate_count"], 1)
+        self.assertEqual(payload["candidates"][0]["signal"], "source_outage_safety_cue")
+        self.assertIn("source_outage_safety", {item["role"] for item in payload["query_plan"]})
+        self.assertIn("source_outage_safety", payload["candidates"][0]["matched_query_roles"])
+        self.assertEqual(payload["next_action"], "review_counterevidence_leads")
+
     def test_counterevidence_requires_claim_and_valid_top_k(self):
         stderr = io.StringIO()
         missing = run(["counterevidence", "--claim", ""], stderr=stderr, source=self.source)

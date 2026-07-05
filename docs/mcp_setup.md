@@ -82,7 +82,10 @@ claim is contradicted, and an empty candidate list does not prove that no
 counter-evidence exists. The response includes `query_plan`, `query_results`,
 stable `next_action`, and per-candidate `matched_query_roles` so agents can
 explain why a candidate was surfaced without treating the retrieval signal as a
-verdict. Candidate-bearing responses use
+verdict. Claims that overinterpret source outages, timeouts, or `not_found` as
+fabrication evidence add a `source_outage_safety` query role; candidates may use
+`signal=source_outage_safety_cue` when they explicitly say source failures lower
+confidence without proving fabrication. Candidate-bearing responses use
 `next_action=review_counterevidence_leads`; source-limited empty responses use
 `next_action=retry_or_check_source_health`.
 For batch workflows, `audit_claim_support_tool` and

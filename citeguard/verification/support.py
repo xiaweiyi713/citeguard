@@ -439,6 +439,32 @@ def _english_contradiction_pattern(claim: str, evidence: str) -> bool:
     return bool(fabrication_claim and fabrication_denial)
 
 
+def _source_outage_safety_pattern(claim: str, evidence: str) -> bool:
+    claim_text = normalize_text(claim)
+    evidence_text = normalize_text(evidence)
+    outage_claim = re.search(
+        r"\b(?:source|sources|outage|outages|unavailable|timeout|timeouts|not_found|not\s+found|missing)\b",
+        claim_text,
+    )
+    fabrication_claim = re.search(r"\b(?:fabricated|fake|false|hallucinated|forged)\b", claim_text)
+    confidence_claim = re.search(r"\b(?:increase|raises?|boosts?|proves?|evidence|confidence)\b", claim_text)
+    if not outage_claim or not (fabrication_claim or confidence_claim):
+        return False
+
+    outage_evidence = re.search(
+        r"\b(?:source|sources|outage|outages|unavailable|timeout|timeouts|not_found|not\s+found|missing)\b",
+        evidence_text,
+    )
+    safety_evidence = re.search(
+        r"\b(?:lower|lowers|reduced?|decrease[sd]?|inconclusive|retry|source[-\s]?health)\b.*"
+        r"\b(?:confidence|certainty|inspection|check)\b"
+        r"|\bnot\s+(?:evidence|proof)\b.*\b(?:fabricated|fake|false|hallucinated|forged)\b"
+        r"|\bmust\s+not\b.*\b(?:fabricated|fake|false|hallucinated|forged)\b",
+        evidence_text,
+    )
+    return bool(outage_evidence and safety_evidence)
+
+
 def _chinese_contradiction_pattern(claim: str, evidence: str) -> bool:
     claim_text = normalize_text(claim)
     evidence_text = normalize_text(evidence)
@@ -1183,6 +1209,23 @@ def _counterevidence_query_plan(claim: str) -> List[Dict[str, str]]:
                 "rationale": "Probe for exceptions to absolute or necessity claims.",
             }
         )
+    if re.search(
+        r"\b(source|sources|outage|outages|unavailable|timeout|timeouts|not_found|not\s+found|fabricated|fake|hallucinated)\b",
+        normalized,
+    ):
+        queries.append(
+            {
+                "query": (
+                    f"{claim} source outage unavailable timeout not found "
+                    "not evidence fabricated lower confidence inconclusive"
+                ),
+                "role": "source_outage_safety",
+                "rationale": (
+                    "Probe for evidence that source outages or not-found results lower confidence "
+                    "without proving fabrication."
+                ),
+            }
+        )
     if any(term in normalized for term in ("提升", "提高", "增加", "改善")):
         queries.append(
             {
@@ -1240,7 +1283,12 @@ def _rank_counterevidence_records(
         record_tokens = set(tokenize_text(text))
         overlap = len(claim_tokens & record_tokens)
         relatedness = overlap / max(len(claim_tokens), 1)
-        explicit_cue = _english_contradiction_pattern(claim, text) or _chinese_contradiction_pattern(claim, text)
+        source_outage_safety_cue = _source_outage_safety_pattern(claim, text)
+        explicit_cue = (
+            source_outage_safety_cue
+            or _english_contradiction_pattern(claim, text)
+            or _chinese_contradiction_pattern(claim, text)
+        )
         cue_score = 1.0 if explicit_cue else 0.0
         source_score = float(record.metadata.get("source_score", 0.0))
         score = min(1.0, 0.55 * relatedness + 0.35 * cue_score + 0.10 * source_score)
@@ -1260,7 +1308,13 @@ def _rank_counterevidence_records(
                     "url": record.url,
                     "source": record.source,
                     "score": round(score, 4),
-                    "signal": "explicit_contradiction_cue" if explicit_cue else "related_candidate",
+                    "signal": (
+                        "source_outage_safety_cue"
+                        if source_outage_safety_cue
+                        else "explicit_contradiction_cue"
+                        if explicit_cue
+                        else "related_candidate"
+                    ),
                     "matched_queries": list(query_match.get("queries", [])),
                     "matched_query_roles": list(query_match.get("roles", [])),
                     "match_rationales": list(query_match.get("rationales", [])),

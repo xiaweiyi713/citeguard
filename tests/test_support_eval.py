@@ -74,7 +74,7 @@ class SupportEvalTests(unittest.TestCase):
     def test_load_support_eval_reads_seed_file(self):
         cases = load_support_eval(os.path.join("data", "eval", "support_eval.json"))
         set_cases = load_support_set_eval(os.path.join("data", "eval", "support_eval.json"))
-        self.assertGreaterEqual(len(cases), 30)
+        self.assertGreaterEqual(len(cases), 33)
         self.assertGreaterEqual(len(set_cases), 4)
         self.assertIn(cases[0].gold, {"supported", "weakly_supported", "insufficient_evidence", "contradicted"})
         self.assertEqual(cases[0].evidence_scope, "abstract")
@@ -87,6 +87,19 @@ class SupportEvalTests(unittest.TestCase):
         self.assertIn("s28", case_ids)
         self.assertIn("s29", case_ids)
         self.assertIn("s30", case_ids)
+        self.assertIn("s31", case_ids)
+        self.assertIn("s32", case_ids)
+        self.assertIn("s33", case_ids)
+        seeded_cases = {case.case_id: case for case in cases}
+        self.assertEqual(seeded_cases["s31"].case_type, "hard_negative")
+        self.assertEqual(seeded_cases["s31"].gold, "insufficient_evidence")
+        self.assertIn("human-reviewed benchmark", seeded_cases["s31"].claim)
+        self.assertEqual(seeded_cases["s32"].case_type, "contradiction")
+        self.assertEqual(seeded_cases["s32"].gold, "contradicted")
+        self.assertIn("source outage", seeded_cases["s32"].claim)
+        self.assertEqual(seeded_cases["s33"].case_type, "full_text_required")
+        self.assertEqual(seeded_cases["s33"].gold, "insufficient_evidence")
+        self.assertIn("eligibility criterion", seeded_cases["s33"].claim)
         self.assertTrue(any(case.case_type == "hard_negative" for case in cases))
         self.assertTrue(any(case.case_type == "contradiction" for case in cases))
         self.assertTrue(any(case.case_type == "weak_support" for case in cases))
@@ -95,7 +108,7 @@ class SupportEvalTests(unittest.TestCase):
         self.assertTrue(any(case.evidence_scope == "metadata_snippet" for case in cases))
         self.assertTrue(any(case.evidence_scope == "full_text" for case in cases))
         self.assertEqual({case.split for case in cases}, {"train", "dev", "test"})
-        self.assertEqual(Counter(case.split for case in cases), {"train": 10, "dev": 10, "test": 10})
+        self.assertEqual(Counter(case.split for case in cases), {"train": 11, "dev": 11, "test": 11})
         self.assertTrue(any(case.case_type == "weak_set_boundary" for case in set_cases))
         self.assertTrue(any(case.case_type == "contradiction_set" for case in set_cases))
 
@@ -556,6 +569,9 @@ class SupportEvalTests(unittest.TestCase):
         self.assertTrue(all(item["annotation"]["annotator_label"] == "" for item in payload["cases"]))
         self.assertIn("claim", payload["cases"][0])
         self.assertIn("evidence", payload["cases"][0])
+        self.assertIn("review_focus", payload["cases"][0])
+        self.assertIn("Check whether", payload["cases"][0]["review_focus"])
+        self.assertIn("review_focus", payload["instructions"][-1])
         self.assertNotIn('"gold"', raw)
         self.assertNotIn("adjudicated_label", raw)
         self.assertNotIn("label_notes", raw)
@@ -596,6 +612,8 @@ class SupportEvalTests(unittest.TestCase):
         self.assertIn("Use exactly one of", instructions)
         self.assertIn("When unsure, choose the more conservative label", instructions)
         self.assertIn("annotation.annotator_id", instructions)
+        self.assertIn("review_focus", instructions)
+        self.assertIn("label hint", instructions)
         self.assertIn("Do not edit `case_id`", instructions)
         self.assertNotIn("adjudicated_label", instructions)
         self.assertNotIn('"gold"', instructions)
@@ -625,6 +643,7 @@ class SupportEvalTests(unittest.TestCase):
 
         self.assertEqual({row["case_id"] for row in rows}, {"s04", "s10"})
         self.assertTrue(all(row["annotation"]["rationale"] == "" for row in rows))
+        self.assertTrue(all(row["review_focus"] for row in rows))
         self.assertTrue(all("gold" not in row for row in rows))
         self.assertTrue(all("adjudicated_label" not in row for row in rows))
 
@@ -1240,7 +1259,7 @@ class SupportEvalTests(unittest.TestCase):
         with open(os.path.join("data", "eval", "support_eval.json"), encoding="utf-8") as handle:
             summary = validate_support_eval_dataset(json.load(handle))
 
-        self.assertEqual(summary["test_split"]["case_types"]["hard_negative"], 1)
+        self.assertEqual(summary["test_split"]["case_types"]["hard_negative"], 2)
         self.assertEqual(summary["test_split"]["case_types"]["contradiction"], 3)
         self.assertEqual(summary["test_split"]["case_types"]["full_text_required"], 2)
         self.assertEqual(summary["test_split"]["case_types"]["weak_support"], 1)

@@ -502,6 +502,33 @@ class MCPServerHelperTests(unittest.TestCase):
         self.assertIn("improvement_negation", report["candidates"][0]["matched_query_roles"])
         self.assertIn("review leads", report["interpretation"])
 
+    def test_search_counterevidence_tool_returns_source_outage_safety_candidates(self):
+        source = InMemoryMetadataSource(
+            [
+                CitationRecord(
+                    citation_id="paper-1",
+                    title="Source Outages Are Not Fabrication Evidence",
+                    abstract=(
+                        "Source outages and not_found results lower confidence and are not evidence "
+                        "that a citation is fabricated."
+                    ),
+                    year=2026,
+                    source="memory",
+                ),
+            ]
+        )
+        with mock.patch.object(self.server, "_source", return_value=source):
+            report = self.server.search_counterevidence_tool(
+                "A source outage increases confidence that a citation is fabricated.",
+                top_k=1,
+            )
+
+        self.assertEqual(report["candidate_count"], 1)
+        self.assertEqual(report["candidates"][0]["signal"], "source_outage_safety_cue")
+        self.assertIn("source_outage_safety", {item["role"] for item in report["query_plan"]})
+        self.assertIn("source_outage_safety", report["candidates"][0]["matched_query_roles"])
+        self.assertIn("review leads", report["interpretation"])
+
     def test_mcp_tools_return_structured_errors_for_expected_input_errors(self):
         missing_verify = self.server.verify_citation_tool()
         self.assertFalse(missing_verify["ok"])

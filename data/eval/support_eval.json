@@ -359,6 +359,42 @@
       "case_type": "full_text_required",
       "split": "test",
       "label_notes": "Adverse-event and long-term follow-up claims require full text or protocol evidence absent from the abstract."
+    },
+    {
+      "id": "s31",
+      "claim": "The seed evaluation proves CiteGuard has an independently human-reviewed benchmark.",
+      "evidence": "The support evaluation is a maintainer-authored synthetic seed set; independent annotation and adjudication are planned before benchmark claims.",
+      "gold": "insufficient_evidence",
+      "lang": "en",
+      "evidence_scope": "abstract",
+      "label_source": "maintainer_synthetic",
+      "case_type": "hard_negative",
+      "split": "test",
+      "label_notes": "Related benchmark provenance evidence, but it explicitly does not support a human-reviewed benchmark claim."
+    },
+    {
+      "id": "s32",
+      "claim": "A source outage should increase confidence that a citation is fabricated.",
+      "evidence": "Source outages reduce confidence and require retry or source-health inspection; they are not evidence that a citation is fabricated.",
+      "gold": "contradicted",
+      "lang": "en",
+      "evidence_scope": "metadata_snippet",
+      "label_source": "maintainer_synthetic",
+      "case_type": "contradiction",
+      "split": "dev",
+      "label_notes": "Explicitly contradicts converting source-health failures into fabrication confidence."
+    },
+    {
+      "id": "s33",
+      "claim": "The abstract fully reports every eligibility criterion used to exclude prior treatment.",
+      "evidence": "The abstract summarizes outcomes and states that detailed eligibility criteria are described in the full methods section.",
+      "gold": "insufficient_evidence",
+      "lang": "en",
+      "evidence_scope": "abstract",
+      "label_source": "maintainer_synthetic",
+      "case_type": "full_text_required",
+      "split": "train",
+      "label_notes": "Eligibility-criteria details require full text; the abstract only points to methods."
     }
   ],
   "set_cases": [

@@ -387,6 +387,35 @@ class CheckClaimSupportTests(unittest.TestCase):
         self.assertEqual(payload["sources_available"], ["metadata_source"])
         self.assertEqual(payload["next_action"], "review_counterevidence_leads")
 
+    def test_search_counterevidence_candidates_flags_source_outage_safety_leads(self):
+        safety_record = CitationRecord(
+            citation_id="source-outage-safety",
+            title="Source Outages Are Not Fabrication Evidence",
+            abstract=(
+                "Source outages and not_found results lower confidence and are not evidence "
+                "that a citation is fabricated."
+            ),
+            authors=["A. Auditor"],
+            year=2026,
+            source="memory",
+        )
+        source = InMemoryMetadataSource([self.paper, safety_record])
+
+        report = search_counterevidence_candidates(
+            "A source outage increases confidence that a citation is fabricated.",
+            source,
+            top_k=1,
+        )
+        payload = report.to_dict()
+
+        self.assertEqual(payload["candidate_count"], 1)
+        self.assertEqual(payload["candidates"][0]["title"], "Source Outages Are Not Fabrication Evidence")
+        self.assertEqual(payload["candidates"][0]["signal"], "source_outage_safety_cue")
+        self.assertIn("source_outage_safety", {item["role"] for item in payload["query_plan"]})
+        self.assertIn("source_outage_safety", payload["candidates"][0]["matched_query_roles"])
+        self.assertIn("not_found results lower confidence", payload["candidates"][0]["abstract_snippet"])
+        self.assertEqual(payload["next_action"], "review_counterevidence_leads")
+
     def test_search_counterevidence_candidates_reports_source_outage(self):
         report = search_counterevidence_candidates("Method M improves task T.", _FailingMetadataSource())
         payload = report.to_dict()

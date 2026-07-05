@@ -528,6 +528,9 @@ License-File: LICENSE
         self.assertIn("review_counterevidence_leads", smoke)
         self.assertIn("explicit_contradiction_cue", smoke)
         self.assertIn("improvement_negation", smoke)
+        self.assertIn("source_outage_safety", smoke)
+        self.assertIn("source_outage_safety_cue", smoke)
+        self.assertIn("source-outage safety counter-evidence leads", smoke)
         self.assertIn("input_mode", smoke)
         self.assertIn("citation_set", smoke)
         self.assertIn("installed `citeguard-mcp`", setup_doc)
@@ -568,6 +571,13 @@ License-File: LICENSE
         self.assertIn("CITEGUARD_MAILTO", setup_doc)
         self.assertIn("fix_configuration", setup_doc)
         self.assertIn("not evidence that a citation is", setup_doc)
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        cli_reference = (ROOT / "docs" / "cli_reference.md").read_text(encoding="utf-8")
+        support = (ROOT / "citeguard" / "verification" / "support.py").read_text(encoding="utf-8")
+        combined_counterevidence_contract = f"{readme}\n{setup_doc}\n{cli_reference}\n{support}"
+        self.assertIn("source_outage_safety", combined_counterevidence_contract)
+        self.assertIn("source_outage_safety_cue", combined_counterevidence_contract)
+        self.assertIn("not_found", combined_counterevidence_contract)
 
     def test_cli_reference_documents_status_schema_contract(self):
         cli_reference = (ROOT / "docs" / "cli_reference.md").read_text(encoding="utf-8")
@@ -747,6 +757,31 @@ License-File: LICENSE
             with self.subTest(phrase=phrase):
                 self.assertIn(phrase, combined)
 
+    def test_support_seed_documents_new_high_risk_boundaries(self):
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+        benchmark_todo = (ROOT / "docs" / "benchmark_todo.md").read_text(encoding="utf-8")
+        support_eval = (ROOT / "data" / "eval" / "support_eval.json").read_text(encoding="utf-8")
+        sidecar = (ROOT / "data" / "eval" / "support_eval_label_sidecar.json").read_text(encoding="utf-8")
+        combined = f"{readme}\n{changelog}\n{benchmark_todo}\n{support_eval}\n{sidecar}"
+
+        required_phrases = [
+            "33 evidence-level cases",
+            "benchmark provenance",
+            "source-outage-to-fabrication inferences",
+            "source outage",
+            "eligibility criteria",
+            '"id": "s31"',
+            '"id": "s32"',
+            '"id": "s33"',
+            '"case_id": "s31"',
+            '"case_id": "s32"',
+            '"case_id": "s33"',
+        ]
+        for phrase in required_phrases:
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, combined)
+
     def test_release_checklist_includes_support_label_audit(self):
         checklist = (ROOT / "docs" / "release_checklist.md").read_text(encoding="utf-8")
         benchmark_design = (ROOT / "docs" / "benchmark_design.md").read_text(encoding="utf-8")
@@ -764,6 +799,9 @@ License-File: LICENSE
         self.assertIn("--apply-adjudications", checklist)
         self.assertIn("adjudication_report.conflicts", checklist)
         self.assertIn("annotation.annotator_id", checklist)
+        self.assertIn("review_focus", combined)
+        self.assertIn("label hint", guidelines)
+        self.assertIn("不能当作 label", benchmark_design)
         self.assertIn("duplicate_annotator", checklist)
         self.assertIn("adjudicated_label", checklist)
         self.assertIn("human-reviewed benchmark", checklist)
@@ -834,6 +872,7 @@ License-File: LICENSE
             "top risk indexes",
             "next_action",
             "review_counterevidence_leads",
+            "signal=source_outage_safety_cue",
             "error.next_action",
             "error.recovery",
             "error.details.expected",

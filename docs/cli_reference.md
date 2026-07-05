@@ -257,7 +257,11 @@ ranked candidate records, source health diagnostics, stable `next_action`, and
 an `interpretation` reminder. Candidate rows include `matched_queries`,
 `matched_query_roles`, and `match_rationales` so reviewers can see whether a
 lead came from the original claim query, an improvement-negation probe, a
-support-negation probe, or an absolute-claim exception probe.
+support-negation probe, an absolute-claim exception probe, or a
+`source_outage_safety` probe for claims that overinterpret source outages,
+timeouts, or `not_found` as fabrication evidence. Candidate `signal` can also
+be `source_outage_safety_cue` when the lead explicitly says source failures
+lower confidence without proving fabrication.
 
 Candidates are review leads only: they are not proof of contradiction, and an
 empty result is not proof that no counter-evidence exists. Run support checks on

@@ -194,10 +194,13 @@ python3 scripts/prepare_support_label_sidecar.py \
 ```
 
 The annotation packet includes claim/evidence context, evidence scope, case
-type, split, priority, source locator, and blank annotation fields. It omits
-`gold`, `adjudicated_label`, `annotator_labels`, and `label_notes` so reviewers
-can label independently before adjudication. Use `--packet-format jsonl` when
-you want one case per line for spreadsheets or lightweight annotation tools.
+type, split, priority, source locator, a non-gold `review_focus` boundary hint,
+and blank annotation fields. It omits `gold`, `adjudicated_label`,
+`annotator_labels`, and `label_notes` so reviewers can label independently
+before adjudication. `review_focus` tells reviewers what support boundary to
+inspect, for example full-text gaps or topical overclaims, but it is not a
+label hint. Use `--packet-format jsonl` when you want one case per line for
+spreadsheets or lightweight annotation tools.
 Use `--instructions-output` to write a reviewer-facing Markdown instruction
 sheet with the allowed labels, conservative labeling rule, required annotation
 fields, and fields that must not be modified.

@@ -59,6 +59,20 @@ FIXTURE_RECORDS = [
         "source": "fixture",
         "abstract": "We show method M does not improve task T accuracy.",
     },
+    {
+        "citation_id": "fixture-source-outage-safety",
+        "title": "Source Outages Are Not Fabrication Evidence",
+        "authors": ["A. Auditor"],
+        "year": 2026,
+        "venue": "CiteGuard Fixtures",
+        "doi": "",
+        "arxiv_id": "",
+        "source": "fixture",
+        "abstract": (
+            "Source outages and not_found results lower confidence and are not evidence "
+            "that a citation is fabricated."
+        ),
+    },
 ]
 
 
@@ -251,6 +265,17 @@ async def _run_smoke(command: str, server_args: List[str], require_sdk: bool = F
                 )
                 _require_counterevidence_payload(counterevidence)
 
+                source_outage_counterevidence = _coerce_tool_payload(
+                    await session.call_tool(
+                        "search_counterevidence_tool",
+                        {
+                            "claim": "A source outage increases confidence that a citation is fabricated.",
+                            "top_k": 1,
+                        },
+                    )
+                )
+                _require_source_outage_counterevidence_payload(source_outage_counterevidence)
+
                 missing_input = _coerce_tool_payload(
                     await session.call_tool("verify_citation_tool", {})
                 )
@@ -318,6 +343,7 @@ async def _run_smoke(command: str, server_args: List[str], require_sdk: bool = F
         "OK: MCP stdio smoke passed "
         "(initialize, list_tools, status, offline verify, offline audit, offline support, "
         "offline support-audit citation set, offline counter-evidence leads, "
+        "source-outage safety counter-evidence leads, "
         "high-risk-only batch filtering, source-health next_action, structured errors, "
         "batch shape error details)."
     )
@@ -636,6 +662,30 @@ def _require_counterevidence_payload(payload: dict) -> None:
         raise RuntimeError(f"Expected conservative review-leads interpretation, got: {payload!r}")
     if payload.get("source_failure_mode") != "none":
         raise RuntimeError(f"Expected no source failure in offline counter-evidence smoke, got: {payload!r}")
+    _require_stable_next_action(payload, expected="review_counterevidence_leads")
+
+
+def _require_source_outage_counterevidence_payload(payload: dict) -> None:
+    expected_claim = "A source outage increases confidence that a citation is fabricated."
+    if payload.get("claim") != expected_claim:
+        raise RuntimeError(f"Unexpected source-outage counter-evidence claim, got: {payload!r}")
+    if payload.get("candidate_count") != 1:
+        raise RuntimeError(f"Expected one source-outage safety candidate, got: {payload!r}")
+    candidates = payload.get("candidates")
+    if not isinstance(candidates, list) or len(candidates) != 1:
+        raise RuntimeError(f"Expected one source-outage safety candidate row, got: {payload!r}")
+    candidate = candidates[0]
+    if candidate.get("signal") != "source_outage_safety_cue":
+        raise RuntimeError(f"Expected source_outage_safety_cue lead, got: {payload!r}")
+    if "source_outage_safety" not in set(candidate.get("matched_query_roles", [])):
+        raise RuntimeError(f"Expected source_outage_safety query role, got: {payload!r}")
+    query_plan = payload.get("query_plan")
+    if not isinstance(query_plan, list) or "source_outage_safety" not in {item.get("role") for item in query_plan}:
+        raise RuntimeError(f"Expected source_outage_safety in query_plan, got: {payload!r}")
+    if "review leads" not in str(payload.get("interpretation", "")):
+        raise RuntimeError(f"Expected conservative review-leads interpretation, got: {payload!r}")
+    if payload.get("source_failure_mode") != "none":
+        raise RuntimeError(f"Expected no source failure in offline source-outage safety smoke, got: {payload!r}")
     _require_stable_next_action(payload, expected="review_counterevidence_leads")
 
 

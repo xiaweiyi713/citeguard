@@ -334,6 +334,39 @@
       "notes": "Synthetic full-text-required case: adverse-event and long-term follow-up claims are absent from the abstract."
     },
     {
+      "case_id": "s31",
+      "adjudication_status": "not_human_reviewed",
+      "annotator_count": 0,
+      "annotator_labels": [],
+      "adjudicated_label": "insufficient_evidence",
+      "disagreement": "not_applicable",
+      "adjudicator": "",
+      "source_locator": "",
+      "notes": "Synthetic hard negative: seed benchmark provenance does not support independently human-reviewed benchmark claims."
+    },
+    {
+      "case_id": "s32",
+      "adjudication_status": "not_human_reviewed",
+      "annotator_count": 0,
+      "annotator_labels": [],
+      "adjudicated_label": "contradicted",
+      "disagreement": "not_applicable",
+      "adjudicator": "",
+      "source_locator": "",
+      "notes": "Synthetic contradiction: source outages lower confidence and must not increase fabrication confidence."
+    },
+    {
+      "case_id": "s33",
+      "adjudication_status": "not_human_reviewed",
+      "annotator_count": 0,
+      "annotator_labels": [],
+      "adjudicated_label": "insufficient_evidence",
+      "disagreement": "not_applicable",
+      "adjudicator": "",
+      "source_locator": "",
+      "notes": "Synthetic full-text-required case: eligibility criteria are absent from the abstract."
+    },
+    {
       "case_id": "ss01",
       "adjudication_status": "not_human_reviewed",
       "annotator_count": 0,

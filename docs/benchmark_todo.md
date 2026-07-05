@@ -11,7 +11,9 @@ benchmark claims.
   scopes, and a dataset-level label policy.
 - The seed set covers direct support, weak support, unrelated negatives, hard
   negatives, full-text-required cases, explicit contradictions, and citation-set
-  aggregation boundaries.
+  aggregation boundaries. Current high-risk seed cases include benchmark
+  provenance overclaims, source-outage-to-fabrication inferences, and
+  abstract-only claims that require full-text methods evidence.
 - Dataset validation requires high-risk support boundaries in the `test` split:
   weak support, hard negatives, contradictions, full-text-required cases, and
   every gold label must be present before final-report metrics are trusted.

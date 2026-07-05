@@ -230,11 +230,14 @@ python3 scripts/prepare_support_label_sidecar.py \
 ```
 
 `--annotation-packet` 输出 claim、evidence、evidence_scope、case_type、split、
-priority、source locator 和空白 annotation 字段,但不会输出 `gold`、
-`adjudicated_label`、`annotator_labels` 或 `label_notes`。需要一行一个样本时可加
-`--packet-format jsonl`。`--instructions-output` 会同时生成给独立标注员使用的
-Markdown instruction sheet,说明允许标签、保守标注规则和不可修改字段,但不暴露隐藏
-gold/adjudication 字段。标注员必须填写 `annotation.annotator_id`;缺失
+priority、source locator、非 gold 的 `review_focus` 边界提示和空白
+annotation 字段,但不会输出 `gold`、`adjudicated_label`、`annotator_labels`
+或 `label_notes`。`review_focus` 只提示标注员检查哪类 support 边界,例如
+full-text 缺口、主题相关但过度宣称、或 source outage 推断,不能当作 label
+hint。需要一行一个样本时可加 `--packet-format jsonl`。`--instructions-output`
+会同时生成给独立标注员使用的 Markdown instruction sheet,说明允许标签、保守标注
+规则和不可修改字段,但不暴露隐藏 gold/adjudication 字段。标注员必须填写
+`annotation.annotator_id`;缺失
 annotator id 的行会进入 `merge_report.skipped`,同一个 case 里重复的
 annotator id 会作为 `duplicate_annotator` conflict 报告,不能算作双人标注。
 标注员返回填好的 packet 后,用保守 merge 回填 sidecar:
