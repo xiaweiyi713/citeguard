@@ -434,7 +434,7 @@ python3 scripts/smoke_published_package.py --version 0.1.0  # dry-run post-publi
 
 The unit suite, verification eval, support fixture eval, and support dataset
 validation are network-free and run in CI. Eval datasets live in [`data/eval/`](data/eval/).
-The claim-support seed eval includes 40 evidence-level cases plus citation-set
+The claim-support seed eval includes 44 evidence-level cases plus 6 citation-set
 policy cases. It reports accuracy, supported precision/recall/F1,
 per-label precision/recall/F1, abstention rate, false-support rate, contradiction recall,
 optional breakdowns by `case_type`, `evidence_scope`, language, and split, a confusion matrix,
@@ -446,6 +446,7 @@ recommended action, plus
 `false_support_analysis`, which summarizes total support overcalls, high-risk
 false-support case ids, and breakdowns by case type, evidence scope, language,
 and split for release triage.
+The latest seed expansion covers multi-paper weak-evidence over-synthesis, model-availability-as-support overclaims, supplemental-material full-text boundaries, Semantic Scholar rate-limit non-existence overclaims, a Chinese citation-set weak aggregation boundary, and a source-limited citation-set fabrication boundary.
 `--quality-gate` turns the report into a conservative
 release gate: by default, any false support, weak false support, or missed
 contradiction fails the command with a machine-readable `quality_gate` block.
@@ -457,7 +458,9 @@ the compact payload includes `false_support_analysis.risk_slices` and
 `false_support_analysis.top_risk_slice` for supported-overcall priorities.
 Reports also include `support_set_policy`, a deterministic fixture that checks
 claim-level aggregation boundaries such as multiple weak citations remaining
-tentative and contradictions dominating the aggregate.
+tentative and contradictions dominating the aggregate. Release gates also check
+support-set policy case ids, case-type/language coverage, and artifact manifest
+summary fields so those aggregation boundaries cannot disappear silently.
 The seed support data is split into `train`, `dev`, and
 `test` so calibration and final reporting can be separated. It is a regression
 fixture, not a final human-reviewed benchmark. The default support eval backend

@@ -12,8 +12,12 @@ benchmark claims.
 - The seed set covers direct support, weak support, unrelated negatives, hard
   negatives, full-text-required cases, explicit contradictions, and citation-set
   aggregation boundaries. Current high-risk seed cases include benchmark
-  provenance overclaims, source-outage-to-fabrication inferences, and
-  abstract-only claims that require full-text methods evidence.
+  provenance overclaims, source-outage-to-fabrication inferences, multi-paper
+  weak-evidence over-synthesis, model-availability-as-support overclaims,
+  supplemental-material full-text boundaries, Semantic Scholar rate-limit
+  non-existence overclaims, a Chinese citation-set weak aggregation boundary, a
+  source-limited citation-set fabrication boundary, and abstract-only claims
+  that require full-text methods evidence.
 - Dataset validation requires high-risk support boundaries in the `test` split:
   weak support, hard negatives, contradictions, full-text-required cases, and
   every gold label must be present before final-report metrics are trusted.

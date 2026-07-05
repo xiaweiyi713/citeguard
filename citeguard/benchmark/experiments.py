@@ -81,6 +81,7 @@ def _result_summary(result: Dict[str, Any]) -> Dict[str, Any]:
     if "quality_gate" in result and isinstance(result["quality_gate"], dict):
         summary["quality_gate_ok"] = bool(result["quality_gate"].get("ok"))
     _add_false_support_triage_summary(summary, result)
+    _add_support_set_policy_summary(summary, result)
     return summary
 
 
@@ -127,3 +128,30 @@ def _add_false_support_triage_summary(summary: Dict[str, Any], result: Dict[str,
             summary.setdefault("false_support_top_overcall_backend", None)
             summary.setdefault("false_support_top_risk_slice_id", None)
             summary.setdefault("false_support_top_risk_slice_case_ids", [])
+
+
+def _add_support_set_policy_summary(summary: Dict[str, Any], result: Dict[str, Any]) -> None:
+    support_set_policy = result.get("support_set_policy")
+    if not isinstance(support_set_policy, dict):
+        return
+    dataset = support_set_policy.get("dataset")
+    overall = support_set_policy.get("overall")
+    cases = support_set_policy.get("cases")
+    if not isinstance(dataset, dict):
+        dataset = {}
+    if not isinstance(overall, dict):
+        overall = {}
+    if not isinstance(cases, list):
+        cases = []
+
+    case_types = dataset.get("case_types", {})
+    languages = dataset.get("languages", {})
+    splits = dataset.get("splits", {})
+    summary["support_set_policy_case_count"] = int(dataset.get("n", 0) or 0)
+    summary["support_set_policy_case_types"] = dict(case_types) if isinstance(case_types, dict) else {}
+    summary["support_set_policy_languages"] = dict(languages) if isinstance(languages, dict) else {}
+    summary["support_set_policy_splits"] = dict(splits) if isinstance(splits, dict) else {}
+    summary["support_set_policy_accuracy"] = overall.get("accuracy")
+    summary["support_set_policy_case_ids"] = [
+        case.get("case_id") for case in cases if isinstance(case, dict) and case.get("case_id")
+    ]

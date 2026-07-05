@@ -781,8 +781,8 @@ License-File: LICENSE
         self.assertEqual(summary["steps"][0]["status"], "passed")
         self.assertEqual(summary["steps"][0]["dataset"], "data/eval/support_eval.json")
         self.assertEqual(summary["steps"][0]["label_sidecar"], "data/eval/support_eval_label_sidecar.json")
-        self.assertEqual(summary["steps"][0]["case_count"], 44)
-        self.assertEqual(summary["steps"][0]["sidecar_case_count"], 44)
+        self.assertEqual(summary["steps"][0]["case_count"], 50)
+        self.assertEqual(summary["steps"][0]["sidecar_case_count"], 50)
         self.assertEqual(summary["steps"][0]["human_reviewed"], 0)
         self.assertEqual(summary["steps"][0]["dual_annotated"], 0)
         self.assertEqual(summary["steps"][0]["published_benchmark"], 0)
@@ -1050,6 +1050,15 @@ License-File: LICENSE
                             "false_support_risk_slice_count": 0,
                             "false_support_top_risk_slice_id": None,
                             "false_support_top_risk_slice_case_ids": [],
+                            "support_set_policy_case_count": 3,
+                            "support_set_policy_case_types": {
+                                "contradiction_set": 1,
+                                "weak_set_boundary": 2,
+                            },
+                            "support_set_policy_languages": {"en": 2, "zh": 1},
+                            "support_set_policy_splits": {"test": 3},
+                            "support_set_policy_accuracy": 1.0,
+                            "support_set_policy_case_ids": ["ss02", "ss03", "ss05"],
                         }
                     }
                 ),
@@ -1072,7 +1081,19 @@ License-File: LICENSE
                             "critical_review_case_ids": [],
                             "failures": [],
                         },
-                        "support_set_policy": {"accuracy": 1.0},
+                        "support_set_policy": {
+                            "accuracy": 1.0,
+                            "contradiction_recall": 1.0,
+                            "false_support_rate": 0.0,
+                            "case_count": 3,
+                            "case_types": {
+                                "contradiction_set": 1,
+                                "weak_set_boundary": 2,
+                            },
+                            "languages": {"en": 2, "zh": 1},
+                            "splits": {"test": 3},
+                            "case_ids": ["ss02", "ss03", "ss05"],
+                        },
                         "experiment_artifact": {
                             "files": {
                                 "manifest": str(manifest_path),
@@ -1117,8 +1138,11 @@ License-File: LICENSE
         self.assertTrue(summary["steps"][0]["false_support_triage_present"])
         self.assertEqual(summary["steps"][0]["false_support_analysis"]["risk_slices"], [])
         self.assertTrue(summary["steps"][0]["manifest_false_support_triage_present"])
+        self.assertTrue(summary["steps"][0]["support_set_policy_present"])
+        self.assertEqual(summary["steps"][0]["support_set_policy"]["case_ids"], ["ss02", "ss03", "ss05"])
         self.assertEqual(summary["steps"][0]["manifest_errors"], [])
         self.assertEqual(summary["steps"][0]["manifest_result_summary"]["false_support_risk_slice_count"], 0)
+        self.assertEqual(summary["steps"][0]["manifest_result_summary"]["support_set_policy_case_count"], 3)
 
     def test_release_gate_fails_on_support_review_manifest_mismatch(self):
         summary = {"ok": True, "steps": []}
@@ -1132,6 +1156,15 @@ License-File: LICENSE
                             "false_support_risk_slice_count": 0,
                             "false_support_top_risk_slice_id": None,
                             "false_support_top_risk_slice_case_ids": [],
+                            "support_set_policy_case_count": 3,
+                            "support_set_policy_case_types": {
+                                "contradiction_set": 1,
+                                "weak_set_boundary": 2,
+                            },
+                            "support_set_policy_languages": {"en": 2, "zh": 1},
+                            "support_set_policy_splits": {"test": 3},
+                            "support_set_policy_accuracy": 1.0,
+                            "support_set_policy_case_ids": ["ss02", "ss03", "ss05"],
                         }
                     }
                 ),
@@ -1149,6 +1182,14 @@ License-File: LICENSE
                             "top_risk_slice": None,
                         },
                         "quality_gate": {"ok": True, "review_queue_case_ids": [], "critical_review_case_ids": []},
+                        "support_set_policy": {
+                            "accuracy": 1.0,
+                            "case_count": 3,
+                            "case_types": {"contradiction_set": 1, "weak_set_boundary": 2},
+                            "languages": {"en": 2, "zh": 1},
+                            "splits": {"test": 3},
+                            "case_ids": ["ss02", "ss03", "ss05"],
+                        },
                         "experiment_artifact": {"files": {"manifest": str(manifest_path)}},
                     }
                 )
@@ -1165,6 +1206,69 @@ License-File: LICENSE
         self.assertEqual(summary["steps"][0]["name"], "support_review_queue")
         self.assertEqual(summary["steps"][0]["status"], "failed")
         self.assertIn("manifest_total_overcall_count_mismatch", summary["steps"][0]["manifest_errors"])
+
+    def test_release_gate_fails_on_missing_support_set_policy_contract(self):
+        summary = {"ok": True, "steps": []}
+        with tempfile.TemporaryDirectory() as tmpdir:
+            manifest_path = Path(tmpdir) / "manifest.json"
+            manifest_path.write_text(
+                json.dumps(
+                    {
+                        "result_summary": {
+                            "false_support_total_overcall_count": 0,
+                            "false_support_risk_slice_count": 0,
+                            "false_support_top_risk_slice_id": None,
+                            "false_support_top_risk_slice_case_ids": [],
+                            "support_set_policy_case_count": 2,
+                            "support_set_policy_case_types": {"weak_set_boundary": 1},
+                            "support_set_policy_languages": {"en": 2},
+                            "support_set_policy_splits": {"test": 2},
+                            "support_set_policy_accuracy": 1.0,
+                            "support_set_policy_case_ids": ["ss02", "ss03"],
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+            completed = mock.Mock(
+                stdout=json.dumps(
+                    {
+                        "case_count": 12,
+                        "review_queue": [],
+                        "review_queue_summary": {"count": 0},
+                        "false_support_analysis": {
+                            "total_overcall_count": 0,
+                            "risk_slices": [],
+                            "top_risk_slice": None,
+                        },
+                        "quality_gate": {"ok": True, "review_queue_case_ids": [], "critical_review_case_ids": []},
+                        "support_set_policy": {
+                            "accuracy": 1.0,
+                            "case_count": 2,
+                            "case_types": {"weak_set_boundary": 1},
+                            "languages": {"en": 2},
+                            "splits": {"test": 2},
+                            "case_ids": ["ss02", "ss03"],
+                        },
+                        "experiment_artifact": {"files": {"manifest": str(manifest_path)}},
+                    }
+                )
+            )
+            with mock.patch("scripts.release_package_gate._run", return_value=completed):
+                _record_support_review_queue_gate(
+                    summary,
+                    python="python3",
+                    project_root=ROOT,
+                    dataset="data/eval/support_eval.json",
+                )
+
+        self.assertFalse(summary["ok"])
+        self.assertEqual(summary["steps"][0]["name"], "support_review_queue")
+        self.assertEqual(summary["steps"][0]["status"], "failed")
+        self.assertFalse(summary["steps"][0]["support_set_policy_present"])
+        self.assertIn("support_set_policy_missing_contradiction_set", summary["steps"][0]["manifest_errors"])
+        self.assertIn("support_set_policy_missing_zh_case", summary["steps"][0]["manifest_errors"])
+        self.assertIn("support_set_policy_missing_case_ss05", summary["steps"][0]["manifest_errors"])
 
     def test_release_gate_records_support_baseline_comparison_contract(self):
         summary = {"ok": True, "steps": []}
@@ -1718,6 +1822,12 @@ License-File: LICENSE
             "citation-set",
             "multiple weak",
             "run_support_set_policy_fixture_report",
+            "support_set_policy_case_count",
+            "support_set_policy_case_types",
+            "support_set_policy_languages",
+            "support_set_policy_case_ids",
+            "case-type/language coverage",
+            "manifest fields",
         ]
         for phrase in required_phrases:
             with self.subTest(phrase=phrase):
@@ -1779,7 +1889,7 @@ License-File: LICENSE
         combined = f"{readme}\n{changelog}\n{benchmark_todo}\n{support_eval}\n{sidecar}"
 
         required_phrases = [
-            "40 evidence-level cases",
+            "44 evidence-level cases",
             "benchmark provenance",
             "source-outage-to-fabrication inferences",
             "source outage",
@@ -1787,6 +1897,13 @@ License-File: LICENSE
             "eligibility criteria",
             "simulated-review causal",
             "reviewer-replacement overclaims",
+            "multi-paper weak-evidence over-synthesis",
+            "model-availability-as-support overclaims",
+            "supplemental-material full-text boundaries",
+            "Semantic Scholar rate-limit non-existence overclaims",
+            "6 citation-set policy cases",
+            "Chinese citation-set weak aggregation boundary",
+            "source-limited citation-set fabrication boundary",
             '"id": "s31"',
             '"id": "s32"',
             '"id": "s33"',
@@ -1797,6 +1914,10 @@ License-File: LICENSE
             '"id": "s38"',
             '"id": "s39"',
             '"id": "s40"',
+            '"id": "s41"',
+            '"id": "s42"',
+            '"id": "s43"',
+            '"id": "s44"',
             '"case_id": "s31"',
             '"case_id": "s32"',
             '"case_id": "s33"',
@@ -1807,6 +1928,14 @@ License-File: LICENSE
             '"case_id": "s38"',
             '"case_id": "s39"',
             '"case_id": "s40"',
+            '"case_id": "s41"',
+            '"case_id": "s42"',
+            '"case_id": "s43"',
+            '"case_id": "s44"',
+            '"id": "ss05"',
+            '"id": "ss06"',
+            '"case_id": "ss05"',
+            '"case_id": "ss06"',
         ]
         for phrase in required_phrases:
             with self.subTest(phrase=phrase):

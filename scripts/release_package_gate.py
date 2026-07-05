@@ -2252,6 +2252,7 @@ def _record_support_review_queue_gate(
     review_queue = payload.get("review_queue", []) if isinstance(payload, dict) else []
     review_queue_summary = payload.get("review_queue_summary", {}) if isinstance(payload, dict) else {}
     false_support_analysis = payload.get("false_support_analysis", {}) if isinstance(payload, dict) else {}
+    support_set_policy = payload.get("support_set_policy", {}) if isinstance(payload, dict) else {}
     manifest_result_summary = _artifact_manifest_result_summary(artifact_manifest, manifest_errors)
     has_false_support_triage = (
         isinstance(false_support_analysis, dict)
@@ -2263,11 +2264,17 @@ def _record_support_review_queue_gate(
         false_support_analysis,
     )
     manifest_errors.extend(review_manifest_errors)
+    support_set_policy_present, support_set_policy_errors = _validate_support_set_policy_contract(
+        support_set_policy,
+        manifest_result_summary,
+    )
+    manifest_errors.extend(support_set_policy_errors)
     passed = (
         isinstance(review_queue, list)
         and bool(quality_gate.get("ok"))
         and has_false_support_triage
         and manifest_false_support_triage_present
+        and support_set_policy_present
         and not manifest_errors
     )
     summary["steps"].append(
@@ -2283,10 +2290,11 @@ def _record_support_review_queue_gate(
             "false_support_analysis": false_support_analysis,
             "false_support_triage_present": has_false_support_triage,
             "manifest_false_support_triage_present": manifest_false_support_triage_present,
+            "support_set_policy_present": support_set_policy_present,
             "manifest_result_summary": manifest_result_summary,
             "manifest_errors": manifest_errors,
             "failures": quality_gate.get("failures", []),
-            "support_set_policy": payload.get("support_set_policy", {}) if isinstance(payload, dict) else {},
+            "support_set_policy": support_set_policy,
             "stdout_tail": _tail(completed.stdout),
         }
     )
@@ -2356,6 +2364,55 @@ def _validate_support_review_manifest_summary(
         and isinstance(manifest_result_summary.get("false_support_top_risk_slice_case_ids"), list)
     )
     return present, errors
+
+
+def _validate_support_set_policy_contract(
+    support_set_policy: Dict[str, Any],
+    manifest_result_summary: Dict[str, Any],
+) -> tuple[bool, List[str]]:
+    errors: List[str] = []
+    if not isinstance(support_set_policy, dict):
+        return False, ["support_set_policy_missing"]
+    case_types = support_set_policy.get("case_types", {})
+    languages = support_set_policy.get("languages", {})
+    case_ids = support_set_policy.get("case_ids", [])
+    if not isinstance(case_types, dict):
+        case_types = {}
+        errors.append("support_set_policy_case_types_missing")
+    if not isinstance(languages, dict):
+        languages = {}
+        errors.append("support_set_policy_languages_missing")
+    if not isinstance(case_ids, list):
+        case_ids = []
+        errors.append("support_set_policy_case_ids_missing")
+    if int(support_set_policy.get("case_count", 0) or 0) < 3:
+        errors.append("support_set_policy_test_case_count_too_low")
+    if int(case_types.get("weak_set_boundary", 0) or 0) < 1:
+        errors.append("support_set_policy_missing_weak_set_boundary")
+    if int(case_types.get("contradiction_set", 0) or 0) < 1:
+        errors.append("support_set_policy_missing_contradiction_set")
+    if int(languages.get("zh", 0) or 0) < 1:
+        errors.append("support_set_policy_missing_zh_case")
+    for expected_case_id in ("ss02", "ss03", "ss05"):
+        if expected_case_id not in case_ids:
+            errors.append(f"support_set_policy_missing_case_{expected_case_id}")
+
+    if manifest_result_summary.get("support_set_policy_case_count") != support_set_policy.get("case_count"):
+        errors.append("manifest_support_set_policy_case_count_mismatch")
+    if manifest_result_summary.get("support_set_policy_case_types") != case_types:
+        errors.append("manifest_support_set_policy_case_types_mismatch")
+    if manifest_result_summary.get("support_set_policy_languages") != languages:
+        errors.append("manifest_support_set_policy_languages_mismatch")
+    if manifest_result_summary.get("support_set_policy_case_ids") != case_ids:
+        errors.append("manifest_support_set_policy_case_ids_mismatch")
+
+    present = (
+        "support_set_policy_case_count" in manifest_result_summary
+        and isinstance(manifest_result_summary.get("support_set_policy_case_types"), dict)
+        and isinstance(manifest_result_summary.get("support_set_policy_languages"), dict)
+        and isinstance(manifest_result_summary.get("support_set_policy_case_ids"), list)
+    )
+    return present and not errors, errors
 
 
 def _validate_support_baseline_manifest_summary(

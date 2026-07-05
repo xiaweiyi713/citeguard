@@ -94,7 +94,7 @@ class SupportEvalTests(unittest.TestCase):
         cases = load_support_eval(os.path.join("data", "eval", "support_eval.json"))
         set_cases = load_support_set_eval(os.path.join("data", "eval", "support_eval.json"))
         self.assertGreaterEqual(len(cases), 40)
-        self.assertGreaterEqual(len(set_cases), 4)
+        self.assertGreaterEqual(len(set_cases), 6)
         self.assertIn(cases[0].gold, {"supported", "weakly_supported", "insufficient_evidence", "contradicted"})
         self.assertEqual(cases[0].evidence_scope, "abstract")
         self.assertTrue(cases[0].label_source)
@@ -116,6 +116,10 @@ class SupportEvalTests(unittest.TestCase):
         self.assertIn("s38", case_ids)
         self.assertIn("s39", case_ids)
         self.assertIn("s40", case_ids)
+        self.assertIn("s41", case_ids)
+        self.assertIn("s42", case_ids)
+        self.assertIn("s43", case_ids)
+        self.assertIn("s44", case_ids)
         seeded_cases = {case.case_id: case for case in cases}
         self.assertEqual(seeded_cases["s31"].case_type, "hard_negative")
         self.assertEqual(seeded_cases["s31"].gold, "insufficient_evidence")
@@ -147,6 +151,18 @@ class SupportEvalTests(unittest.TestCase):
         self.assertEqual(seeded_cases["s40"].case_type, "hard_negative")
         self.assertEqual(seeded_cases["s40"].gold, "insufficient_evidence")
         self.assertIn("自动替代人工审稿", seeded_cases["s40"].claim)
+        self.assertEqual(seeded_cases["s41"].case_type, "hard_negative")
+        self.assertEqual(seeded_cases["s41"].gold, "insufficient_evidence")
+        self.assertIn("Two weakly related papers", seeded_cases["s41"].claim)
+        self.assertEqual(seeded_cases["s42"].case_type, "contradiction")
+        self.assertEqual(seeded_cases["s42"].gold, "contradicted")
+        self.assertIn("model being available", seeded_cases["s42"].claim)
+        self.assertEqual(seeded_cases["s43"].case_type, "full_text_required")
+        self.assertEqual(seeded_cases["s43"].gold, "insufficient_evidence")
+        self.assertIn("补充材料", seeded_cases["s43"].claim)
+        self.assertEqual(seeded_cases["s44"].case_type, "contradiction")
+        self.assertEqual(seeded_cases["s44"].gold, "contradicted")
+        self.assertIn("Semantic Scholar", seeded_cases["s44"].claim)
         self.assertTrue(any(case.case_type == "hard_negative" for case in cases))
         self.assertTrue(any(case.case_type == "contradiction" for case in cases))
         self.assertTrue(any(case.case_type == "weak_support" for case in cases))
@@ -154,11 +170,14 @@ class SupportEvalTests(unittest.TestCase):
         self.assertTrue(any(case.evidence_scope == "title" for case in cases))
         self.assertTrue(any(case.evidence_scope == "metadata_snippet" for case in cases))
         self.assertTrue(any(case.evidence_scope == "full_text" for case in cases))
-        self.assertEqual(Counter(case.lang for case in cases), {"en": 30, "zh": 10})
+        self.assertEqual(Counter(case.lang for case in cases), {"en": 32, "zh": 12})
         self.assertEqual({case.split for case in cases}, {"train", "dev", "test"})
-        self.assertEqual(Counter(case.split for case in cases), {"train": 13, "dev": 14, "test": 13})
+        self.assertEqual(Counter(case.split for case in cases), {"train": 14, "dev": 15, "test": 15})
         self.assertTrue(any(case.case_type == "weak_set_boundary" for case in set_cases))
         self.assertTrue(any(case.case_type == "contradiction_set" for case in set_cases))
+        set_case_ids = {case.case_id for case in set_cases}
+        self.assertIn("ss05", set_case_ids)
+        self.assertIn("ss06", set_case_ids)
 
     def test_load_support_label_sidecar_reads_seed_file(self):
         cases = load_support_label_cases(os.path.join("data", "eval", "support_eval.json"))
@@ -631,8 +650,8 @@ class SupportEvalTests(unittest.TestCase):
                 instructions = handle.read()
 
         self.assertEqual(packet["packet_type"], "support_label_annotation_packet")
-        self.assertEqual(packet["packet_summary"]["case_count_by_language"], {"zh": 7})
-        self.assertEqual(packet["packet_summary"]["case_count_by_review_status"], {"not_human_reviewed": 7})
+        self.assertEqual(packet["packet_summary"]["case_count_by_language"], {"zh": 9})
+        self.assertEqual(packet["packet_summary"]["case_count_by_review_status"], {"not_human_reviewed": 9})
         self.assertTrue(all(item["lang"] == "zh" for item in packet["cases"]))
         self.assertIn("Packet summary", instructions)
 
@@ -1851,12 +1870,12 @@ class SupportEvalTests(unittest.TestCase):
         with open(os.path.join("data", "eval", "support_eval.json"), encoding="utf-8") as handle:
             summary = validate_support_eval_dataset(json.load(handle))
 
-        self.assertEqual(summary["test_split"]["case_types"]["hard_negative"], 2)
+        self.assertEqual(summary["test_split"]["case_types"]["hard_negative"], 3)
         self.assertEqual(summary["test_split"]["case_types"]["contradiction"], 5)
-        self.assertEqual(summary["test_split"]["case_types"]["full_text_required"], 2)
+        self.assertEqual(summary["test_split"]["case_types"]["full_text_required"], 3)
         self.assertEqual(summary["test_split"]["case_types"]["weak_support"], 1)
-        self.assertEqual(summary["languages"], {"en": 30, "zh": 10})
-        self.assertEqual(summary["test_split"]["languages"], {"en": 8, "zh": 5})
+        self.assertEqual(summary["languages"], {"en": 32, "zh": 12})
+        self.assertEqual(summary["test_split"]["languages"], {"en": 9, "zh": 6})
         self.assertEqual(set(summary["test_split"]["gold_labels"]), {
             "contradicted",
             "insufficient_evidence",
@@ -1868,8 +1887,9 @@ class SupportEvalTests(unittest.TestCase):
         with open(os.path.join("data", "eval", "support_eval.json"), encoding="utf-8") as handle:
             summary = validate_support_eval_dataset(json.load(handle))
 
-        self.assertGreaterEqual(summary["set_cases"]["n"], 4)
-        self.assertEqual(summary["set_cases"]["case_types"]["weak_set_boundary"], 1)
+        self.assertGreaterEqual(summary["set_cases"]["n"], 6)
+        self.assertEqual(summary["set_cases"]["case_types"]["weak_set_boundary"], 2)
+        self.assertEqual(summary["set_cases"]["case_types"]["set_aggregation"], 3)
         self.assertIn("test", summary["set_cases"]["splits"])
 
     def test_validate_support_eval_dataset_rejects_missing_coverage(self):
@@ -2117,9 +2137,12 @@ class SupportEvalTests(unittest.TestCase):
 
         self.assertEqual(predict_support_set_policy(by_id["ss02"]), "weakly_supported")
         self.assertEqual(predict_support_set_policy(by_id["ss03"]), "contradicted")
+        self.assertEqual(predict_support_set_policy(by_id["ss05"]), "weakly_supported")
+        self.assertEqual(predict_support_set_policy(by_id["ss06"]), "insufficient_evidence")
         self.assertEqual(report["overall"]["accuracy"], 1.0)
-        self.assertEqual(report["dataset"]["case_types"]["weak_set_boundary"], 1)
-        self.assertEqual(report["dataset"]["languages"], {"en": 4})
+        self.assertEqual(report["dataset"]["case_types"]["weak_set_boundary"], 2)
+        self.assertEqual(report["dataset"]["case_types"]["set_aggregation"], 3)
+        self.assertEqual(report["dataset"]["languages"], {"en": 5, "zh": 1})
         self.assertTrue(all(item["correct"] for item in report["cases"]))
 
     def test_quality_gate_passes_for_deterministic_fixture_report(self):

@@ -327,11 +327,23 @@ def _review_queue_only_payload(result: Dict[str, object], args: argparse.Namespa
             "failures": list(label_sidecar_gate.get("failures", [])),
             "warnings": list(label_sidecar_gate.get("warnings", [])),
         }
-    if support_set_overall:
+    if isinstance(support_set_policy, dict) and support_set_overall:
+        support_set_dataset = support_set_policy.get("dataset", {})
+        support_set_cases = support_set_policy.get("cases", [])
+        case_ids = [
+            case.get("case_id")
+            for case in support_set_cases
+            if isinstance(case, dict) and case.get("case_id")
+        ] if isinstance(support_set_cases, list) else []
         payload["support_set_policy"] = {
             "accuracy": support_set_overall.get("accuracy"),
             "contradiction_recall": support_set_overall.get("contradiction_recall"),
             "false_support_rate": support_set_overall.get("false_support_rate"),
+            "case_count": support_set_dataset.get("n") if isinstance(support_set_dataset, dict) else None,
+            "case_types": support_set_dataset.get("case_types", {}) if isinstance(support_set_dataset, dict) else {},
+            "languages": support_set_dataset.get("languages", {}) if isinstance(support_set_dataset, dict) else {},
+            "splits": support_set_dataset.get("splits", {}) if isinstance(support_set_dataset, dict) else {},
+            "case_ids": case_ids,
         }
     if "experiment_artifact" in result:
         payload["experiment_artifact"] = result["experiment_artifact"]

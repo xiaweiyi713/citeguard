@@ -479,6 +479,54 @@
       "case_type": "hard_negative",
       "split": "dev",
       "label_notes": "Chinese hard negative: a real, topically related paper recommends human review and does not support replacing reviewers."
+    },
+    {
+      "id": "s41",
+      "claim": "Two weakly related papers together prove the deployment caused fewer citation hallucinations.",
+      "evidence": "Paper A describes a citation-auditing checklist. Paper B reports annotators found citation errors in generated bibliographies, but neither evaluates deployed hallucination reduction.",
+      "gold": "insufficient_evidence",
+      "lang": "en",
+      "evidence_scope": "mixed",
+      "label_source": "maintainer_synthetic",
+      "case_type": "hard_negative",
+      "split": "test",
+      "label_notes": "Multi-paper hard negative: combining topical evidence must not imply a causal deployment outcome that neither paper measures."
+    },
+    {
+      "id": "s42",
+      "claim": "The model being available proves the cited paper supports the claim.",
+      "evidence": "The support backend is installed and available, but the retrieved evidence says the cited paper evaluates a different task and does not discuss the claim.",
+      "gold": "contradicted",
+      "lang": "en",
+      "evidence_scope": "metadata_snippet",
+      "label_source": "maintainer_synthetic",
+      "case_type": "contradiction",
+      "split": "dev",
+      "label_notes": "Model availability is not evidence support; the snippet explicitly says the paper discusses a different task."
+    },
+    {
+      "id": "s43",
+      "claim": "摘要证明所有补充材料中的排除标准都被满足。",
+      "evidence": "摘要仅报告主要疗效结果，并说明排除标准详见补充材料。",
+      "gold": "insufficient_evidence",
+      "lang": "zh",
+      "evidence_scope": "abstract",
+      "label_source": "maintainer_synthetic",
+      "case_type": "full_text_required",
+      "split": "test",
+      "label_notes": "Chinese full-text boundary: supplemental eligibility criteria cannot be confirmed from an abstract that only points to supplementary material."
+    },
+    {
+      "id": "s44",
+      "claim": "Semantic Scholar 限流证明这条引用不存在。",
+      "evidence": "Semantic Scholar 限流只表示当前来源暂时无法返回结果；OpenAlex 或 DOI 查询仍可能确认该论文存在。",
+      "gold": "contradicted",
+      "lang": "zh",
+      "evidence_scope": "metadata_snippet",
+      "label_source": "maintainer_synthetic",
+      "case_type": "contradiction",
+      "split": "train",
+      "label_notes": "Chinese live-source reliability case: rate limiting contradicts a non-existence conclusion and should route to retry/source-health review."
     }
   ],
   "set_cases": [
@@ -525,6 +573,28 @@
       "case_type": "set_aggregation",
       "split": "train",
       "label_notes": "A set of non-confirming citations should abstain rather than imply support."
+    },
+    {
+      "id": "ss05",
+      "claim": "多篇主题相关论文共同证明该工具可以替代人工审稿。",
+      "citation_verdicts": ["weakly_supported", "weakly_supported", "insufficient_evidence"],
+      "gold": "weakly_supported",
+      "lang": "zh",
+      "label_source": "maintainer_synthetic",
+      "case_type": "weak_set_boundary",
+      "split": "test",
+      "label_notes": "Chinese citation-set boundary: multiple weak or unresolved citations remain tentative and must not be upgraded to supported."
+    },
+    {
+      "id": "ss06",
+      "claim": "A set of source-limited checks proves the reference is fabricated.",
+      "citation_verdicts": ["insufficient_evidence", "insufficient_evidence"],
+      "gold": "insufficient_evidence",
+      "lang": "en",
+      "label_source": "maintainer_synthetic",
+      "case_type": "set_aggregation",
+      "split": "dev",
+      "label_notes": "Source-limited citation-set boundary: multiple inconclusive checks should abstain rather than prove fabrication."
     }
   ]
 }

@@ -197,11 +197,17 @@
 - Added language-specific high-risk audit failures for support-label sidecar
   readiness checks, so reviewer assignment can block on unreviewed Chinese or
   other language-specific high-risk cases.
-- Expanded the synthetic support eval seed set to 40 evidence-level cases with
+- Expanded the synthetic support eval seed set to 44 evidence-level cases with
   additional high-risk hard-negative, contradiction, and full-text-required
   boundaries for benchmark-provenance overclaims, source-outage fabrication
   inferences, abstract-only eligibility claims, simulated-review causal
-  overclaims, and reviewer-replacement overclaims.
+  overclaims, reviewer-replacement overclaims, multi-paper weak-evidence
+  over-synthesis, model-availability-as-support overclaims, supplemental-material
+  full-text boundaries, and Semantic Scholar rate-limit non-existence
+  overclaims.
+- Expanded citation-set support policy coverage to 6 citation-set policy cases,
+  including a Chinese citation-set weak aggregation boundary and a
+  source-limited citation-set fabrication boundary.
 - Added Chinese source-outage/not-found safety benchmark cases covering
   unsafe fabrication-confidence overclaims, Crossref timeout hard negatives,
   and rate-limit/not-found contradiction examples.

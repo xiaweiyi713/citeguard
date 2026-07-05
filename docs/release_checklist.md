@@ -144,7 +144,10 @@ agent skill bundle.
   `false_support_total_overcall_count` and `false_support_top_risk_slice_id`.
   The report should include `support_set_policy` so
   citation-set aggregation boundaries are checked alongside evidence-level
-  cases. The baseline comparison table should include at least the deterministic
+  cases. The release gate checks support-set case ids, explicit
+  case-type/language coverage, and manifest fields such as `support_set_policy_case_count`,
+  `support_set_policy_case_types`, `support_set_policy_languages`, and
+  `support_set_policy_case_ids`. The baseline comparison table should include at least the deterministic
   `fixture` row and the zero-model `heuristic` row, with heuristic limitations
   visible in the diagnostics, plus `false_support_risk_slices` and
   `top_false_support_risk_slice` for prioritized false-support triage. The

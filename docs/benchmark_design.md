@@ -16,10 +16,13 @@
 这些指标已经在 [citeguard/benchmark/metrics.py](/Users/xuwenyao/CiteGuard/citeguard/benchmark/metrics.py) 中实现。
 
 `data/eval/support_eval.json` 还包含一个小型、合成 claim-support seed set:
-24 条 evidence-level cases 加上 citation-set policy cases。它用于回归测试
+44 条 evidence-level cases 加上 6 条 citation-set policy cases。它用于回归测试
 title、abstract、metadata snippet 和 full-text scope 下的支撑性判断,并特别加入
-hard negatives、contradictions、title-only weak support、source-outage 安全表述和
-多引用聚合边界样本。当前脚本输出:
+hard negatives、contradictions、title-only weak support、source-outage 安全表述、
+multi-paper weak-evidence over-synthesis、model-availability-as-support
+overclaims、supplemental-material full-text boundaries、Semantic Scholar
+rate-limit non-existence overclaims、Chinese citation-set weak aggregation
+boundary、source-limited citation-set fabrication boundary 和多引用聚合边界样本。当前脚本输出:
 
 - accuracy
 - supported precision / recall / F1
@@ -49,7 +52,11 @@ schema；这不是模型质量指标。运行 `python3 scripts/eval_support.py -
 - `quality_gate`: 如果传入 `--quality-gate`,报告会附带保守发布门禁结果,并在失败时以非零状态码退出；失败 payload 包含 `quality_gate.review_queue_case_ids` 和 `quality_gate.critical_review_case_ids`,便于 agent 先复核最高风险样本
 - `support_set_policy`: model-free citation-set 聚合边界报告,确认 multiple weak
   citations 仍是 tentative、contradiction 会支配 aggregate verdict、全不足证据会
-  abstain
+  abstain,且 source-limited citation-set fabrication boundary 不能被升级为伪造结论；
+  release gate 同步检查 `support_set_policy_case_count`、
+  `support_set_policy_case_types`、`support_set_policy_languages` 和
+  `support_set_policy_case_ids` manifest 摘要,确保 test split 中保留 weak set、
+  contradiction set 和中文 citation-set 边界
 - `cases`: 每条样本的 gold、predicted、correct、case_type、evidence_scope 和 label_source
 
 每条 seed case 都包含 `evidence_scope`、`label_source`、`case_type`、`split` 和可选

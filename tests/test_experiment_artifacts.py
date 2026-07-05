@@ -100,6 +100,13 @@ class ExperimentArtifactTests(unittest.TestCase):
         self.assertEqual(manifest["result_summary"]["false_support_risk_slice_count"], 0)
         self.assertIsNone(manifest["result_summary"]["false_support_top_risk_slice_id"])
         self.assertEqual(manifest["result_summary"]["false_support_top_risk_slice_case_ids"], [])
+        self.assertEqual(manifest["result_summary"]["support_set_policy_case_count"], 3)
+        self.assertEqual(
+            manifest["result_summary"]["support_set_policy_case_types"],
+            {"contradiction_set": 1, "weak_set_boundary": 2},
+        )
+        self.assertEqual(manifest["result_summary"]["support_set_policy_languages"], {"en": 2, "zh": 1})
+        self.assertEqual(manifest["result_summary"]["support_set_policy_case_ids"], ["ss02", "ss03", "ss05"])
         self.assertEqual(result["quality_gate"]["ok"], True)
         self.assertEqual(config["split"], "test")
         self.assertTrue(config["quality_gate"])

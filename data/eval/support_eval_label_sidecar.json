@@ -444,6 +444,50 @@
       "notes": "Synthetic Chinese hard negative: a real related tool paper recommends human review, not replacing reviewers."
     },
     {
+      "case_id": "s41",
+      "adjudication_status": "not_human_reviewed",
+      "annotator_count": 0,
+      "annotator_labels": [],
+      "adjudicated_label": "insufficient_evidence",
+      "disagreement": "not_applicable",
+      "adjudicator": "",
+      "source_locator": "",
+      "notes": "Synthetic multi-paper hard negative: weak topical evidence must not be over-synthesized into causal deployment support."
+    },
+    {
+      "case_id": "s42",
+      "adjudication_status": "not_human_reviewed",
+      "annotator_count": 0,
+      "annotator_labels": [],
+      "adjudicated_label": "contradicted",
+      "disagreement": "not_applicable",
+      "adjudicator": "",
+      "source_locator": "",
+      "notes": "Synthetic contradiction: model availability is not support evidence when the snippet says the paper addresses a different task."
+    },
+    {
+      "case_id": "s43",
+      "adjudication_status": "not_human_reviewed",
+      "annotator_count": 0,
+      "annotator_labels": [],
+      "adjudicated_label": "insufficient_evidence",
+      "disagreement": "not_applicable",
+      "adjudicator": "",
+      "source_locator": "",
+      "notes": "Synthetic Chinese full-text boundary: supplemental exclusion criteria are not proven by an abstract pointer."
+    },
+    {
+      "case_id": "s44",
+      "adjudication_status": "not_human_reviewed",
+      "annotator_count": 0,
+      "annotator_labels": [],
+      "adjudicated_label": "contradicted",
+      "disagreement": "not_applicable",
+      "adjudicator": "",
+      "source_locator": "",
+      "notes": "Synthetic Chinese source-health contradiction: Semantic Scholar rate limiting does not prove non-existence."
+    },
+    {
       "case_id": "ss01",
       "adjudication_status": "not_human_reviewed",
       "annotator_count": 0,
@@ -486,6 +530,28 @@
       "adjudicator": "",
       "source_locator": "",
       "notes": "Synthetic citation-set policy case: non-confirming citations should abstain."
+    },
+    {
+      "case_id": "ss05",
+      "adjudication_status": "not_human_reviewed",
+      "annotator_count": 0,
+      "annotator_labels": [],
+      "adjudicated_label": "weakly_supported",
+      "disagreement": "not_applicable",
+      "adjudicator": "",
+      "source_locator": "",
+      "notes": "Synthetic Chinese citation-set boundary: multiple weak or unresolved citations remain tentative."
+    },
+    {
+      "case_id": "ss06",
+      "adjudication_status": "not_human_reviewed",
+      "annotator_count": 0,
+      "annotator_labels": [],
+      "adjudicated_label": "insufficient_evidence",
+      "disagreement": "not_applicable",
+      "adjudicator": "",
+      "source_locator": "",
+      "notes": "Synthetic source-limited citation-set boundary: multiple inconclusive checks do not prove fabrication."
     }
   ]
 }
