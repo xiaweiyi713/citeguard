@@ -106,6 +106,8 @@ def main(argv: Optional[List[str]] = None) -> int:
     }
 
     _record_project_metadata_contract(summary, project_root)
+    _record_legacy_src_shim_contract(summary, project_root)
+    _record_cache_replay_fixture_gate(summary, python=args.python, project_root=project_root)
 
     if not args.skip_support_label_gate:
         _record_support_label_sidecar_gate(
@@ -129,6 +131,13 @@ def main(argv: Optional[List[str]] = None) -> int:
             python=args.python,
             project_root=project_root,
             dataset=args.support_eval_dataset,
+        )
+        _record_support_review_queue_annotation_packet_gate(
+            summary,
+            python=args.python,
+            project_root=project_root,
+            dataset=args.support_eval_dataset,
+            label_sidecar=args.support_label_sidecar,
         )
 
     if not args.skip_install_smoke:
@@ -211,6 +220,174 @@ def _record_project_metadata_contract(summary: Dict[str, Any], project_root: Pat
             **details,
         }
     )
+
+
+def _record_legacy_src_shim_contract(summary: Dict[str, Any], project_root: Path) -> None:
+    try:
+        details = _check_legacy_src_shim_contract(project_root)
+    except Exception as exc:
+        summary["steps"].append(
+            {
+                "name": "legacy_src_shim_contract",
+                "status": "failed",
+                "message": str(exc),
+            }
+        )
+        summary["ok"] = False
+        return
+
+    summary["steps"].append(
+        {
+            "name": "legacy_src_shim_contract",
+            "status": "passed",
+            **details,
+        }
+    )
+
+
+def _check_legacy_src_shim_contract(project_root: Path) -> Dict[str, Any]:
+    legacy_root = project_root / "src"
+    if not legacy_root.exists():
+        raise RuntimeError("legacy src compatibility package is missing")
+
+    errors: List[str] = []
+    files = sorted(legacy_root.rglob("*.py"))
+    for path in files:
+        relative = path.relative_to(project_root).as_posix()
+        text = path.read_text(encoding="utf-8")
+        line_count = len(text.splitlines())
+        if line_count > 25:
+            errors.append(f"{relative} has {line_count} lines; legacy shims should stay thin")
+        if re.search(r"^\s*(from\s+src\b|import\s+src\b)", text, flags=re.MULTILINE):
+            errors.append(f"{relative} imports from the legacy src namespace")
+        if relative != "src/__init__.py" and "citeguard" not in text:
+            errors.append(f"{relative} does not forward to citeguard.*")
+        if relative != "src/__init__.py" and not re.search(
+            r"(Backward-compatible|Compatibility shim|compatibility shim)",
+            text,
+        ):
+            errors.append(f"{relative} does not identify itself as a compatibility shim")
+
+    if errors:
+        raise RuntimeError("; ".join(errors))
+
+    return {
+        "file_count": len(files),
+        "max_lines": max((len(path.read_text(encoding="utf-8").splitlines()) for path in files), default=0),
+        "checked_root": "src",
+        "policy": "legacy shims only; new code imports citeguard.*",
+    }
+
+
+def _record_cache_replay_fixture_gate(summary: Dict[str, Any], *, python: str, project_root: Path) -> None:
+    try:
+        details = _check_cache_replay_fixture_gate(python=python, project_root=project_root)
+    except Exception as exc:
+        summary["steps"].append(
+            {
+                "name": "cache_replay_fixture",
+                "status": "failed",
+                "message": str(exc),
+            }
+        )
+        summary["ok"] = False
+        return
+
+    summary["steps"].append(
+        {
+            "name": "cache_replay_fixture",
+            "status": "passed",
+            **details,
+        }
+    )
+
+
+def _check_cache_replay_fixture_gate(*, python: str, project_root: Path) -> Dict[str, Any]:
+    from citeguard.graph import CitationRecord
+    from citeguard.retrieval.scholarly_clients import InMemoryMetadataSource
+    from citeguard.runtime import build_configured_source
+    from citeguard.verification.cache import CachingMetadataSource
+
+    with tempfile.TemporaryDirectory(prefix="citeguard-cache-replay-") as tmpdir:
+        tmp = Path(tmpdir)
+        cache_db = tmp / "verification_cache.sqlite"
+        fixture_a = tmp / "fixture-a.json"
+        fixture_b = tmp / "fixture-b.json"
+        record = CitationRecord(
+            citation_id="release-cache-1",
+            title="Release Cache Replay Fixture",
+            authors=["CiteGuard Maintainer"],
+            year=2026,
+            venue="Release Gate",
+            source="release_fixture",
+            abstract="A deterministic cache replay fixture for release validation.",
+        )
+        cached = CachingMetadataSource(InMemoryMetadataSource([record]), db_path=str(cache_db))
+        cached.search("Release Cache Replay Fixture", top_k=5)
+
+        manifests = []
+        commands = []
+        for fixture_path in (fixture_a, fixture_b):
+            cmd = [
+                python,
+                "-m",
+                "citeguard",
+                "cache",
+                "export",
+                "--path",
+                str(cache_db),
+                "--deterministic",
+                "--output",
+                str(fixture_path),
+            ]
+            completed = _run(cmd, cwd=project_root)
+            commands.append(cmd)
+            manifests.append(json.loads(completed.stdout))
+
+        fixture_text_a = fixture_a.read_text(encoding="utf-8")
+        fixture_text_b = fixture_b.read_text(encoding="utf-8")
+        fixture_records = json.loads(fixture_text_a)
+        replay_source = build_configured_source(env={"CITEGUARD_FIXTURE_CITATIONS": str(fixture_a)})
+        replay_records = replay_source.all_records()
+
+    leaked_timestamp_fields = []
+    for item in fixture_records if isinstance(fixture_records, list) else []:
+        metadata = item.get("metadata", {}) if isinstance(item, dict) else {}
+        provenance = metadata.get("cache_provenance", {}) if isinstance(metadata, dict) else {}
+        if "cache_updated_at" in metadata:
+            leaked_timestamp_fields.append("metadata.cache_updated_at")
+        if "timestamp" in provenance:
+            leaked_timestamp_fields.append("metadata.cache_provenance.timestamp")
+
+    errors = []
+    if not manifests or not all(manifest.get("deterministic") for manifest in manifests):
+        errors.append("cache export manifest did not report deterministic=true")
+    if any(manifest.get("exported_at") is not None for manifest in manifests):
+        errors.append("deterministic cache export manifest leaked exported_at")
+    if any(manifest.get("cache_oldest_entry_timestamp") is not None for manifest in manifests):
+        errors.append("deterministic cache export manifest leaked oldest cache timestamp")
+    if any(manifest.get("cache_newest_entry_timestamp") is not None for manifest in manifests):
+        errors.append("deterministic cache export manifest leaked newest cache timestamp")
+    if fixture_text_a != fixture_text_b:
+        errors.append("deterministic cache fixture exports were not byte-identical")
+    if not isinstance(fixture_records, list) or len(fixture_records) != 1:
+        errors.append("deterministic cache fixture should contain exactly one record")
+    if leaked_timestamp_fields:
+        errors.append("deterministic cache fixture leaked timestamp-only provenance")
+    if not replay_records or replay_records[0].title != "Release Cache Replay Fixture":
+        errors.append("offline fixture replay did not load the exported record")
+    if errors:
+        raise RuntimeError("; ".join(errors))
+
+    return {
+        "commands": commands,
+        "record_count": manifests[0].get("record_count"),
+        "deterministic": manifests[0].get("deterministic"),
+        "byte_identical": fixture_text_a == fixture_text_b,
+        "fixture_record_count": len(fixture_records),
+        "replay_record_title": replay_records[0].title if replay_records else "",
+        "leaked_timestamp_fields": sorted(set(leaked_timestamp_fields)),
+    }
 
 
 def _check_project_metadata_contract(project_root: Path) -> Dict[str, Any]:
@@ -536,6 +713,106 @@ def _record_support_review_queue_gate(
             "critical_review_case_ids": quality_gate.get("critical_review_case_ids", []),
             "failures": quality_gate.get("failures", []),
             "support_set_policy": payload.get("support_set_policy", {}) if isinstance(payload, dict) else {},
+            "stdout_tail": _tail(completed.stdout),
+        }
+    )
+    if not passed:
+        summary["ok"] = False
+
+
+def _record_support_review_queue_annotation_packet_gate(
+    summary: Dict[str, Any],
+    *,
+    python: str,
+    project_root: Path,
+    dataset: str,
+    label_sidecar: str,
+) -> None:
+    with tempfile.TemporaryDirectory(prefix="citeguard-review-queue-packet-") as tmpdir:
+        packet_path = Path(tmpdir) / "support-label-packet-review-queue-test.json"
+        instructions_path = Path(tmpdir) / "support-label-packet-review-queue-test-instructions.md"
+        cmd = [
+            python,
+            "scripts/prepare_support_label_sidecar.py",
+            "--dataset",
+            dataset,
+            "--existing-sidecar",
+            label_sidecar,
+            "--annotation-packet",
+            "--from-review-queue",
+            "--review-backend",
+            "heuristic",
+            "--split",
+            "test",
+            "--limit",
+            "2",
+            "--output",
+            str(packet_path),
+            "--instructions-output",
+            str(instructions_path),
+        ]
+        try:
+            completed = _run(cmd, cwd=project_root)
+            packet_text = packet_path.read_text(encoding="utf-8")
+            instructions_text = instructions_path.read_text(encoding="utf-8")
+            payload = json.loads(packet_text)
+        except subprocess.CalledProcessError as exc:
+            summary["steps"].append(
+                {
+                    "name": "support_review_queue_annotation_packet",
+                    "status": "failed",
+                    "command": cmd,
+                    "stdout_tail": _tail(exc.stdout or ""),
+                    "stderr_tail": _tail(exc.stderr or ""),
+                }
+            )
+            summary["ok"] = False
+            return
+        except (OSError, json.JSONDecodeError) as exc:
+            summary["steps"].append(
+                {
+                    "name": "support_review_queue_annotation_packet",
+                    "status": "failed",
+                    "command": cmd,
+                    "message": f"Could not read or parse review-queue annotation packet: {exc}",
+                    "stdout_tail": _tail(locals().get("completed", subprocess.CompletedProcess(cmd, 0, "")).stdout or ""),
+                }
+            )
+            summary["ok"] = False
+            return
+
+    filters = payload.get("filters", {}) if isinstance(payload, dict) else {}
+    cases = payload.get("cases", []) if isinstance(payload, dict) else []
+    packet_summary = payload.get("packet_summary", {}) if isinstance(payload, dict) else {}
+    forbidden_fields = ('"gold"', '"predicted"', '"adjudicated_label"', '"annotator_labels"')
+    leaked_fields = [field for field in forbidden_fields if field in packet_text]
+    ranks = [
+        item.get("review_queue_rank")
+        for item in cases
+        if isinstance(item, dict) and "review_queue_rank" in item
+    ]
+    passed = (
+        bool(payload.get("ok"))
+        and payload.get("packet_type") == "support_label_annotation_packet"
+        and bool(filters.get("from_review_queue"))
+        and bool(filters.get("review_queue_case_ids"))
+        and isinstance(cases, list)
+        and bool(cases)
+        and len(ranks) == len(cases)
+        and not leaked_fields
+        and "review_queue_rank" in instructions_text
+    )
+    summary["steps"].append(
+        {
+            "name": "support_review_queue_annotation_packet",
+            "status": "passed" if passed else "failed",
+            "command": cmd,
+            "packet_id": payload.get("packet_id") if isinstance(payload, dict) else "",
+            "case_count": payload.get("n") if isinstance(payload, dict) else None,
+            "packet_case_ids": packet_summary.get("case_ids", []) if isinstance(packet_summary, dict) else [],
+            "review_queue_case_ids": filters.get("review_queue_case_ids", []) if isinstance(filters, dict) else [],
+            "review_queue_ranks": ranks,
+            "leaked_hidden_fields": leaked_fields,
             "stdout_tail": _tail(completed.stdout),
         }
     )

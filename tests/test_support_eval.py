@@ -711,6 +711,60 @@ class SupportEvalTests(unittest.TestCase):
         self.assertNotIn("adjudicated_label", raw)
         self.assertNotIn("label_notes", raw)
 
+    def test_prepare_support_label_sidecar_can_build_packet_from_review_queue(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            packet_path = os.path.join(tmpdir, "review-queue-packet.json")
+            instructions_path = os.path.join(tmpdir, "review-queue-instructions.md")
+            completed = subprocess.run(
+                [
+                    sys.executable,
+                    "scripts/prepare_support_label_sidecar.py",
+                    "--dataset",
+                    os.path.join("data", "eval", "support_eval.json"),
+                    "--existing-sidecar",
+                    os.path.join("data", "eval", "support_eval_label_sidecar.json"),
+                    "--annotation-packet",
+                    "--from-review-queue",
+                    "--review-backend",
+                    "heuristic",
+                    "--split",
+                    "test",
+                    "--output",
+                    packet_path,
+                    "--instructions-output",
+                    instructions_path,
+                ],
+                check=True,
+                cwd=os.getcwd(),
+                capture_output=True,
+                text=True,
+            )
+            with open(packet_path, encoding="utf-8") as handle:
+                raw = handle.read()
+            payload = json.loads(raw)
+            with open(instructions_path, encoding="utf-8") as handle:
+                instructions = handle.read()
+
+        self.assertEqual(completed.stdout, "")
+        self.assertEqual(
+            payload["filters"]["review_queue_case_ids"],
+            ["s10", "s16", "s27", "s36", "s09", "s24"],
+        )
+        self.assertEqual(payload["filters"]["from_review_queue"], True)
+        self.assertEqual(payload["filters"]["review_backend"], "heuristic")
+        self.assertEqual(payload["filters"]["split"], ["test"])
+        self.assertEqual(payload["packet_summary"]["case_ids"], payload["filters"]["review_queue_case_ids"])
+        self.assertEqual([item["review_queue_rank"] for item in payload["cases"]], [1, 2, 3, 4, 5, 6])
+        self.assertEqual(payload["packet_summary"]["case_count_by_split"], {"test": 6})
+        self.assertEqual(payload["packet_summary"]["case_count_by_review_status"], {"not_human_reviewed": 6})
+        self.assertTrue(all(item["annotation"]["annotator_label"] == "" for item in payload["cases"]))
+        self.assertIn("review_queue_rank", instructions)
+        self.assertIn("do not treat it as a label hint", instructions)
+        self.assertNotIn('"gold"', raw)
+        self.assertNotIn('"predicted"', raw)
+        self.assertNotIn("adjudicated_label", raw)
+        self.assertNotIn("missed_contradiction", raw)
+
     def test_prepare_support_label_sidecar_can_limit_annotation_packet_per_language(self):
         completed = subprocess.run(
             [

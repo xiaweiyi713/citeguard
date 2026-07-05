@@ -222,6 +222,24 @@ sheet with the allowed labels, conservative labeling rule, required annotation
 fields, and fields that must not be modified.
 Reviewers must fill `annotation.annotator_id`; merge rejects missing annotator
 identity, and the same annotator cannot count twice for one case.
+If a support backend fails the quality gate, convert its `review_queue` into a
+blinded packet before changing thresholds:
+
+```bash
+python3 scripts/prepare_support_label_sidecar.py \
+  --dataset data/eval/support_eval.json \
+  --existing-sidecar data/eval/support_eval_label_sidecar.json \
+  --annotation-packet \
+  --from-review-queue \
+  --review-backend heuristic \
+  --split test \
+  --output experiments/support-label-packet-review-queue-test.json \
+  --instructions-output experiments/support-label-packet-review-queue-test-instructions.md
+```
+
+This preserves eval triage order through `review_queue_rank`, but the packet
+remains blinded: it does not include dataset gold labels, adjudicated labels,
+previous annotator labels, or backend predictions.
 After reviewers return completed packets, merge matching labels back into a
 sidecar draft:
 

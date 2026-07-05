@@ -3,6 +3,7 @@
 from pathlib import Path
 import re
 import subprocess
+import sys
 import unittest
 from unittest import mock
 
@@ -11,11 +12,14 @@ from citeguard.retrieval.scholarly_clients.factory import DEFAULT_USER_AGENT
 from citeguard.verification import STABLE_NEXT_ACTIONS
 from citeguard.version import __version__
 from scripts.release_package_gate import (
+    _record_cache_replay_fixture_gate,
+    _record_legacy_src_shim_contract,
     _record_mcp_extra_smoke,
     _record_mcp_stdio_smoke,
     _record_published_smoke_plan,
     _record_support_label_sidecar_gate,
     _record_support_review_queue_gate,
+    _record_support_review_queue_annotation_packet_gate,
 )
 from scripts.smoke_package import _assert_archive_excludes_generated_files, _assert_distribution_metadata_contract
 
@@ -333,9 +337,21 @@ License-File: LICENSE
             "--with-deps",
             "--extra mcp",
             "support_label_sidecar_gate",
+            "legacy_src_shim_contract",
+            "_record_legacy_src_shim_contract",
+            "legacy shims only; new code imports citeguard.*",
+            "cache_replay_fixture",
+            "_record_cache_replay_fixture_gate",
+            "cache export",
+            "--deterministic",
+            "byte_identical",
             "support_review_queue",
+            "support_review_queue_annotation_packet",
             "_record_support_review_queue_gate",
+            "_record_support_review_queue_annotation_packet_gate",
             "--review-queue-only",
+            "--from-review-queue",
+            '"review_queue_rank"',
             'quality_gate.get("review_queue_case_ids", [])',
             'quality_gate.get("critical_review_case_ids", [])',
             'gate.get("thresholds", {})',
@@ -620,6 +636,37 @@ License-File: LICENSE
         self.assertEqual(summary["steps"][0]["failures"][0]["language"], "zh")
         self.assertEqual(summary["steps"][0]["metrics"]["high_risk_case_count_by_language"], {"zh": 5})
 
+    def test_release_gate_records_legacy_src_shim_contract(self):
+        summary = {"ok": True, "steps": []}
+
+        _record_legacy_src_shim_contract(summary, ROOT)
+
+        self.assertTrue(summary["ok"])
+        self.assertEqual(summary["steps"][0]["name"], "legacy_src_shim_contract")
+        self.assertEqual(summary["steps"][0]["status"], "passed")
+        self.assertGreater(summary["steps"][0]["file_count"], 0)
+        self.assertLessEqual(summary["steps"][0]["max_lines"], 25)
+        self.assertEqual(summary["steps"][0]["checked_root"], "src")
+        self.assertEqual(summary["steps"][0]["policy"], "legacy shims only; new code imports citeguard.*")
+
+    def test_release_gate_records_cache_replay_fixture_contract(self):
+        summary = {"ok": True, "steps": []}
+
+        _record_cache_replay_fixture_gate(summary, python=sys.executable, project_root=ROOT)
+
+        self.assertTrue(summary["ok"])
+        self.assertEqual(summary["steps"][0]["name"], "cache_replay_fixture")
+        self.assertEqual(summary["steps"][0]["status"], "passed")
+        self.assertTrue(summary["steps"][0]["deterministic"])
+        self.assertTrue(summary["steps"][0]["byte_identical"])
+        self.assertEqual(summary["steps"][0]["fixture_record_count"], 1)
+        self.assertEqual(summary["steps"][0]["record_count"], 1)
+        self.assertEqual(summary["steps"][0]["replay_record_title"], "Release Cache Replay Fixture")
+        self.assertEqual(summary["steps"][0]["leaked_timestamp_fields"], [])
+        self.assertIn("--deterministic", summary["steps"][0]["commands"][0])
+        self.assertIn("cache", summary["steps"][0]["commands"][0])
+        self.assertIn("export", summary["steps"][0]["commands"][0])
+
     def test_release_gate_records_support_review_queue_contract(self):
         summary = {"ok": True, "steps": []}
         completed = mock.Mock(
@@ -661,6 +708,49 @@ License-File: LICENSE
         self.assertEqual(summary["steps"][0]["review_queue_count"], 0)
         self.assertEqual(summary["steps"][0]["review_queue_summary"], {"count": 0, "by_severity": {}})
         self.assertEqual(summary["steps"][0]["review_queue_case_ids"], [])
+
+    def test_release_gate_records_support_review_queue_annotation_packet_contract(self):
+        summary = {"ok": True, "steps": []}
+        completed = mock.Mock(stdout="")
+
+        def fake_run(cmd, *, cwd):
+            packet_path = Path(cmd[cmd.index("--output") + 1])
+            instructions_path = Path(cmd[cmd.index("--instructions-output") + 1])
+            packet_path.write_text(
+                (
+                    '{"ok": true, "packet_type": "support_label_annotation_packet", '
+                    '"packet_id": "support-packet-test", "n": 2, '
+                    '"filters": {"from_review_queue": true, "review_queue_case_ids": ["s10", "s16"]}, '
+                    '"packet_summary": {"case_ids": ["s10", "s16"]}, '
+                    '"cases": [{"case_id": "s10", "review_queue_rank": 1}, '
+                    '{"case_id": "s16", "review_queue_rank": 2}]}'
+                ),
+                encoding="utf-8",
+            )
+            instructions_path.write_text("Use `review_queue_rank` only as assignment priority.", encoding="utf-8")
+            return completed
+
+        with mock.patch("scripts.release_package_gate._run", side_effect=fake_run) as run:
+            _record_support_review_queue_annotation_packet_gate(
+                summary,
+                python="python3",
+                project_root=ROOT,
+                dataset="data/eval/support_eval.json",
+                label_sidecar="data/eval/support_eval_label_sidecar.json",
+            )
+
+        run.assert_called_once()
+        command = run.call_args.args[0]
+        self.assertIn("scripts/prepare_support_label_sidecar.py", command)
+        self.assertIn("--from-review-queue", command)
+        self.assertIn("--review-backend", command)
+        self.assertIn("heuristic", command)
+        self.assertEqual(summary["steps"][0]["name"], "support_review_queue_annotation_packet")
+        self.assertEqual(summary["steps"][0]["status"], "passed")
+        self.assertEqual(summary["steps"][0]["packet_case_ids"], ["s10", "s16"])
+        self.assertEqual(summary["steps"][0]["review_queue_case_ids"], ["s10", "s16"])
+        self.assertEqual(summary["steps"][0]["review_queue_ranks"], [1, 2])
+        self.assertEqual(summary["steps"][0]["leaked_hidden_fields"], [])
 
     def test_mcp_smoke_checks_structured_errors(self):
         smoke = (ROOT / "scripts" / "smoke_mcp.py").read_text(encoding="utf-8")
@@ -1136,6 +1226,9 @@ License-File: LICENSE
             "`filtered.returned_indexes` / `filtered.omitted_indexes`",
             "`index`, `citation/claim`, `verdict`, `risk`, `next_action`, `why`, `next step`",
             "--review-queue-only",
+            "--from-review-queue",
+            "blinded annotation packet",
+            "review_queue_rank",
             "`review_queue`",
             "`quality_gate.review_queue_case_ids`",
             "`quality_gate.critical_review_case_ids`",

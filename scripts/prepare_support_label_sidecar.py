@@ -74,6 +74,23 @@ def main(argv: Optional[list[str]] = None) -> int:
         help="Only include this stable case id; repeat for multiple cases.",
     )
     parser.add_argument(
+        "--from-review-queue",
+        action="store_true",
+        help=(
+            "Select cases from the support-eval review queue before applying other filters. "
+            "Useful for turning quality-gate failures into blinded annotation packets."
+        ),
+    )
+    parser.add_argument(
+        "--review-backend",
+        choices=["fixture", "heuristic", "production"],
+        default="heuristic",
+        help=(
+            "Backend used with --from-review-queue. fixture is deterministic and usually produces "
+            "an empty queue; heuristic is the local zero-model triage baseline."
+        ),
+    )
+    parser.add_argument(
         "--unreviewed-only",
         action="store_true",
         help="Only include cases whose sidecar adjudication_status is not_human_reviewed.",
@@ -188,11 +205,26 @@ def main(argv: Optional[list[str]] = None) -> int:
 
     all_cases = load_support_label_cases(args.dataset)
     _validate_case_ids(args.case_id, all_cases, parser)
+    review_queue_case_ids: list[str] = []
+    review_queue_order: dict[str, int] = {}
     existing = None
     if args.existing_sidecar:
         with open(args.existing_sidecar, encoding="utf-8") as handle:
             existing = json.load(handle)
         validate_support_label_sidecar(existing, all_cases)
+    if args.from_review_queue:
+        review_queue_case_ids = _review_queue_case_ids(
+            dataset_path=args.dataset,
+            splits=args.split,
+            backend_name=args.review_backend,
+        )
+        review_queue_order = {case_id: index for index, case_id in enumerate(review_queue_case_ids)}
+        all_cases = [
+            case
+            for case in sorted(all_cases, key=lambda item: review_queue_order.get(item.case_id, 10**9))
+            if case.case_id in review_queue_order
+        ]
+        setattr(args, "_review_queue_case_ids", review_queue_case_ids)
 
     review_statuses = ["not_human_reviewed"] if args.unreviewed_only else args.review_status
     candidates = (
@@ -249,6 +281,7 @@ def main(argv: Optional[list[str]] = None) -> int:
             existing_sidecar=existing_for_cases,
             dataset_name=Path(args.dataset).name,
             filters=_filter_summary(args),
+            preferred_case_order=review_queue_order if args.from_review_queue else None,
         )
         if args.instructions_output:
             Path(args.instructions_output).write_text(_format_annotation_instructions(packet), encoding="utf-8")
@@ -615,6 +648,7 @@ def _build_annotation_packet(
     existing_sidecar: Optional[dict],
     dataset_name: str,
     filters: Optional[dict] = None,
+    preferred_case_order: Optional[dict[str, int]] = None,
 ) -> dict:
     """Build a blinded packet for independent support-label annotation."""
 
@@ -624,30 +658,31 @@ def _build_annotation_packet(
         if isinstance(item, dict) and item.get("case_id")
     }
     packet_cases = []
-    for case in sorted(cases, key=_annotation_priority):
+    for case in sorted(cases, key=lambda item: _annotation_packet_sort_key(item, preferred_case_order)):
         sidecar_item = sidecar_by_id.get(case.case_id, {})
-        packet_cases.append(
-            {
-                "case_id": case.case_id,
-                "priority": _case_priority_label(case),
-                "claim": case.claim,
-                "evidence": case.evidence,
-                "evidence_scope": case.evidence_scope,
-                "case_type": case.case_type,
-                "split": case.split,
-                "lang": case.lang,
-                "review_focus": _review_focus(case),
-                "review_status": sidecar_item.get("adjudication_status", "not_human_reviewed"),
-                "source_locator": sidecar_item.get("source_locator", ""),
-                "annotation": {
-                    "annotator_id": "",
-                    "annotator_label": "",
-                    "rationale": "",
-                    "confidence": "",
-                    "notes": "",
-                },
-            }
-        )
+        packet_item = {
+            "case_id": case.case_id,
+            "priority": _case_priority_label(case),
+            "claim": case.claim,
+            "evidence": case.evidence,
+            "evidence_scope": case.evidence_scope,
+            "case_type": case.case_type,
+            "split": case.split,
+            "lang": case.lang,
+            "review_focus": _review_focus(case),
+            "review_status": sidecar_item.get("adjudication_status", "not_human_reviewed"),
+            "source_locator": sidecar_item.get("source_locator", ""),
+            "annotation": {
+                "annotator_id": "",
+                "annotator_label": "",
+                "rationale": "",
+                "confidence": "",
+                "notes": "",
+            },
+        }
+        if preferred_case_order is not None and case.case_id in preferred_case_order:
+            packet_item["review_queue_rank"] = preferred_case_order[case.case_id] + 1
+        packet_cases.append(packet_item)
 
     packet_id = _annotation_packet_id(dataset_name, filters or {}, packet_cases)
     for index, item in enumerate(packet_cases, start=1):
@@ -711,6 +746,14 @@ def _annotation_packet_id(dataset_name: str, filters: dict, packet_cases: list) 
     return "support-packet-" + hashlib.sha256(encoded).hexdigest()[:16]
 
 
+def _annotation_packet_sort_key(case, preferred_case_order: Optional[dict[str, int]]) -> tuple:
+    if preferred_case_order is not None and case.case_id in preferred_case_order:
+        return (0, preferred_case_order[case.case_id], case.case_id)
+    if preferred_case_order is not None:
+        return (1, *_annotation_priority(case))
+    return _annotation_priority(case)
+
+
 def _format_annotation_packet(packet: dict, packet_format: str) -> str:
     if packet_format == "jsonl":
         return "".join(json.dumps(item, ensure_ascii=False) + "\n" for item in packet.get("cases", []))
@@ -755,11 +798,12 @@ def _format_annotation_instructions(packet: dict) -> str:
             "- `annotation.confidence`: optional low/medium/high or numeric confidence.",
             "- `annotation.notes`: optional ambiguity, scope, or full-text notes.",
             "- `review_focus`: non-gold guidance about the support boundary to inspect; do not treat it as a label hint.",
+            "- `review_queue_rank`, when present, is assignment priority from eval triage; do not treat it as a label hint.",
             "",
             "## Do Not Modify",
             "",
             "Do not edit `case_id`, `claim`, `evidence`, `evidence_scope`, `case_type`, `split`, `priority`, `review_focus`, or `source_locator`.",
-            "Also do not edit `packet_id` or `packet_case_index`; they tie returned annotations back to the archived reviewer batch.",
+            "Also do not edit `packet_id`, `packet_case_index`, or `review_queue_rank`; they tie returned annotations back to the archived reviewer batch.",
             "The packet intentionally omits dataset gold labels and adjudicated labels; do not request or reconstruct them before labeling.",
             "",
             "## Return Checklist",
@@ -1141,6 +1185,10 @@ def _filter_cases_by_review_status(cases: list, existing: Optional[dict], review
 
 def _filter_summary(args: argparse.Namespace) -> dict:
     filters = {}
+    if args.from_review_queue:
+        filters["from_review_queue"] = True
+        filters["review_backend"] = args.review_backend
+        filters["review_queue_case_ids"] = list(getattr(args, "_review_queue_case_ids", []))
     if args.priority:
         filters["priority"] = list(args.priority)
     if args.split:
@@ -1164,6 +1212,37 @@ def _filter_summary(args: argparse.Namespace) -> dict:
     if args.limit_per_evidence_scope is not None:
         filters["limit_per_evidence_scope"] = args.limit_per_evidence_scope
     return filters
+
+
+def _review_queue_case_ids(dataset_path: str, splits: Optional[list[str]], backend_name: str) -> list[str]:
+    from citeguard.verification.support_eval import (
+        load_support_eval,
+        run_support_eval_fixture_report,
+        run_support_eval_report,
+    )
+
+    cases = load_support_eval(dataset_path)
+    if splits:
+        split_set = set(splits)
+        cases = [case for case in cases if case.split in split_set]
+    if backend_name == "fixture":
+        report = run_support_eval_fixture_report(cases)
+    else:
+        if backend_name == "heuristic":
+            from citeguard.verifiers import HeuristicSupportBackend
+
+            backend = HeuristicSupportBackend()
+        else:
+            from citeguard.runtime import build_configured_support_backend
+
+            backend = build_configured_support_backend()
+        report = run_support_eval_report(cases, backend)
+    queue = report.get("review_queue", []) if isinstance(report, dict) else []
+    return [
+        str(item.get("case_id"))
+        for item in queue
+        if isinstance(item, dict) and str(item.get("case_id", "")).strip()
+    ]
 
 
 def _positive_int(value: str) -> int:

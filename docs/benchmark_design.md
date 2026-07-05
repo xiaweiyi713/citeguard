@@ -337,6 +337,27 @@ python3 scripts/prepare_support_label_sidecar.py \
   --instructions-output experiments/support-label-packet-high-risk-test-batch1-instructions.md
 ```
 
+当某个 backend 的 support quality gate 失败时,可以直接把它的
+`review_queue` 转成盲标 packet,让人工复核从最危险的失败样本开始:
+
+```bash
+python3 scripts/prepare_support_label_sidecar.py \
+  --dataset data/eval/support_eval.json \
+  --existing-sidecar data/eval/support_eval_label_sidecar.json \
+  --annotation-packet \
+  --from-review-queue \
+  --review-backend heuristic \
+  --split test \
+  --output experiments/support-label-packet-review-queue-test.json \
+  --instructions-output experiments/support-label-packet-review-queue-test-instructions.md
+```
+
+`--from-review-queue` 会先运行 support eval report,按 `review_queue` 顺序选出
+case,再套用 `--split`、`--lang`、`--limit`、`--unreviewed-only` 等常规过滤。
+导出的 packet 只增加 `review_queue_rank` 作为分配优先级,不会暴露 dataset
+gold、adjudicated label、annotator labels 或 backend prediction。标注员仍应只根据
+packet 中的 claim/evidence/evidence_scope 独立标注。
+
 过滤只影响导出的标注 packet 或 audit 视图,不会把未选中的 case 从原始
 dataset 或正式 sidecar 中删除。
 用 `--unreviewed-only` 可以在已有 sidecar 人工复核记录时只导出尚未审阅的

@@ -509,6 +509,24 @@ single-reviewer, second-reviewer, and adjudication batches.
 The `--audit` report also includes `recommended_packets` with ready-to-run
 commands for balanced high-risk first review, language-specific high-risk
 review, and second-reviewer batches when `single_annotator` cases exist.
+When an eval backend fails the support quality gate, turn its triage queue into
+a blinded reviewer packet directly:
+
+```bash
+python3 scripts/prepare_support_label_sidecar.py \
+  --dataset data/eval/support_eval.json \
+  --existing-sidecar data/eval/support_eval_label_sidecar.json \
+  --annotation-packet \
+  --from-review-queue \
+  --review-backend heuristic \
+  --split test \
+  --output experiments/support-label-packet-review-queue-test.json \
+  --instructions-output experiments/support-label-packet-review-queue-test-instructions.md
+```
+
+The packet follows `review_queue` order and adds `review_queue_rank` as an
+assignment-priority field, but it still omits hidden gold labels, adjudicated
+labels, prior annotator labels, and model predictions.
 
 The instruction sheet tells reviewers how to label conservatively without
 exposing hidden gold or adjudication fields. Merge completed packets back

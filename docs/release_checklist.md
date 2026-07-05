@@ -27,8 +27,13 @@ agent skill bundle.
   This runs fresh-venv wheel and source-distribution install smokes, checks
   package archive cleanliness, verifies expected release files, runs the
   `project_metadata_contract` source-file gate, runs the
+  `legacy_src_shim_contract` to keep the legacy `src` package thin and
+  `citeguard.*`-forwarding, records `cache_replay_fixture` by exporting a
+  deterministic cache fixture twice and replaying it offline, runs the
   `support_label_sidecar_gate` provenance check, records its structured
-  `thresholds`, `metrics`, and `failures`, checks the built artifact
+  `thresholds`, `metrics`, and `failures`, records `support_review_queue` and
+  `support_review_queue_annotation_packet` so the fixture queue and heuristic
+  blinded packet path are release-smoked, checks the built artifact
   distribution metadata contract, and runs PEP 517 `python -m build` plus
   `python -m twine check` when release tools are installed. The MCP extra gate
   records `mcp_extra_wheel_install_smoke` in the release summary and should be

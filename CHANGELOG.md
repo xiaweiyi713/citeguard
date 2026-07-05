@@ -75,6 +75,17 @@
   support-failure triage payloads.
 - Added a default `support_review_queue` step to the release package gate so
   compact support triage output is checked before release.
+- Added `prepare_support_label_sidecar.py --from-review-queue` so support eval
+  failure queues can be converted directly into blinded human annotation
+  packets without exposing gold labels or backend predictions.
+- Added a release-gate smoke for review-queue annotation packets so release
+  summaries prove the blinded packet path works and does not expose hidden
+  labels or backend predictions.
+- Added a release-gate contract that keeps the legacy `src` package limited to
+  thin `citeguard.*` compatibility shims.
+- Added a release-gate cache replay fixture smoke that exports deterministic
+  cache fixtures twice and verifies offline replay without timestamp-only
+  provenance leaks.
 - Added language coverage and `by_language` support-eval reporting so English
   and Chinese false-support or missed-contradiction risks can be triaged
   separately.

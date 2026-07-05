@@ -205,6 +205,11 @@ configured via environment variables.
   report. Read `review_queue` first, then branch on
   `quality_gate.review_queue_case_ids` and
   `quality_gate.critical_review_case_ids`.
+- When the user asks for human review, benchmark labeling, or adjudication of
+  those failures, generate a blinded annotation packet with
+  `python3 scripts/prepare_support_label_sidecar.py --annotation-packet --from-review-queue --review-backend heuristic --split test`.
+  Use `review_queue_rank` only as assignment priority; do not treat it as a
+  label hint or expose hidden gold labels/model predictions.
 - For expected tool errors (`ok=false`), use `error.next_action` for branching
   and `error.recovery` as the concise next-step instruction instead of
   paraphrasing `error.message`.

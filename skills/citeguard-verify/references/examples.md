@@ -165,6 +165,23 @@ When this exits non-zero, read `quality_gate.review_queue_case_ids` before
 expanding full report rows. Present `review_queue` in order; do not treat
 heuristic missed contradictions as final scientific judgments.
 
+Turn that queue into a blinded human annotation packet:
+
+```bash
+python3 scripts/prepare_support_label_sidecar.py \
+  --dataset data/eval/support_eval.json \
+  --existing-sidecar data/eval/support_eval_label_sidecar.json \
+  --annotation-packet \
+  --from-review-queue \
+  --review-backend heuristic \
+  --split test \
+  --output experiments/support-label-packet-review-queue-test.json \
+  --instructions-output experiments/support-label-packet-review-queue-test-instructions.md
+```
+
+Use `review_queue_rank` as assignment priority only; it is not a label hint and
+does not expose gold labels or backend predictions.
+
 Suggested compact result table:
 
 | item | verdict | risk | next step |
