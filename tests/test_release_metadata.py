@@ -459,6 +459,8 @@ License-File: LICENSE
         self.assertIn("source_health.schema_version", setup_doc)
         self.assertIn("configured/checked/responded/unchecked sources", setup_doc)
         self.assertIn("source_health.summary", setup_doc)
+        self.assertIn("failure_details", setup_doc)
+        self.assertIn("failure_count", setup_doc)
         self.assertIn("next_action", setup_doc)
         self.assertIn("next_action=review_counterevidence_leads", setup_doc)
         self.assertIn("cache_status", setup_doc)
@@ -479,6 +481,8 @@ License-File: LICENSE
             "sources_checked",
             "sources_responded",
             "sources_unchecked",
+            "failure_details",
+            "failure_count",
             "next_action",
             "cache_status",
             "inspect_ok",

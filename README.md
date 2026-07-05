@@ -247,7 +247,8 @@ is bypassing live sources, whether gated-source host suffixes are blocked, and
 whether source-specific credentials such as `CITEGUARD_MAILTO` or
 `SEMANTIC_SCHOLAR_API_KEY` are configured. `source_health.summary` gives agents a
 compact `degraded` flag, status counts, available/failed source lists, stable
-`recovery_code`, and stable `next_action` for retry/configuration decisions.
+`failure_count`, summary-level `failure_details`, `recovery_code`, and stable
+`next_action` for retry/configuration decisions.
 `cache_status` gives agents cache schema version, entry counts, timestamp
 bounds, `inspect_ok`, and stable `next_action` without exposing raw cache
 queries.

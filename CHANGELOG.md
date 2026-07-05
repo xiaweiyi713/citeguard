@@ -24,6 +24,8 @@
 - Added cache export provenance for source, query, timestamp, operation, and raw
   match score.
 - Added source-level readiness reporting in `citeguard status` / `citeguard_status_tool`.
+- Added summary-level source health failure counts and failure details for agent
+  retry/configuration decisions.
 - Added short HTTP retries for transient scholarly source failures plus
   `CITEGUARD_HTTP_RETRIES` and `CITEGUARD_HTTP_RETRY_BACKOFF` status fields.
 - Added machine-readable HTTP/source failure diagnostics for timeouts, rate

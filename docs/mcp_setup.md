@@ -107,8 +107,9 @@ nested `source_health.schema_version` fields version the machine-readable status
 contract. The `source_health.summary` block is the agent-friendly entry point:
 it reports status counts, configured/checked/responded/unchecked sources,
 available/failed sources, invalid source names, `degraded`,
-`all_checked_sources_failed`, a stable `recovery_code`, and a stable
-`next_action` (`continue`, `inspect_source_health`,
+`all_checked_sources_failed`, summary-level `failure_count` and
+`failure_details`, a stable `recovery_code`, and a stable `next_action`
+(`continue`, `inspect_source_health`,
 `retry_or_check_source_health`, or `fix_configuration`) for retry or
 configuration decisions.
 `cache_status` reports cache schema version, entry counts, entry-prefix counts,

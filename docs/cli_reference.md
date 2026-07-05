@@ -27,7 +27,8 @@ without treating HTTP cache replay as a source outage. `source_health.summary`
 counts each status, lists `sources_configured`, `sources_checked`,
 `sources_responded`, `sources_unchecked`, `sources_available`,
 `sources_failed`, and `invalid_sources`, and exposes `degraded`,
-`all_checked_sources_failed`, stable `recovery_code` values such as `timeout`,
+`all_checked_sources_failed`, summary-level `failure_count` and
+`failure_details`, stable `recovery_code` values such as `timeout`,
 `source_unavailable`, or `invalid_input`, and a stable `next_action` such as
 `continue`, `inspect_source_health`, `retry_or_check_source_health`, or
 `fix_configuration`. Use `--health-query` to override the

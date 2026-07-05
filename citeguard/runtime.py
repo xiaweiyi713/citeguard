@@ -21,7 +21,7 @@ from citeguard.verification import CachingMetadataSource, inspect_cache, source_
 DEFAULT_SOURCES = "openalex,crossref,arxiv"
 DEFAULT_MAILTO = "research@example.com"
 STATUS_SCHEMA_VERSION = 1
-SOURCE_HEALTH_SCHEMA_VERSION = 1
+SOURCE_HEALTH_SCHEMA_VERSION = 2
 POLITE_ACCESS_SCHEMA_VERSION = 1
 CONTACT_REQUIRED_SOURCES = {"openalex", "crossref"}
 SOURCE_ALIASES = {
@@ -335,6 +335,8 @@ def _source_health_summary(sources: List[dict], live_check_performed: bool, mode
         "sources_available": sources_available,
         "sources_failed": sources_failed,
         "invalid_sources": invalid_sources,
+        "failure_details": failure_details,
+        "failure_count": len(failure_details),
         "degraded": degraded,
         "all_checked_sources_failed": all_checked_failed,
         "recovery_code": recovery_code,
