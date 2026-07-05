@@ -66,6 +66,15 @@
   full-text-required boundaries.
 - Added grouped `false_support_case_ids` and `weak_false_support_case_ids` in
   support false-overcall analysis for split/case-type/evidence-scope triage.
+- Added support-eval `review_queue` plus baseline comparison
+  `review_queue_case_ids` / `critical_review_case_ids` so agents and
+  maintainers can inspect the highest-risk support failures first.
+- Added `quality_gate.review_queue_case_ids` and
+  `quality_gate.critical_review_case_ids` to support-eval gate failures.
+- Added `scripts/eval_support.py --review-queue-only` for compact
+  support-failure triage payloads.
+- Added a default `support_review_queue` step to the release package gate so
+  compact support triage output is checked before release.
 - Added language coverage and `by_language` support-eval reporting so English
   and Chinese false-support or missed-contradiction risks can be triaged
   separately.

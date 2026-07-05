@@ -197,6 +197,8 @@ def _comparison_row(backend_name: str, report: Dict[str, Any], gate: Dict[str, A
     counts = report.get("error_bucket_counts", {})
     false_support_analysis = report.get("false_support_analysis", {})
     diagnostics = report.get("diagnostics", {})
+    review_queue = list(report.get("review_queue", []))
+    review_queue_summary = report.get("review_queue_summary", {})
     return {
         "backend": backend_name,
         "quality_gate_ok": bool(gate.get("ok")),
@@ -211,6 +213,22 @@ def _comparison_row(backend_name: str, report: Dict[str, Any], gate: Dict[str, A
         "weak_false_support_count": counts.get("weak_false_support", 0),
         "total_overcall_count": false_support_analysis.get("total_overcall_count", 0),
         "high_risk_false_support_case_ids": list(false_support_analysis.get("high_risk_case_ids", [])),
+        "review_queue_case_ids": [
+            str(item.get("case_id", ""))
+            for item in review_queue[:10]
+            if item.get("case_id")
+        ],
+        "critical_review_case_ids": [
+            str(item.get("case_id", ""))
+            for item in review_queue
+            if item.get("severity") == "critical" and item.get("case_id")
+        ],
+        "review_queue_by_severity": dict(review_queue_summary.get("by_severity", {}))
+        if isinstance(review_queue_summary, dict)
+        else {},
+        "review_queue_by_recommended_action": dict(review_queue_summary.get("by_recommended_action", {}))
+        if isinstance(review_queue_summary, dict)
+        else {},
         "missed_contradiction_count": counts.get("missed_contradiction", 0),
         "heuristic_limited": bool(diagnostics.get("heuristic_limited")),
         "warnings": list(diagnostics.get("warnings", [])),

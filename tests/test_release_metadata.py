@@ -15,6 +15,7 @@ from scripts.release_package_gate import (
     _record_mcp_stdio_smoke,
     _record_published_smoke_plan,
     _record_support_label_sidecar_gate,
+    _record_support_review_queue_gate,
 )
 from scripts.smoke_package import _assert_archive_excludes_generated_files, _assert_distribution_metadata_contract
 
@@ -325,12 +326,18 @@ License-File: LICENSE
             "--include-published-smoke-plan",
             "--include-published-mcp-smoke-plan",
             "--skip-support-label-gate",
+            "--skip-support-review-queue",
             "--support-label-sidecar",
             "--support-eval-dataset",
             "--min-high-risk-reviewed-by-language",
             "--with-deps",
             "--extra mcp",
             "support_label_sidecar_gate",
+            "support_review_queue",
+            "_record_support_review_queue_gate",
+            "--review-queue-only",
+            'quality_gate.get("review_queue_case_ids", [])',
+            'quality_gate.get("critical_review_case_ids", [])',
             'gate.get("thresholds", {})',
             'gate.get("metrics", {})',
             'gate.get("failures", [])',
@@ -613,6 +620,48 @@ License-File: LICENSE
         self.assertEqual(summary["steps"][0]["failures"][0]["language"], "zh")
         self.assertEqual(summary["steps"][0]["metrics"]["high_risk_case_count_by_language"], {"zh": 5})
 
+    def test_release_gate_records_support_review_queue_contract(self):
+        summary = {"ok": True, "steps": []}
+        completed = mock.Mock(
+            stdout=(
+                '{"case_count": 12, "review_queue": [], '
+                '"review_queue_summary": {"count": 0, "by_severity": {}}, '
+                '"quality_gate": {"ok": true, "review_queue_case_ids": [], '
+                '"critical_review_case_ids": [], "failures": []}, '
+                '"support_set_policy": {"accuracy": 1.0}}'
+            )
+        )
+        with mock.patch("scripts.release_package_gate._run", return_value=completed) as run:
+            _record_support_review_queue_gate(
+                summary,
+                python="python3",
+                project_root=ROOT,
+                dataset="data/eval/support_eval.json",
+            )
+
+        run.assert_called_once()
+        self.assertEqual(
+            run.call_args.args[0],
+            [
+                "python3",
+                "scripts/eval_support.py",
+                "--dataset",
+                "data/eval/support_eval.json",
+                "--split",
+                "test",
+                "--backend",
+                "fixture",
+                "--quality-gate",
+                "--review-queue-only",
+            ],
+        )
+        self.assertTrue(summary["ok"])
+        self.assertEqual(summary["steps"][0]["name"], "support_review_queue")
+        self.assertEqual(summary["steps"][0]["status"], "passed")
+        self.assertEqual(summary["steps"][0]["review_queue_count"], 0)
+        self.assertEqual(summary["steps"][0]["review_queue_summary"], {"count": 0, "by_severity": {}})
+        self.assertEqual(summary["steps"][0]["review_queue_case_ids"], [])
+
     def test_mcp_smoke_checks_structured_errors(self):
         smoke = (ROOT / "scripts" / "smoke_mcp.py").read_text(encoding="utf-8")
         setup_doc = (ROOT / "docs" / "mcp_setup.md").read_text(encoding="utf-8")
@@ -879,6 +928,13 @@ License-File: LICENSE
             "per-label precision/recall/F1",
             "per-label precision / recall / F1",
             "`per_label`",
+            "`review_queue`",
+            "--review-queue-only",
+            "review_queue_case_ids",
+            "critical_review_case_ids",
+            "quality_gate.review_queue_case_ids",
+            "quality_gate.critical_review_case_ids",
+            "`recommended_action`",
             "false_support_analysis",
             "total_overcall_count",
             "high-risk false support case ids",
@@ -950,6 +1006,9 @@ License-File: LICENSE
         self.assertIn("human-reviewed benchmark", checklist)
         self.assertIn("compare_support_baselines.py", checklist)
         self.assertIn("support-baselines-release", checklist)
+        self.assertIn("--review-queue-only", checklist)
+        self.assertIn("quality_gate.review_queue_case_ids", checklist)
+        self.assertIn("quality_gate.critical_review_case_ids", checklist)
         self.assertIn("package archive cleanliness", checklist)
         self.assertIn("__pycache__", checklist)
         self.assertIn("baseline comparison table", benchmark_design)
@@ -1076,6 +1135,10 @@ License-File: LICENSE
             "Review queue summary from `review_summary.action_queues`",
             "`filtered.returned_indexes` / `filtered.omitted_indexes`",
             "`index`, `citation/claim`, `verdict`, `risk`, `next_action`, `why`, `next step`",
+            "--review-queue-only",
+            "`review_queue`",
+            "`quality_gate.review_queue_case_ids`",
+            "`quality_gate.critical_review_case_ids`",
             "source retry is inconclusive",
             "Scope / limitations",
             "## Scenario routing",

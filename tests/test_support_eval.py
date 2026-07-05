@@ -23,6 +23,8 @@ from citeguard.verification.support_eval import (
     compute_support_metrics,
     compute_support_quality_gate,
     compute_support_report,
+    compute_support_review_queue,
+    compute_support_review_queue_summary,
     filter_support_cases_by_split,
     load_support_label_cases,
     load_support_label_sidecar,
@@ -1914,6 +1916,12 @@ class SupportEvalTests(unittest.TestCase):
         self.assertEqual(report["confusion_matrix"]["insufficient_evidence"]["supported"], 1)
         self.assertEqual(report["error_bucket_counts"]["false_support"], 1)
         self.assertEqual(report["error_bucket_counts"]["missed_contradiction"], 0)
+        self.assertEqual(report["review_queue"][0]["case_id"], "b")
+        self.assertEqual(report["review_queue"][0]["severity"], "critical")
+        self.assertEqual(report["review_queue"][0]["recommended_action"], "rewrite_or_replace_evidence")
+        self.assertEqual(report["review_queue_summary"]["count"], 1)
+        self.assertEqual(report["review_queue_summary"]["by_severity"], {"critical": 1})
+        self.assertEqual(report["review_queue_summary"]["by_recommended_action"], {"rewrite_or_replace_evidence": 1})
         self.assertEqual(report["false_support_analysis"]["false_support_count"], 1)
         self.assertEqual(report["false_support_analysis"]["weak_false_support_count"], 0)
         self.assertEqual(report["false_support_analysis"]["by_case_type"]["hard_negative"]["case_ids"], ["b"])
@@ -1986,6 +1994,11 @@ class SupportEvalTests(unittest.TestCase):
         self.assertIn("false_support_count", {failure["code"] for failure in gate["failures"]})
         self.assertIn("supported_precision", {failure["code"] for failure in gate["failures"]})
         self.assertEqual(gate["failures"][0]["case_ids"], ["b"])
+        self.assertEqual(gate["review_queue_case_ids"], ["b"])
+        self.assertEqual(gate["critical_review_case_ids"], ["b"])
+        self.assertEqual(gate["metrics"]["review_queue_count"], 1)
+        self.assertEqual(gate["metrics"]["critical_review_count"], 1)
+        self.assertEqual(gate["review_queue_summary"]["by_bucket"], {"false_support": 1})
 
     def test_quality_gate_fails_on_missed_contradiction(self):
         cases = [
@@ -1999,6 +2012,8 @@ class SupportEvalTests(unittest.TestCase):
         self.assertFalse(gate["ok"])
         self.assertIn("contradiction_recall", {failure["code"] for failure in gate["failures"]})
         self.assertEqual(gate["metrics"]["contradiction_recall"], 0.0)
+        self.assertEqual(gate["review_queue_case_ids"], ["b"])
+        self.assertEqual(gate["critical_review_case_ids"], [])
 
     def test_eval_support_cli_quality_gate_exits_nonzero_on_failure(self):
         completed = subprocess.run(
@@ -2023,8 +2038,46 @@ class SupportEvalTests(unittest.TestCase):
         payload = json.loads(completed.stdout)
         self.assertFalse(payload["quality_gate"]["ok"])
         self.assertEqual(payload["quality_gate"]["failures"][0]["code"], "supported_precision")
+        self.assertIn("review_queue_case_ids", payload["quality_gate"])
         self.assertIn("support_set_policy", payload)
         self.assertEqual(payload["support_set_policy"]["overall"]["accuracy"], 1.0)
+
+    def test_eval_support_cli_can_print_review_queue_only(self):
+        completed = subprocess.run(
+            [
+                sys.executable,
+                "scripts/eval_support.py",
+                "--dataset",
+                os.path.join("data", "eval", "support_eval.json"),
+                "--split",
+                "test",
+                "--backend",
+                "heuristic",
+                "--quality-gate",
+                "--review-queue-only",
+            ],
+            check=False,
+            cwd=os.getcwd(),
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertEqual(completed.returncode, 1)
+        payload = json.loads(completed.stdout)
+        self.assertEqual(payload["backend"], "heuristic")
+        self.assertEqual(payload["split"], "test")
+        self.assertIn("review_queue", payload)
+        self.assertNotIn("cases", payload)
+        self.assertEqual(payload["quality_gate"]["ok"], False)
+        self.assertEqual(payload["quality_gate"]["review_queue_case_ids"][:4], ["s10", "s16", "s27", "s36"])
+        self.assertEqual(payload["review_queue_summary"]["by_severity"]["high"], 4)
+        self.assertEqual(
+            payload["quality_gate"]["review_queue_summary"]["by_recommended_action"][
+                "run_nli_or_human_contradiction_review"
+            ],
+            4,
+        )
+        self.assertEqual(payload["review_queue"][0]["recommended_action"], "run_nli_or_human_contradiction_review")
 
     def test_eval_support_cli_sidecar_gate_exits_nonzero_on_review_threshold(self):
         completed = subprocess.run(
@@ -2188,6 +2241,38 @@ class SupportEvalTests(unittest.TestCase):
         self.assertEqual(analysis["by_split"]["test"]["false_support_case_ids"], ["a"])
         self.assertEqual(analysis["by_split"]["test"]["weak_false_support_case_ids"], ["b"])
         self.assertIn("highest-risk", analysis["interpretation"])
+
+    def test_support_review_queue_prioritizes_high_risk_support_failures(self):
+        cases = [
+            SupportCase("a", "claim", "evidence", "contradicted", case_type="contradiction", evidence_scope="abstract", split="test"),
+            SupportCase("b", "claim", "evidence", "insufficient_evidence", case_type="hard_negative", evidence_scope="abstract", split="test"),
+            SupportCase("c", "claim", "evidence", "contradicted", case_type="contradiction", evidence_scope="abstract", split="dev"),
+            SupportCase("d", "claim", "evidence", "supported", case_type="direct_support", evidence_scope="abstract", split="test"),
+        ]
+        buckets = compute_support_error_buckets(
+            cases,
+            ["supported", "weakly_supported", "insufficient_evidence", "insufficient_evidence"],
+        )
+
+        queue = compute_support_review_queue(buckets)
+
+        self.assertEqual([item["case_id"] for item in queue], ["a", "c", "b", "d"])
+        self.assertEqual(queue[0]["severity"], "critical")
+        self.assertEqual(queue[0]["risk_score"], 100)
+        self.assertEqual(queue[0]["buckets"], ["false_support", "missed_contradiction"])
+        self.assertEqual(queue[0]["recommended_action"], "inspect_contradiction_before_accepting_support")
+        self.assertEqual(queue[1]["severity"], "high")
+        self.assertEqual(queue[1]["recommended_action"], "run_nli_or_human_contradiction_review")
+        self.assertEqual(queue[2]["buckets"], ["weak_false_support"])
+        self.assertEqual(queue[2]["recommended_action"], "downgrade_or_find_stronger_evidence")
+        self.assertEqual(queue[3]["recommended_action"], "inspect_recall_loss")
+
+        summary = compute_support_review_queue_summary(queue)
+        self.assertEqual(summary["count"], 4)
+        self.assertEqual(summary["by_severity"], {"critical": 1, "high": 2, "medium": 1})
+        self.assertEqual(summary["by_bucket"]["missed_contradiction"], 2)
+        self.assertEqual(summary["top_case_ids"], ["a", "c", "b", "d"])
+        self.assertEqual(summary["critical_case_ids"], ["a"])
 
 
 if __name__ == "__main__":

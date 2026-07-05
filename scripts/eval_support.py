@@ -57,6 +57,14 @@ def main() -> None:
         help="Include breakdowns by case_type and evidence_scope plus per-case rows.",
     )
     parser.add_argument(
+        "--review-queue-only",
+        action="store_true",
+        help=(
+            "Print only the support-failure review queue and gate summaries. "
+            "This implies --report and is useful for agent triage."
+        ),
+    )
+    parser.add_argument(
         "--validate-only",
         action="store_true",
         help="Validate dataset schema, provenance, and coverage without loading support models.",
@@ -194,7 +202,7 @@ def main() -> None:
         sidecar_summary = validate_support_label_sidecar(sidecar_data, load_support_label_cases(args.dataset))
     if args.split:
         cases = filter_support_cases_by_split(cases, args.split)
-    wants_report = args.report or args.quality_gate
+    wants_report = args.report or args.quality_gate or args.review_queue_only
     if args.backend == "fixture":
         result = run_support_eval_fixture_report(cases) if wants_report else run_support_eval_fixture(cases)
     else:
@@ -260,7 +268,8 @@ def main() -> None:
             output_dir=args.output_dir,
             run_id=args.run_id,
         )
-    print(json.dumps(result, indent=2, ensure_ascii=False))
+    output = _review_queue_only_payload(result, args) if args.review_queue_only and isinstance(result, dict) else result
+    print(json.dumps(output, indent=2, ensure_ascii=False))
     if (
         sidecar_summary is not None
         and isinstance(result, dict)
@@ -269,6 +278,53 @@ def main() -> None:
         sys.exit(1)
     if args.quality_gate and isinstance(result, dict) and not result["quality_gate"]["ok"]:
         sys.exit(1)
+
+
+def _review_queue_only_payload(result: Dict[str, object], args: argparse.Namespace) -> Dict[str, object]:
+    dataset = result.get("dataset", {})
+    overall = result.get("overall", {})
+    quality_gate = result.get("quality_gate")
+    label_sidecar_gate = result.get("label_sidecar_gate")
+    support_set_policy = result.get("support_set_policy", {})
+    support_set_overall = support_set_policy.get("overall", {}) if isinstance(support_set_policy, dict) else {}
+    payload: Dict[str, object] = {
+        "dataset": args.dataset,
+        "split": args.split or "all",
+        "backend": args.backend,
+        "case_count": dataset.get("n") if isinstance(dataset, dict) else None,
+        "overall": {
+            "accuracy": overall.get("accuracy") if isinstance(overall, dict) else None,
+            "supported_precision": overall.get("supported_precision") if isinstance(overall, dict) else None,
+            "false_support_rate": overall.get("false_support_rate") if isinstance(overall, dict) else None,
+            "contradiction_recall": overall.get("contradiction_recall") if isinstance(overall, dict) else None,
+        },
+        "review_queue_summary": result.get("review_queue_summary", {}),
+        "review_queue": list(result.get("review_queue", [])),
+    }
+    if isinstance(quality_gate, dict):
+        payload["quality_gate"] = {
+            "ok": quality_gate.get("ok"),
+            "review_queue_case_ids": list(quality_gate.get("review_queue_case_ids", [])),
+            "critical_review_case_ids": list(quality_gate.get("critical_review_case_ids", [])),
+            "review_queue_summary": quality_gate.get("review_queue_summary", {}),
+            "failures": list(quality_gate.get("failures", [])),
+            "warnings": list(quality_gate.get("warnings", [])),
+        }
+    if isinstance(label_sidecar_gate, dict):
+        payload["label_sidecar_gate"] = {
+            "ok": label_sidecar_gate.get("ok"),
+            "failures": list(label_sidecar_gate.get("failures", [])),
+            "warnings": list(label_sidecar_gate.get("warnings", [])),
+        }
+    if support_set_overall:
+        payload["support_set_policy"] = {
+            "accuracy": support_set_overall.get("accuracy"),
+            "contradiction_recall": support_set_overall.get("contradiction_recall"),
+            "false_support_rate": support_set_overall.get("false_support_rate"),
+        }
+    if "experiment_artifact" in result:
+        payload["experiment_artifact"] = result["experiment_artifact"]
+    return payload
 
 
 if __name__ == "__main__":

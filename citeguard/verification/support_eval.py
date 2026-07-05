@@ -1197,6 +1197,15 @@ def compute_support_quality_gate(
     gold_labels = dataset.get("gold_labels", {}) if isinstance(dataset, dict) else {}
     counts = report.get("error_bucket_counts", {}) if isinstance(report, dict) else {}
     buckets = report.get("error_buckets", {}) if isinstance(report, dict) else {}
+    raw_review_queue = report.get("review_queue", []) if isinstance(report, dict) else []
+    review_queue = (
+        list(raw_review_queue)
+        if isinstance(raw_review_queue, list)
+        else compute_support_review_queue(buckets if isinstance(buckets, dict) else {})
+    )
+    if not review_queue and isinstance(buckets, dict):
+        review_queue = compute_support_review_queue(buckets)
+    review_queue_summary = compute_support_review_queue_summary(review_queue)
     thresholds = {
         "max_false_support_rate": max_false_support_rate,
         "max_false_support_count": max_false_support_count,
@@ -1288,7 +1297,22 @@ def compute_support_quality_gate(
             "weak_false_support_count": weak_false_support_count,
             "supported_precision": supported_precision,
             "contradiction_recall": contradiction_recall,
+            "review_queue_count": len(review_queue),
+            "critical_review_count": sum(
+                1 for item in review_queue if isinstance(item, dict) and item.get("severity") == "critical"
+            ),
         },
+        "review_queue_case_ids": [
+            str(item.get("case_id", ""))
+            for item in review_queue[:10]
+            if isinstance(item, dict) and item.get("case_id")
+        ],
+        "critical_review_case_ids": [
+            str(item.get("case_id", ""))
+            for item in review_queue
+            if isinstance(item, dict) and item.get("severity") == "critical" and item.get("case_id")
+        ],
+        "review_queue_summary": review_queue_summary,
         "failures": failures,
         "warnings": warnings,
     }
@@ -1303,6 +1327,7 @@ def compute_support_report(
     overall_preds = [(case.gold, pred) for case, pred in zip(cases, predictions)]
     error_buckets = compute_support_error_buckets(cases, predictions)
     error_bucket_counts = {key: len(items) for key, items in error_buckets.items()}
+    review_queue = compute_support_review_queue(error_buckets)
     return {
         "dataset": summarize_support_cases(cases),
         "overall": compute_support_metrics(overall_preds),
@@ -1313,6 +1338,8 @@ def compute_support_report(
         "by_split": _compute_grouped_metrics(cases, predictions, "split"),
         "error_bucket_counts": error_bucket_counts,
         "error_buckets": error_buckets,
+        "review_queue": review_queue,
+        "review_queue_summary": compute_support_review_queue_summary(review_queue),
         "false_support_analysis": compute_false_support_analysis(error_buckets),
         "diagnostics": compute_support_diagnostics(cases, predictions, backend_name=backend_name),
         "cases": [
@@ -1329,6 +1356,167 @@ def compute_support_report(
             }
             for case, pred in zip(cases, predictions)
         ],
+    }
+
+
+def compute_support_review_queue_summary(review_queue: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """Summarize a support review queue for machine routing."""
+
+    valid_items = [item for item in review_queue if isinstance(item, dict)]
+    by_severity: Dict[str, int] = {}
+    by_recommended_action: Dict[str, int] = {}
+    by_bucket: Dict[str, int] = {}
+    critical_case_ids: List[str] = []
+    top_case_ids: List[str] = []
+
+    for item in valid_items:
+        case_id = str(item.get("case_id", "")).strip()
+        if case_id and len(top_case_ids) < 10:
+            top_case_ids.append(case_id)
+        severity = str(item.get("severity", "") or "unknown")
+        by_severity[severity] = by_severity.get(severity, 0) + 1
+        if severity == "critical" and case_id:
+            critical_case_ids.append(case_id)
+        action = str(item.get("recommended_action", "") or "inspect_case")
+        by_recommended_action[action] = by_recommended_action.get(action, 0) + 1
+        buckets = item.get("buckets", [])
+        if not isinstance(buckets, list):
+            buckets = []
+        for bucket in buckets:
+            bucket_name = str(bucket)
+            by_bucket[bucket_name] = by_bucket.get(bucket_name, 0) + 1
+
+    return {
+        "count": len(valid_items),
+        "by_severity": dict(sorted(by_severity.items())),
+        "by_recommended_action": dict(sorted(by_recommended_action.items())),
+        "by_bucket": dict(sorted(by_bucket.items())),
+        "top_case_ids": top_case_ids,
+        "critical_case_ids": critical_case_ids,
+    }
+
+
+def compute_support_review_queue(error_buckets: Dict[str, List[Dict[str, str]]]) -> List[Dict[str, Any]]:
+    """Return a risk-ordered review queue for support-eval failures."""
+
+    by_case_id: Dict[str, Dict[str, Any]] = {}
+    bucket_order = (
+        "false_support",
+        "missed_contradiction",
+        "weak_false_support",
+        "supported_rejected",
+        "incorrect_abstention",
+    )
+    for bucket in bucket_order:
+        for item in error_buckets.get(bucket, []):
+            case_id = str(item.get("case_id", "")).strip()
+            if not case_id:
+                continue
+            row = by_case_id.setdefault(case_id, dict(item, buckets=[]))
+            row["buckets"].append(bucket)
+
+    queue = []
+    for row in by_case_id.values():
+        metadata = _support_review_queue_metadata(row)
+        queue.append(
+            {
+                "case_id": row["case_id"],
+                "severity": metadata["severity"],
+                "risk_score": metadata["risk_score"],
+                "buckets": sorted(set(row["buckets"]), key=_support_review_bucket_rank),
+                "gold": row.get("gold", ""),
+                "predicted": row.get("predicted", ""),
+                "case_type": row.get("case_type", ""),
+                "evidence_scope": row.get("evidence_scope", ""),
+                "lang": row.get("lang", ""),
+                "split": row.get("split", ""),
+                "recommended_action": metadata["recommended_action"],
+                "reason": metadata["reason"],
+            }
+        )
+
+    return sorted(
+        queue,
+        key=lambda item: (
+            -int(item["risk_score"]),
+            item.get("split") != "test",
+            str(item.get("case_type", "")),
+            str(item.get("case_id", "")),
+        ),
+    )
+
+
+def _support_review_bucket_rank(bucket: str) -> int:
+    ranks = {
+        "false_support": 0,
+        "missed_contradiction": 1,
+        "weak_false_support": 2,
+        "supported_rejected": 3,
+        "incorrect_abstention": 4,
+    }
+    return ranks.get(bucket, 99)
+
+
+def _support_review_queue_metadata(row: Dict[str, Any]) -> Dict[str, Any]:
+    buckets = set(row.get("buckets", []))
+    gold = str(row.get("gold", ""))
+    predicted = str(row.get("predicted", ""))
+    case_type = str(row.get("case_type", ""))
+
+    if "false_support" in buckets and gold == "contradicted":
+        return {
+            "severity": "critical",
+            "risk_score": 100,
+            "recommended_action": "inspect_contradiction_before_accepting_support",
+            "reason": "The backend predicted supported for a contradicted case.",
+        }
+    if "false_support" in buckets and case_type in HIGH_RISK_SUPPORT_CASE_TYPES:
+        return {
+            "severity": "critical",
+            "risk_score": 95,
+            "recommended_action": "rewrite_or_replace_evidence",
+            "reason": "A high-risk non-supporting case was predicted as supported.",
+        }
+    if "false_support" in buckets:
+        return {
+            "severity": "critical",
+            "risk_score": 90,
+            "recommended_action": "rewrite_or_replace_evidence",
+            "reason": "A non-supporting case was predicted as supported.",
+        }
+    if "missed_contradiction" in buckets:
+        return {
+            "severity": "high",
+            "risk_score": 80,
+            "recommended_action": "run_nli_or_human_contradiction_review",
+            "reason": "A contradicted case was not predicted as contradicted.",
+        }
+    if "weak_false_support" in buckets:
+        return {
+            "severity": "high",
+            "risk_score": 70,
+            "recommended_action": "downgrade_or_find_stronger_evidence",
+            "reason": "A non-supporting case was predicted as weakly_supported.",
+        }
+    if "supported_rejected" in buckets:
+        return {
+            "severity": "medium",
+            "risk_score": 50,
+            "recommended_action": "inspect_recall_loss",
+            "reason": "A supported case was rejected or contradicted.",
+        }
+    if "incorrect_abstention" in buckets:
+        return {
+            "severity": "medium",
+            "risk_score": 40,
+            "recommended_action": "inspect_abstention_threshold",
+            "reason": "The backend abstained on a case with a stronger gold label.",
+        }
+    return {
+        "severity": "low",
+        "risk_score": 10,
+        "recommended_action": "inspect_case",
+        "reason": f"Review case with gold={gold!r} and predicted={predicted!r}.",
     }
 
 

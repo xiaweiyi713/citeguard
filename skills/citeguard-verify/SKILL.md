@@ -199,6 +199,12 @@ configured via environment variables.
   map filtered rows back to the original input list. Use
   `filtered.omitted_review_summary` to briefly say what was hidden by the filter
   instead of implying omitted rows were unexamined.
+- For support benchmark or release-readiness triage, prefer
+  `python3 scripts/eval_support.py --split test --backend heuristic --quality-gate --review-queue-only`
+  when the user wants the highest-risk support failures rather than a full
+  report. Read `review_queue` first, then branch on
+  `quality_gate.review_queue_case_ids` and
+  `quality_gate.critical_review_case_ids`.
 - For expected tool errors (`ok=false`), use `error.next_action` for branching
   and `error.recovery` as the concise next-step instruction instead of
   paraphrasing `error.message`.

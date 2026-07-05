@@ -89,6 +89,8 @@ agent skill bundle.
   ```bash
   python scripts/eval_support.py
   python scripts/eval_support.py --report --split test --quality-gate
+  python scripts/eval_support.py --split test --backend fixture --quality-gate --review-queue-only
+  python scripts/eval_support.py --split test --backend heuristic --quality-gate --review-queue-only
   python scripts/eval_support.py --report --split test --quality-gate --output-dir experiments --run-id support-release-smoke
   python scripts/compare_support_baselines.py --split test --min-high-risk-reviewed-by-language zh=0 --output-dir experiments --run-id support-baselines-release
   python scripts/prepare_support_label_sidecar.py --existing-sidecar data/eval/support_eval_label_sidecar.json --annotation-packet --priority high --split test --limit 3 --output experiments/support-label-packet-high-risk-test-batch1.json --instructions-output experiments/support-label-packet-high-risk-test-batch1-instructions.md
@@ -99,7 +101,11 @@ agent skill bundle.
 
   The quality gate should stay conservative for release candidates: false
   support, weak false support, and missed contradictions must be reviewed before
-  relaxing thresholds. The report should include `support_set_policy` so
+  relaxing thresholds. The fixture `--review-queue-only` output should have an
+  empty `review_queue` and `review_queue_summary.count=0`; the heuristic `--review-queue-only` output is a compact
+  triage artifact for `quality_gate.review_queue_case_ids` and
+  `quality_gate.critical_review_case_ids`, with `review_queue_summary` grouped by
+  severity and recommended action, not a model-quality claim. The report should include `support_set_policy` so
   citation-set aggregation boundaries are checked alongside evidence-level
   cases. The baseline comparison table should include at least the deterministic
   `fixture` row and the zero-model `heuristic` row, with heuristic limitations

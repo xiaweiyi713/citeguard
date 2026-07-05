@@ -155,6 +155,16 @@ Counter-evidence lead search:
 }
 ```
 
+Support eval review queue:
+
+```bash
+python3 scripts/eval_support.py --split test --backend heuristic --quality-gate --review-queue-only
+```
+
+When this exits non-zero, read `quality_gate.review_queue_case_ids` before
+expanding full report rows. Present `review_queue` in order; do not treat
+heuristic missed contradictions as final scientific judgments.
+
 Suggested compact result table:
 
 | item | verdict | risk | next step |

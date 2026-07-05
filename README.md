@@ -407,6 +407,7 @@ python3 scripts/eval_verification.py       # offline, deterministic existence/me
 python3 scripts/eval_support.py            # deterministic support fixture eval, no model downloads
 python3 scripts/eval_support.py --report   # fixture report with case-type/evidence-scope breakdowns
 python3 scripts/eval_support.py --report --split test --quality-gate
+python3 scripts/eval_support.py --split test --backend heuristic --quality-gate --review-queue-only
 python3 scripts/eval_support.py --backend heuristic --report --split test
 python3 scripts/eval_support.py --backend production --report --split test  # requires [models] and cached/downloadable weights
 python3 scripts/eval_support.py --validate-only  # dataset schema/provenance/coverage gate only
@@ -433,12 +434,19 @@ per-label precision/recall/F1, abstention rate, false-support rate, contradictio
 optional breakdowns by `case_type`, `evidence_scope`, language, and split, a confusion matrix,
 high-risk error buckets such as false support and missed contradiction, and
 provenance fields for each synthetic seed case. Reports also include
+`review_queue`, which ranks the most dangerous support-eval failures first,
+`review_queue_summary`, which groups that queue by severity, bucket, and
+recommended action, plus
 `false_support_analysis`, which summarizes total support overcalls, high-risk
 false-support case ids, and breakdowns by case type, evidence scope, language,
 and split for release triage.
 `--quality-gate` turns the report into a conservative
 release gate: by default, any false support, weak false support, or missed
 contradiction fails the command with a machine-readable `quality_gate` block.
+Failed gates include `quality_gate.review_queue_case_ids` and
+`quality_gate.critical_review_case_ids` so agents can inspect the highest-risk
+cases first. Use `--review-queue-only` when an agent or release script only
+needs the compact support-failure triage payload instead of the full report.
 Reports also include `support_set_policy`, a deterministic fixture that checks
 claim-level aggregation boundaries such as multiple weak citations remaining
 tentative and contradictions dominating the aggregate.

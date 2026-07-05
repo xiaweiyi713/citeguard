@@ -44,6 +44,11 @@ def main(argv: Optional[List[str]] = None) -> int:
         action="store_true",
         help="Skip support label sidecar provenance validation. Intended only for local debugging.",
     )
+    parser.add_argument(
+        "--skip-support-review-queue",
+        action="store_true",
+        help="Skip support eval review-queue contract validation. Intended only for local debugging.",
+    )
     parser.add_argument("--support-eval-dataset", default="data/eval/support_eval.json")
     parser.add_argument("--support-label-sidecar", default="data/eval/support_eval_label_sidecar.json")
     parser.add_argument("--min-sidecar-coverage", type=float, default=1.0)
@@ -117,6 +122,13 @@ def main(argv: Optional[List[str]] = None) -> int:
             max_unresolved_disagreements=args.max_unresolved_disagreements,
             min_raw_dual_agreement_rate=args.min_raw_dual_agreement_rate,
             max_supported_disagreements=args.max_supported_disagreements,
+        )
+    if not args.skip_support_review_queue:
+        _record_support_review_queue_gate(
+            summary,
+            python=args.python,
+            project_root=project_root,
+            dataset=args.support_eval_dataset,
         )
 
     if not args.skip_install_smoke:
@@ -449,6 +461,81 @@ def _record_support_label_sidecar_gate(
             "thresholds": gate.get("thresholds", {}),
             "metrics": gate.get("metrics", {}),
             "failures": gate.get("failures", []),
+            "stdout_tail": _tail(completed.stdout),
+        }
+    )
+    if not passed:
+        summary["ok"] = False
+
+
+def _record_support_review_queue_gate(
+    summary: Dict[str, Any],
+    *,
+    python: str,
+    project_root: Path,
+    dataset: str,
+) -> None:
+    cmd = [
+        python,
+        "scripts/eval_support.py",
+        "--dataset",
+        dataset,
+        "--split",
+        "test",
+        "--backend",
+        "fixture",
+        "--quality-gate",
+        "--review-queue-only",
+    ]
+    try:
+        completed = _run(cmd, cwd=project_root)
+        payload = json.loads(completed.stdout)
+    except subprocess.CalledProcessError as exc:
+        payload = _json_payload_or_empty(exc.stdout or "")
+        quality_gate = payload.get("quality_gate", {}) if isinstance(payload, dict) else {}
+        summary["steps"].append(
+            {
+                "name": "support_review_queue",
+                "status": "failed",
+                "command": cmd,
+                "review_queue_case_ids": quality_gate.get("review_queue_case_ids", []),
+                "critical_review_case_ids": quality_gate.get("critical_review_case_ids", []),
+                "failures": quality_gate.get("failures", []),
+                "stdout_tail": _tail(exc.stdout or ""),
+                "stderr_tail": _tail(exc.stderr or ""),
+            }
+        )
+        summary["ok"] = False
+        return
+    except json.JSONDecodeError as exc:
+        summary["steps"].append(
+            {
+                "name": "support_review_queue",
+                "status": "failed",
+                "command": cmd,
+                "message": f"Could not parse eval_support.py review queue JSON output: {exc}",
+                "stdout_tail": _tail(completed.stdout),
+            }
+        )
+        summary["ok"] = False
+        return
+
+    quality_gate = payload.get("quality_gate", {}) if isinstance(payload, dict) else {}
+    review_queue = payload.get("review_queue", []) if isinstance(payload, dict) else []
+    review_queue_summary = payload.get("review_queue_summary", {}) if isinstance(payload, dict) else {}
+    passed = isinstance(review_queue, list) and bool(quality_gate.get("ok"))
+    summary["steps"].append(
+        {
+            "name": "support_review_queue",
+            "status": "passed" if passed else "failed",
+            "command": cmd,
+            "case_count": payload.get("case_count") if isinstance(payload, dict) else None,
+            "review_queue_count": len(review_queue) if isinstance(review_queue, list) else None,
+            "review_queue_summary": review_queue_summary,
+            "review_queue_case_ids": quality_gate.get("review_queue_case_ids", []),
+            "critical_review_case_ids": quality_gate.get("critical_review_case_ids", []),
+            "failures": quality_gate.get("failures", []),
+            "support_set_policy": payload.get("support_set_policy", {}) if isinstance(payload, dict) else {},
             "stdout_tail": _tail(completed.stdout),
         }
     )
