@@ -486,9 +486,23 @@ python3 scripts/prepare_support_label_sidecar.py \
   --instructions-output experiments/support-label-packet-high-risk-test-instructions.md
 ```
 
+Add `--unreviewed-only` to avoid assigning cases that already have human-review
+provenance in the sidecar, or use `--review-status single_annotator` to assign
+second-reviewer batches for cases that already have one label. Add
+`--limit-per-language N`, `--limit-per-case-type N`, or
+`--limit-per-evidence-scope N` when a small reviewer batch should stay balanced
+across languages, high-risk families, or evidence scopes instead of only taking
+the first filtered rows. Each packet includes a machine-readable deterministic
+`packet_id` plus `packet_summary` with case ids and counts by language, case
+type, evidence scope, split, and priority for release evidence. The summary uses
+stable keys such as `case_count_by_language`, `case_count_by_case_type`, and
+`case_count_by_evidence_scope`.
+
 The instruction sheet tells reviewers how to label conservatively without
 exposing hidden gold or adjudication fields. Merge completed packets back
-conservatively; conflicts are reported instead of silently changing gold labels:
+conservatively; conflicts are reported instead of silently changing gold labels,
+and `merge_report.source_packet_ids` records which reviewer packet ids supplied
+the annotations:
 
 ```bash
 python3 scripts/prepare_support_label_sidecar.py \

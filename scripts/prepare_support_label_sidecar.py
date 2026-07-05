@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 from pathlib import Path
 from typing import Optional
@@ -73,10 +74,46 @@ def main(argv: Optional[list[str]] = None) -> int:
         help="Only include this stable case id; repeat for multiple cases.",
     )
     parser.add_argument(
+        "--unreviewed-only",
+        action="store_true",
+        help="Only include cases whose sidecar adjudication_status is not_human_reviewed.",
+    )
+    parser.add_argument(
+        "--review-status",
+        action="append",
+        choices=[
+            "not_human_reviewed",
+            "single_annotator",
+            "dual_annotator_agreed",
+            "dual_annotator_adjudicated",
+            "published_benchmark",
+        ],
+        default=None,
+        help="Only include cases with this sidecar adjudication_status; repeat for multiple statuses.",
+    )
+    parser.add_argument(
         "--limit",
         type=_positive_int,
         default=None,
         help="Maximum number of filtered cases to include in the packet.",
+    )
+    parser.add_argument(
+        "--limit-per-language",
+        type=_positive_int,
+        default=None,
+        help="Maximum number of filtered cases to include per language code.",
+    )
+    parser.add_argument(
+        "--limit-per-case-type",
+        type=_positive_int,
+        default=None,
+        help="Maximum number of filtered cases to include per case_type.",
+    )
+    parser.add_argument(
+        "--limit-per-evidence-scope",
+        type=_positive_int,
+        default=None,
+        help="Maximum number of filtered cases to include per evidence_scope.",
     )
     parser.add_argument(
         "--audit",
@@ -146,6 +183,8 @@ def main(argv: Optional[list[str]] = None) -> int:
         )
     if args.instructions_output and not args.annotation_packet:
         parser.error("--instructions-output requires --annotation-packet")
+    if args.unreviewed_only and args.review_status:
+        parser.error("--unreviewed-only cannot be combined with --review-status")
 
     all_cases = load_support_label_cases(args.dataset)
     _validate_case_ids(args.case_id, all_cases, parser)
@@ -155,14 +194,23 @@ def main(argv: Optional[list[str]] = None) -> int:
             existing = json.load(handle)
         validate_support_label_sidecar(existing, all_cases)
 
+    review_statuses = ["not_human_reviewed"] if args.unreviewed_only else args.review_status
+    candidates = (
+        _filter_cases_by_review_status(all_cases, existing, review_statuses)
+        if review_statuses
+        else all_cases
+    )
     cases = all_cases if (args.merge_annotation_packet or args.apply_adjudications) else _filter_cases(
-        all_cases,
+        candidates,
         priorities=args.priority,
         splits=args.split,
         case_types=args.case_type,
         languages=args.lang,
         case_ids=args.case_id,
         limit=args.limit,
+        limit_per_language=args.limit_per_language,
+        limit_per_case_type=args.limit_per_case_type,
+        limit_per_evidence_scope=args.limit_per_evidence_scope,
     )
     existing_for_cases = _filter_existing_sidecar(existing, cases) if existing is not None else None
 
@@ -271,10 +319,14 @@ def _merge_annotation_packet(sidecar: dict, cases: list, annotation_rows: list) 
     grouped = {}
     conflicts = []
     skipped = []
+    source_packet_ids = []
     for index, row in enumerate(annotation_rows, start=1):
         if not isinstance(row, dict):
             skipped.append({"index": index, "code": "invalid_row", "message": "Annotation row must be an object."})
             continue
+        packet_id = str(row.get("packet_id", "")).strip()
+        if packet_id:
+            source_packet_ids.append(packet_id)
         case_id = str(row.get("case_id", "")).strip()
         annotation = row.get("annotation", {})
         if not isinstance(annotation, dict):
@@ -385,6 +437,7 @@ def _merge_annotation_packet(sidecar: dict, cases: list, annotation_rows: list) 
         "conflict_count": len(conflicts),
         "skipped_count": len(skipped),
         "applied_case_ids": applied_case_ids,
+        "source_packet_ids": sorted(set(source_packet_ids)),
         "conflicts": conflicts,
         "skipped": skipped,
         "next_actions": _merge_next_actions(conflicts, skipped),
@@ -594,13 +647,27 @@ def _build_annotation_packet(
             }
         )
 
+    packet_id = _annotation_packet_id(dataset_name, filters or {}, packet_cases)
+    for index, item in enumerate(packet_cases, start=1):
+        item["packet_id"] = packet_id
+        item["packet_case_index"] = index
+
     return {
         "ok": True,
         "schema_version": 1,
         "packet_type": "support_label_annotation_packet",
+        "packet_id": packet_id,
         "dataset": dataset_name,
         "filters": filters or {},
         "n": len(packet_cases),
+        "packet_summary": {
+            "case_ids": [item["case_id"] for item in packet_cases],
+            "case_count_by_language": _count_by(packet_cases, "lang"),
+            "case_count_by_case_type": _count_by(packet_cases, "case_type"),
+            "case_count_by_evidence_scope": _count_by(packet_cases, "evidence_scope"),
+            "case_count_by_split": _count_by(packet_cases, "split"),
+            "case_count_by_priority": _count_by(packet_cases, "priority"),
+        },
         "label_options": [
             "supported",
             "weakly_supported",
@@ -618,6 +685,28 @@ def _build_annotation_packet(
     }
 
 
+def _annotation_packet_id(dataset_name: str, filters: dict, packet_cases: list) -> str:
+    signature = {
+        "schema_version": 1,
+        "packet_type": "support_label_annotation_packet",
+        "dataset": dataset_name,
+        "filters": filters,
+        "cases": [
+            {
+                "case_id": item.get("case_id", ""),
+                "priority": item.get("priority", ""),
+                "case_type": item.get("case_type", ""),
+                "split": item.get("split", ""),
+                "lang": item.get("lang", ""),
+                "evidence_scope": item.get("evidence_scope", ""),
+            }
+            for item in packet_cases
+        ],
+    }
+    encoded = json.dumps(signature, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return "support-packet-" + hashlib.sha256(encoded).hexdigest()[:16]
+
+
 def _format_annotation_packet(packet: dict, packet_format: str) -> str:
     if packet_format == "jsonl":
         return "".join(json.dumps(item, ensure_ascii=False) + "\n" for item in packet.get("cases", []))
@@ -633,8 +722,10 @@ def _format_annotation_instructions(packet: dict) -> str:
             "",
             f"- Dataset: `{packet.get('dataset', '')}`",
             f"- Packet type: `{packet.get('packet_type', '')}`",
+            f"- Packet id: `{packet.get('packet_id', '')}`",
             f"- Case count: `{packet.get('n', 0)}`",
             f"- Filters: `{filters}`",
+            f"- Packet summary: `{json.dumps(packet.get('packet_summary', {}), ensure_ascii=False, sort_keys=True)}`",
             "",
             "## Task",
             "",
@@ -664,6 +755,7 @@ def _format_annotation_instructions(packet: dict) -> str:
             "## Do Not Modify",
             "",
             "Do not edit `case_id`, `claim`, `evidence`, `evidence_scope`, `case_type`, `split`, `priority`, `review_focus`, or `source_locator`.",
+            "Also do not edit `packet_id` or `packet_case_index`; they tie returned annotations back to the archived reviewer batch.",
             "The packet intentionally omits dataset gold labels and adjudicated labels; do not request or reconstruct them before labeling.",
             "",
             "## Return Checklist",
@@ -822,8 +914,14 @@ def _filter_cases(
     languages: Optional[list[str]] = None,
     case_ids: Optional[list[str]] = None,
     limit: Optional[int] = None,
+    limit_per_language: Optional[int] = None,
+    limit_per_case_type: Optional[int] = None,
+    limit_per_evidence_scope: Optional[int] = None,
 ) -> list:
     selected = []
+    language_counts = {}
+    case_type_counts = {}
+    evidence_scope_counts = {}
     priorities_set = set(priorities or [])
     splits_set = set(splits or [])
     case_types_set = set(case_types or [])
@@ -840,7 +938,19 @@ def _filter_cases(
             continue
         if case_ids_set and case.case_id not in case_ids_set:
             continue
+        if limit_per_language is not None and language_counts.get(case.lang, 0) >= limit_per_language:
+            continue
+        if limit_per_case_type is not None and case_type_counts.get(case.case_type, 0) >= limit_per_case_type:
+            continue
+        if (
+            limit_per_evidence_scope is not None
+            and evidence_scope_counts.get(case.evidence_scope, 0) >= limit_per_evidence_scope
+        ):
+            continue
         selected.append(case)
+        language_counts[case.lang] = language_counts.get(case.lang, 0) + 1
+        case_type_counts[case.case_type] = case_type_counts.get(case.case_type, 0) + 1
+        evidence_scope_counts[case.evidence_scope] = evidence_scope_counts.get(case.evidence_scope, 0) + 1
         if limit is not None and len(selected) >= limit:
             break
     return selected
@@ -861,6 +971,26 @@ def _filter_existing_sidecar(existing: dict, cases: list) -> dict:
     }
 
 
+def _filter_cases_by_review_status(cases: list, existing: Optional[dict], review_statuses: list[str]) -> list:
+    status_set = set(review_statuses or [])
+    if not status_set:
+        return list(cases)
+    if not existing:
+        return list(cases) if "not_human_reviewed" in status_set else []
+    sidecar_by_id = {
+        str(item.get("case_id")): item
+        for item in existing.get("cases", [])
+        if isinstance(item, dict) and item.get("case_id")
+    }
+    selected = []
+    for case in cases:
+        item = sidecar_by_id.get(case.case_id)
+        status = item.get("adjudication_status") if item is not None else "not_human_reviewed"
+        if status in status_set:
+            selected.append(case)
+    return selected
+
+
 def _filter_summary(args: argparse.Namespace) -> dict:
     filters = {}
     if args.priority:
@@ -873,8 +1003,18 @@ def _filter_summary(args: argparse.Namespace) -> dict:
         filters["lang"] = list(args.lang)
     if args.case_id:
         filters["case_id"] = list(args.case_id)
+    if args.unreviewed_only:
+        filters["unreviewed_only"] = True
+    if args.review_status:
+        filters["review_status"] = list(args.review_status)
     if args.limit is not None:
         filters["limit"] = args.limit
+    if args.limit_per_language is not None:
+        filters["limit_per_language"] = args.limit_per_language
+    if args.limit_per_case_type is not None:
+        filters["limit_per_case_type"] = args.limit_per_case_type
+    if args.limit_per_evidence_scope is not None:
+        filters["limit_per_evidence_scope"] = args.limit_per_evidence_scope
     return filters
 
 

@@ -624,8 +624,17 @@ class SupportEvalTests(unittest.TestCase):
 
         self.assertTrue(payload["ok"])
         self.assertEqual(payload["packet_type"], "support_label_annotation_packet")
+        self.assertTrue(payload["packet_id"].startswith("support-packet-"))
+        self.assertEqual(len(payload["packet_id"]), len("support-packet-") + 16)
         self.assertEqual(payload["filters"], {"priority": ["high"], "split": ["test"], "lang": ["zh"], "limit": 2})
         self.assertEqual(payload["n"], 2)
+        self.assertEqual(payload["packet_summary"]["case_ids"], [item["case_id"] for item in payload["cases"]])
+        self.assertEqual(payload["packet_summary"]["case_count_by_language"], {"zh": 2})
+        self.assertEqual(payload["packet_summary"]["case_count_by_evidence_scope"], {"abstract": 1, "metadata_snippet": 1})
+        self.assertEqual(payload["packet_summary"]["case_count_by_split"], {"test": 2})
+        self.assertEqual(payload["packet_summary"]["case_count_by_priority"], {"high": 2})
+        self.assertTrue(all(item["packet_id"] == payload["packet_id"] for item in payload["cases"]))
+        self.assertEqual([item["packet_case_index"] for item in payload["cases"]], [1, 2])
         self.assertEqual(payload["label_options"][0], "supported")
         self.assertTrue(all(item["priority"] == "high" for item in payload["cases"]))
         self.assertTrue(all(item["split"] == "test" for item in payload["cases"]))
@@ -639,6 +648,211 @@ class SupportEvalTests(unittest.TestCase):
         self.assertNotIn('"gold"', raw)
         self.assertNotIn("adjudicated_label", raw)
         self.assertNotIn("label_notes", raw)
+
+    def test_prepare_support_label_sidecar_can_limit_annotation_packet_per_language(self):
+        completed = subprocess.run(
+            [
+                sys.executable,
+                "scripts/prepare_support_label_sidecar.py",
+                "--dataset",
+                os.path.join("data", "eval", "support_eval.json"),
+                "--existing-sidecar",
+                os.path.join("data", "eval", "support_eval_label_sidecar.json"),
+                "--annotation-packet",
+                "--priority",
+                "high",
+                "--split",
+                "test",
+                "--limit-per-language",
+                "1",
+            ],
+            check=True,
+            cwd=os.getcwd(),
+            capture_output=True,
+            text=True,
+        )
+        payload = json.loads(completed.stdout)
+        counts = Counter(item["lang"] for item in payload["cases"])
+
+        self.assertEqual(
+            payload["filters"],
+            {"priority": ["high"], "split": ["test"], "limit_per_language": 1},
+        )
+        self.assertGreaterEqual(payload["n"], 2)
+        self.assertLessEqual(max(counts.values()), 1)
+        self.assertEqual(payload["packet_summary"]["case_count_by_language"], dict(counts))
+        self.assertIn("en", counts)
+        self.assertIn("zh", counts)
+
+    def test_prepare_support_label_sidecar_can_limit_annotation_packet_per_case_type(self):
+        completed = subprocess.run(
+            [
+                sys.executable,
+                "scripts/prepare_support_label_sidecar.py",
+                "--dataset",
+                os.path.join("data", "eval", "support_eval.json"),
+                "--existing-sidecar",
+                os.path.join("data", "eval", "support_eval_label_sidecar.json"),
+                "--annotation-packet",
+                "--priority",
+                "high",
+                "--limit-per-case-type",
+                "1",
+            ],
+            check=True,
+            cwd=os.getcwd(),
+            capture_output=True,
+            text=True,
+        )
+        payload = json.loads(completed.stdout)
+        counts = Counter(item["case_type"] for item in payload["cases"])
+
+        self.assertEqual(payload["filters"], {"priority": ["high"], "limit_per_case_type": 1})
+        self.assertGreaterEqual(payload["n"], 3)
+        self.assertLessEqual(max(counts.values()), 1)
+        self.assertEqual(payload["packet_summary"]["case_count_by_case_type"], dict(counts))
+        self.assertIn("contradiction", counts)
+        self.assertIn("hard_negative", counts)
+        self.assertIn("full_text_required", counts)
+
+    def test_prepare_support_label_sidecar_can_limit_annotation_packet_per_evidence_scope(self):
+        completed = subprocess.run(
+            [
+                sys.executable,
+                "scripts/prepare_support_label_sidecar.py",
+                "--dataset",
+                os.path.join("data", "eval", "support_eval.json"),
+                "--existing-sidecar",
+                os.path.join("data", "eval", "support_eval_label_sidecar.json"),
+                "--annotation-packet",
+                "--priority",
+                "high",
+                "--limit-per-evidence-scope",
+                "1",
+            ],
+            check=True,
+            cwd=os.getcwd(),
+            capture_output=True,
+            text=True,
+        )
+        payload = json.loads(completed.stdout)
+        counts = Counter(item["evidence_scope"] for item in payload["cases"])
+
+        self.assertEqual(payload["filters"], {"priority": ["high"], "limit_per_evidence_scope": 1})
+        self.assertGreaterEqual(payload["n"], 3)
+        self.assertLessEqual(max(counts.values()), 1)
+        self.assertEqual(payload["packet_summary"]["case_count_by_evidence_scope"], dict(counts))
+        self.assertIn("abstract", counts)
+        self.assertIn("metadata_snippet", counts)
+        self.assertIn("mixed", counts)
+
+    def test_prepare_support_label_sidecar_can_filter_annotation_packet_to_unreviewed_cases(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            sidecar_path = os.path.join(tmpdir, "sidecar.json")
+            with open(os.path.join("data", "eval", "support_eval_label_sidecar.json"), encoding="utf-8") as handle:
+                sidecar = json.load(handle)
+            for item in sidecar["cases"]:
+                if item["case_id"] == "s04":
+                    item["adjudication_status"] = "single_annotator"
+                    item["annotator_count"] = 1
+                    item["annotator_labels"] = [item["adjudicated_label"]]
+                    item["disagreement"] = "none"
+                    item["notes"] = "Unit test reviewed case."
+                    break
+            with open(sidecar_path, "w", encoding="utf-8") as handle:
+                json.dump(sidecar, handle)
+
+            completed = subprocess.run(
+                [
+                    sys.executable,
+                    "scripts/prepare_support_label_sidecar.py",
+                    "--dataset",
+                    os.path.join("data", "eval", "support_eval.json"),
+                    "--existing-sidecar",
+                    sidecar_path,
+                    "--annotation-packet",
+                    "--case-id",
+                    "s04",
+                    "--case-id",
+                    "s10",
+                    "--unreviewed-only",
+                ],
+                check=True,
+                cwd=os.getcwd(),
+                capture_output=True,
+                text=True,
+            )
+        payload = json.loads(completed.stdout)
+
+        self.assertEqual(payload["filters"], {"case_id": ["s04", "s10"], "unreviewed_only": True})
+        self.assertEqual(payload["packet_summary"]["case_ids"], ["s10"])
+        self.assertEqual(payload["n"], 1)
+        self.assertEqual(payload["cases"][0]["case_id"], "s10")
+
+    def test_prepare_support_label_sidecar_can_filter_annotation_packet_by_review_status(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            sidecar_path = os.path.join(tmpdir, "sidecar.json")
+            with open(os.path.join("data", "eval", "support_eval_label_sidecar.json"), encoding="utf-8") as handle:
+                sidecar = json.load(handle)
+            for item in sidecar["cases"]:
+                if item["case_id"] == "s04":
+                    item["adjudication_status"] = "single_annotator"
+                    item["annotator_count"] = 1
+                    item["annotator_labels"] = [item["adjudicated_label"]]
+                    item["disagreement"] = "none"
+                    item["notes"] = "Unit test first review complete."
+                    break
+            with open(sidecar_path, "w", encoding="utf-8") as handle:
+                json.dump(sidecar, handle)
+
+            completed = subprocess.run(
+                [
+                    sys.executable,
+                    "scripts/prepare_support_label_sidecar.py",
+                    "--dataset",
+                    os.path.join("data", "eval", "support_eval.json"),
+                    "--existing-sidecar",
+                    sidecar_path,
+                    "--annotation-packet",
+                    "--case-id",
+                    "s04",
+                    "--case-id",
+                    "s10",
+                    "--review-status",
+                    "single_annotator",
+                ],
+                check=True,
+                cwd=os.getcwd(),
+                capture_output=True,
+                text=True,
+            )
+        payload = json.loads(completed.stdout)
+
+        self.assertEqual(payload["filters"], {"case_id": ["s04", "s10"], "review_status": ["single_annotator"]})
+        self.assertEqual(payload["packet_summary"]["case_ids"], ["s04"])
+        self.assertEqual(payload["cases"][0]["review_status"], "single_annotator")
+
+    def test_prepare_support_label_sidecar_rejects_conflicting_review_status_filters(self):
+        completed = subprocess.run(
+            [
+                sys.executable,
+                "scripts/prepare_support_label_sidecar.py",
+                "--dataset",
+                os.path.join("data", "eval", "support_eval.json"),
+                "--existing-sidecar",
+                os.path.join("data", "eval", "support_eval_label_sidecar.json"),
+                "--annotation-packet",
+                "--unreviewed-only",
+                "--review-status",
+                "single_annotator",
+            ],
+            cwd=os.getcwd(),
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertNotEqual(completed.returncode, 0)
+        self.assertIn("--unreviewed-only cannot be combined with --review-status", completed.stderr)
 
     def test_prepare_support_label_sidecar_writes_annotation_instructions(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -677,6 +891,11 @@ class SupportEvalTests(unittest.TestCase):
         self.assertIn("When unsure, choose the more conservative label", instructions)
         self.assertIn("annotation.annotator_id", instructions)
         self.assertIn("review_focus", instructions)
+        self.assertIn("Packet id", instructions)
+        self.assertIn("packet_case_index", instructions)
+        self.assertIn("Packet summary", instructions)
+        self.assertIn("case_count_by_language", instructions)
+        self.assertIn("case_count_by_evidence_scope", instructions)
         self.assertIn("label hint", instructions)
         self.assertIn("Do not edit `case_id`", instructions)
         self.assertNotIn("adjudicated_label", instructions)
@@ -706,6 +925,8 @@ class SupportEvalTests(unittest.TestCase):
         rows = [json.loads(line) for line in completed.stdout.splitlines()]
 
         self.assertEqual({row["case_id"] for row in rows}, {"s04", "s10"})
+        self.assertEqual(len({row["packet_id"] for row in rows}), 1)
+        self.assertEqual([row["packet_case_index"] for row in rows], [1, 2])
         self.assertTrue(all(row["annotation"]["rationale"] == "" for row in rows))
         self.assertTrue(all(row["review_focus"] for row in rows))
         self.assertTrue(all("gold" not in row for row in rows))
@@ -716,8 +937,11 @@ class SupportEvalTests(unittest.TestCase):
             packet_path = os.path.join(tmpdir, "completed_packet.json")
             packet = {
                 "packet_type": "support_label_annotation_packet",
+                "packet_id": "support-packet-test1234",
                 "cases": [
                     {
+                        "packet_id": "support-packet-test1234",
+                        "packet_case_index": 1,
                         "case_id": "s04",
                         "source_locator": "doi:10.123/example",
                         "annotation": {
@@ -728,6 +952,8 @@ class SupportEvalTests(unittest.TestCase):
                         },
                     },
                     {
+                        "packet_id": "support-packet-test1234",
+                        "packet_case_index": 2,
                         "case_id": "s10",
                         "annotation": {
                             "annotator_id": "reviewer-a",
@@ -736,6 +962,8 @@ class SupportEvalTests(unittest.TestCase):
                         },
                     },
                     {
+                        "packet_id": "support-packet-test1234",
+                        "packet_case_index": 3,
                         "case_id": "s10",
                         "annotation": {
                             "annotator_id": "reviewer-b",
@@ -769,6 +997,7 @@ class SupportEvalTests(unittest.TestCase):
 
         self.assertTrue(payload["merge_report"]["ok"])
         self.assertEqual(payload["merge_report"]["applied_count"], 2)
+        self.assertEqual(payload["merge_report"]["source_packet_ids"], ["support-packet-test1234"])
         self.assertEqual(cases["s04"]["adjudication_status"], "single_annotator")
         self.assertEqual(cases["s04"]["source_locator"], "doi:10.123/example")
         self.assertIn("reviewer-a", cases["s04"]["notes"])

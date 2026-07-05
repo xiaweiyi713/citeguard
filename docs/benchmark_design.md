@@ -327,6 +327,14 @@ python3 scripts/prepare_support_label_sidecar.py \
 
 过滤只影响导出的标注 packet 或 audit 视图,不会把未选中的 case 从原始
 dataset 或正式 sidecar 中删除。
+用 `--unreviewed-only` 可以在已有 sidecar 人工复核记录时只导出尚未审阅的
+case；用 `--review-status single_annotator` 可以导出已经有一名 reviewer、
+需要第二名 reviewer 的 case。用 `--limit-per-language`、`--limit-per-case-type` 和
+`--limit-per-evidence-scope` 可以生成更均衡的小批次,避免第一轮 high-risk
+packet 只覆盖一种语言、风险类型或证据层级。每个 packet 都带确定性的
+`packet_id` 和 `packet_summary`,记录 case ids 以及按语言、case type、
+evidence scope、split、priority 的计数,包括 `case_count_by_language`、
+`case_count_by_case_type` 和 `case_count_by_evidence_scope`,便于归档和发布前审计。
 
 需要把人工标注成熟度作为发布阻断条件时,加上:
 

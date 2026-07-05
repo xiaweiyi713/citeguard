@@ -133,7 +133,8 @@ agent skill bundle.
   with `--apply-adjudications`; any `adjudication_report.conflicts` must be
   reviewed before changing dataset gold or provenance. When `--output-dir` is used,
   archive the generated `result.json`, `config.json`, and `manifest.json` with
-  release evidence.
+  release evidence. When merging completed annotation packets, archive
+  `merge_report.source_packet_ids` with the source `packet_id` values.
 
 - Review support-label provenance maturity before making benchmark claims:
 
@@ -141,6 +142,7 @@ agent skill bundle.
   python scripts/prepare_support_label_sidecar.py --existing-sidecar data/eval/support_eval_label_sidecar.json --audit
   python scripts/prepare_support_label_sidecar.py --existing-sidecar data/eval/support_eval_label_sidecar.json --annotation-packet --priority high --split test --output experiments/support-label-packet-high-risk-test.json --instructions-output experiments/support-label-packet-high-risk-test-instructions.md
   python scripts/prepare_support_label_sidecar.py --existing-sidecar data/eval/support_eval_label_sidecar.json --annotation-packet --priority high --split test --limit 3 --output experiments/support-label-packet-high-risk-test-batch1.json --instructions-output experiments/support-label-packet-high-risk-test-batch1-instructions.md
+  python scripts/prepare_support_label_sidecar.py --existing-sidecar data/eval/support_eval_label_sidecar.json --annotation-packet --priority high --split test --unreviewed-only --limit-per-language 1 --limit-per-case-type 1 --limit-per-evidence-scope 1 --output experiments/support-label-packet-high-risk-test-balanced-batch1.json --instructions-output experiments/support-label-packet-high-risk-test-balanced-batch1-instructions.md
   python scripts/prepare_support_label_sidecar.py --existing-sidecar data/eval/support_eval_label_sidecar.json --merge-annotation-packet experiments/completed-support-label-packet-high-risk-test-batch1.json --output data/eval/support_eval_label_sidecar.merged.json
   python scripts/prepare_support_label_sidecar.py --existing-sidecar data/eval/support_eval_label_sidecar.merged.json --apply-adjudications experiments/resolved-support-label-adjudications.json --output data/eval/support_eval_label_sidecar.adjudicated.json
   python scripts/prepare_support_label_sidecar.py --existing-sidecar data/eval/support_eval_label_sidecar.json --audit --fail-on-high-risk-unreviewed --fail-on-high-risk-unreviewed-language zh
@@ -148,8 +150,11 @@ agent skill bundle.
 
   The seed set is allowed to report `human_reviewed: 0`, but release notes
   should not call it a human-reviewed benchmark until this audit shows reviewed
-  cases, the global and language-specific high-risk unreviewed gates pass, a filtered high-risk test
-  annotation packet plus any limited reviewer batches have been archived or
+  cases, the global and language-specific high-risk unreviewed gates pass, a
+  filtered high-risk test annotation packet plus any unreviewed-only balanced
+  language/case-type/evidence-scope reviewer batches have been archived with their
+  deterministic `packet_id` and `packet_summary` coverage metadata, any
+  `--review-status single_annotator` second-reviewer batches have been archived, or
   intentionally skipped, and the sidecar gate is raised accordingly.
 
 - Run production support eval when model dependencies and cached/downloadable

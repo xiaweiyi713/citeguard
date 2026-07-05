@@ -269,7 +269,19 @@ The audit reports coverage, human-reviewed count, unreviewed cases by split,
 language, and case type, plus a risk-sorted `high_risk_unreviewed` list and
 `high_risk_unreviewed_by_language`. Use
 `--fail-on-high-risk-unreviewed-language LANG` when a language-specific review
-batch, such as Chinese high-risk cases, must block release readiness. Review
+batch, such as Chinese high-risk cases, must block release readiness. Use
+`--unreviewed-only` when assigning reviewer packets from a sidecar that already
+contains human-reviewed cases. Use `--review-status single_annotator` to assign
+second-reviewer packets without exposing prior labels. Use `--limit-per-language`,
+`--limit-per-case-type`, and `--limit-per-evidence-scope` on
+`--annotation-packet` when assigning small reviewer batches that should cover
+multiple languages, high-risk case families, and evidence scopes instead of only
+the earliest filtered rows. Archive the
+packet's deterministic `packet_id` and `packet_summary` with review evidence so
+release notes can show exactly which case ids, languages, case types, and
+evidence scopes were assigned. After `--merge-annotation-packet`, keep
+`merge_report.source_packet_ids` with the merged sidecar so adjudication records
+can be traced back to reviewer batches. Review
 contradiction, hard-negative, and full-text-required cases first because those
 most directly test false support and overclaiming.
 

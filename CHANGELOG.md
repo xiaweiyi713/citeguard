@@ -78,6 +78,19 @@
   package gate so package releases also validate support-label provenance.
 - Made the release gate record structured support-label gate thresholds,
   metrics, and failures instead of requiring agents to parse stdout tails.
+- Added `prepare_support_label_sidecar.py --limit-per-language` and
+  `--limit-per-case-type` / `--limit-per-evidence-scope` for balanced high-risk
+  annotation batches.
+- Added `prepare_support_label_sidecar.py --unreviewed-only` so reviewer packets
+  can skip cases that already have human-review provenance.
+- Added `prepare_support_label_sidecar.py --review-status` for second-reviewer
+  and status-specific annotation packets.
+- Added annotation-packet `packet_summary` coverage metadata for review-batch
+  provenance.
+- Added deterministic annotation-packet `packet_id` values for reproducible
+  reviewer-batch archives.
+- Added `merge_report.source_packet_ids` to preserve reviewer-batch provenance
+  after annotation-packet merges.
 - Added high-risk case-count-by-language metrics to support-label gates so
   release checks can report reviewed and unreviewed language coverage in one
   place.
