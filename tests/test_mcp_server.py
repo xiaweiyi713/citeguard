@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib
+import inspect
 import os
 import sys
 import tempfile
@@ -102,6 +103,19 @@ class MCPServerHelperTests(unittest.TestCase):
     def tearDown(self):
         _clear_mcp_server_modules()
 
+    def test_batch_tool_metadata_documents_high_risk_filtering(self):
+        for tool_name in ("audit_citations_tool", "audit_claim_support_tool"):
+            with self.subTest(tool=tool_name):
+                tool = getattr(self.server, tool_name)
+                signature = inspect.signature(tool)
+                doc = inspect.getdoc(tool) or ""
+
+                self.assertIn("high_risk_only", signature.parameters)
+                self.assertEqual(signature.parameters["high_risk_only"].default, False)
+                self.assertIn("high_risk_only=true", doc)
+                self.assertIn("filtered.returned_indexes", doc)
+                self.assertIn("filtered.omitted_indexes", doc)
+
     def test_status_tool_reports_default_configuration_without_live_queries(self):
         with mock.patch.dict(os.environ, {}, clear=True):
             status = self.server.citeguard_status_tool()
@@ -197,6 +211,40 @@ class MCPServerHelperTests(unittest.TestCase):
         self.assertEqual(report["review_summary"]["top_high_risk_indexes"], [1])
         self.assertEqual(report["review_summary"]["next_actions"]["keep"], 1)
         self.assertEqual(report["review_summary"]["next_actions"]["resolve_identifier_or_replace"], 1)
+        self.assertEqual(report["review_summary"]["action_queues"]["safe_to_keep_indexes"], [0])
+        self.assertEqual(report["review_summary"]["action_queues"]["identity_resolution_indexes"], [1])
+
+    def test_audit_citations_tool_can_filter_high_risk_only(self):
+        source = InMemoryMetadataSource(
+            [
+                CitationRecord(
+                    citation_id="paper-1",
+                    title="GhostCite: A Large-Scale Analysis of Citation Validity",
+                    abstract="GhostCite studies citation validity in generated references.",
+                    year=2026,
+                    source="memory",
+                )
+            ]
+        )
+        with mock.patch.object(self.server, "_source", return_value=source):
+            report = self.server.audit_citations_tool(
+                [
+                    {
+                        "title": "GhostCite: A Large-Scale Analysis of Citation Validity",
+                        "year": 2026,
+                    },
+                    {
+                        "title": "Quantum Teleportation of Citation Hallucinations in Synthetic Benchmarks",
+                    },
+                ],
+                high_risk_only=True,
+            )
+
+        self.assertEqual(report["filtered"]["returned_indexes"], [1])
+        self.assertEqual(report["filtered"]["omitted_indexes"], [0])
+        self.assertEqual(len(report["results"]), 1)
+        self.assertEqual(report["results"][0]["verdict"], "not_found")
+        self.assertEqual(report["review_summary"]["total"], 2)
 
     def test_audit_claim_support_tool_summarizes_batch(self):
         source = InMemoryMetadataSource(
@@ -236,9 +284,47 @@ class MCPServerHelperTests(unittest.TestCase):
         self.assertEqual(report["review_summary"]["top_high_risk_indexes"], [1])
         self.assertEqual(report["review_summary"]["next_actions"]["resolve_citation_identity"], 1)
         self.assertEqual(report["review_summary"]["next_actions"]["keep_claim"], 1)
+        self.assertEqual(report["review_summary"]["action_queues"]["safe_to_keep_indexes"], [0])
+        self.assertEqual(report["review_summary"]["action_queues"]["identity_resolution_indexes"], [1])
         self.assertTrue(report["risk_ranking"][0]["counterevidence_review"])
         self.assertEqual(report["risk_ranking"][0]["counterevidence_reason"], "unresolved_citation")
         self.assertEqual(report["risk_ranking"][0]["next_action"], "resolve_citation_identity")
+
+    def test_audit_claim_support_tool_can_filter_high_risk_only(self):
+        source = InMemoryMetadataSource(
+            [
+                CitationRecord(
+                    citation_id="paper-1",
+                    title="GhostCite: A Large-Scale Analysis of Citation Validity",
+                    abstract="GhostCite studies citation validity in generated references.",
+                    year=2026,
+                    source="memory",
+                )
+            ]
+        )
+        with mock.patch.object(self.server, "_source", return_value=source), mock.patch.object(
+            self.server, "_support_backend", return_value=EntailingSupportBackend()
+        ):
+            report = self.server.audit_claim_support_tool(
+                [
+                    {
+                        "claim": "GhostCite studies citation validity.",
+                        "title": "GhostCite: A Large-Scale Analysis of Citation Validity",
+                    },
+                    {
+                        "claim": "An unknown paper supports a claim.",
+                        "title": "Quantum Teleportation of Citation Hallucinations in Synthetic Benchmarks",
+                    },
+                ],
+                lang="en",
+                high_risk_only=True,
+            )
+
+        self.assertEqual(report["filtered"]["returned_indexes"], [1])
+        self.assertEqual(report["filtered"]["omitted_indexes"], [0])
+        self.assertEqual(len(report["results"]), 1)
+        self.assertEqual(report["results"][0]["resolution"]["verdict"], "not_found")
+        self.assertEqual(report["review_summary"]["total"], 2)
 
     def test_audit_claim_support_tool_can_attach_counterevidence(self):
         source = InMemoryMetadataSource(

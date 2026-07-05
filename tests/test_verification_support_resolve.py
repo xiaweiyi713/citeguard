@@ -330,6 +330,9 @@ class CheckClaimSupportTests(unittest.TestCase):
         self.assertEqual(review_summary["next_actions"]["keep_claim"], 1)
         self.assertEqual(review_summary["top_high_risk_indexes"], [1])
         self.assertEqual(review_summary["top_risk_indexes"], [1, 0])
+        self.assertEqual(review_summary["action_queues"]["identity_resolution_indexes"], [1])
+        self.assertEqual(review_summary["action_queues"]["safe_to_keep_indexes"], [0])
+        self.assertEqual(review_summary["action_queues"]["evidence_review_indexes"], [])
 
     def test_audit_claim_support_flags_contradicted_for_counterevidence_review(self):
         contradictory = CitationRecord(

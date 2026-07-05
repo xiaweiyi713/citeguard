@@ -178,14 +178,20 @@ configured via environment variables.
   (`ambiguous_citation`, `timeout`, or `source_unavailable`).
 - In batch `audit_citations_tool` and `audit_claim_support_tool` results, read
   `review_summary` first for full-batch high/medium/low risk counts,
-  next-action counts, and top risk indexes. Use it to make a compact review
-  queue before expanding individual `risk_ranking` rows.
+  next-action counts, top risk indexes, and `action_queues`. Use
+  `rewrite_or_replace_indexes`, `identity_resolution_indexes`,
+  `evidence_review_indexes`, `source_retry_indexes`, and
+  `safe_to_keep_indexes` to make a compact review queue before expanding
+  individual `risk_ranking` rows.
 - In batch `risk_ranking`, also use `next_action` as the machine-readable action
   (`review_metadata`, `resolve_identifier_or_replace`,
   `disambiguate_identifier`, `retry_or_check_source_health`,
   `review_counterevidence_leads`, `inspect_full_text_or_find_stronger_citation`,
   `rewrite_or_replace_evidence`, etc.). Treat `recommendation` as display text,
   not as the decision contract.
+- For large MCP batches, pass `high_risk_only=true` when the user only wants
+  risky items. Use `filtered.returned_indexes` and `filtered.omitted_indexes` to
+  map filtered rows back to the original input list.
 - For expected tool errors (`ok=false`), use `error.next_action` for branching
   and `error.recovery` as the concise next-step instruction instead of
   paraphrasing `error.message`.

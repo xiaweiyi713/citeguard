@@ -49,6 +49,10 @@ class AuditTests(unittest.TestCase):
         self.assertEqual(review_summary["next_actions"]["keep"], 1)
         self.assertEqual(review_summary["top_high_risk_indexes"], [2])
         self.assertEqual(review_summary["top_risk_indexes"], [2, 1, 0])
+        self.assertEqual(review_summary["action_queues"]["identity_resolution_indexes"], [2])
+        self.assertEqual(review_summary["action_queues"]["metadata_review_indexes"], [1])
+        self.assertEqual(review_summary["action_queues"]["safe_to_keep_indexes"], [0])
+        self.assertEqual(review_summary["action_queues"]["source_retry_indexes"], [])
 
 
 if __name__ == "__main__":

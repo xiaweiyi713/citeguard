@@ -22,7 +22,7 @@ from _bootstrap import ensure_project_root
 ensure_project_root()
 
 from citeguard.runtime import SOURCE_HEALTH_SCHEMA_VERSION
-from citeguard.verification import CACHE_SCHEMA_VERSION, STABLE_NEXT_ACTIONS
+from citeguard.verification import CACHE_SCHEMA_VERSION, REVIEW_ACTION_QUEUE_KEYS, STABLE_NEXT_ACTIONS
 
 
 FIXTURE_RECORDS = [
@@ -167,6 +167,25 @@ async def _run_smoke(command: str, server_args: List[str], require_sdk: bool = F
                 )
                 _require_audit_citations_payload(audit)
 
+                audit_high_risk = _coerce_tool_payload(
+                    await session.call_tool(
+                        "audit_citations_tool",
+                        {
+                            "citations": [
+                                {
+                                    "title": "Attention Is All You Need",
+                                    "arxiv_id": "1706.03762",
+                                },
+                                {
+                                    "title": "A Fixture Paper That Does Not Exist",
+                                },
+                            ],
+                            "high_risk_only": True,
+                        },
+                    )
+                )
+                _require_high_risk_filtered_payload(audit_high_risk, total=2, returned_indexes=[1])
+
                 support = _coerce_tool_payload(
                     await session.call_tool(
                         "check_claim_support_tool",
@@ -203,6 +222,27 @@ async def _run_smoke(command: str, server_args: List[str], require_sdk: bool = F
                 )
                 _require_support_audit_set_payload(support_audit)
 
+                support_audit_high_risk = _coerce_tool_payload(
+                    await session.call_tool(
+                        "audit_claim_support_tool",
+                        {
+                            "items": [
+                                {
+                                    "claim": "The Transformer relies entirely on attention mechanisms.",
+                                    "title": "Attention Is All You Need",
+                                    "arxiv_id": "1706.03762",
+                                },
+                                {
+                                    "claim": "An unknown paper supports this claim.",
+                                    "title": "A Fixture Paper That Does Not Exist",
+                                },
+                            ],
+                            "high_risk_only": True,
+                        },
+                    )
+                )
+                _require_high_risk_filtered_payload(support_audit_high_risk, total=2, returned_indexes=[1])
+
                 counterevidence = _coerce_tool_payload(
                     await session.call_tool(
                         "search_counterevidence_tool",
@@ -236,7 +276,7 @@ async def _run_smoke(command: str, server_args: List[str], require_sdk: bool = F
         "OK: MCP stdio smoke passed "
         "(initialize, list_tools, status, offline verify, offline audit, offline support, "
         "offline support-audit citation set, offline counter-evidence leads, "
-        "source-health next_action, structured errors)."
+        "high-risk-only batch filtering, source-health next_action, structured errors)."
     )
     return 0
 
@@ -383,7 +423,21 @@ def _require_review_summary(payload: dict, total: int) -> dict:
     top_risk_indexes = review_summary.get("top_risk_indexes")
     if not isinstance(top_risk_indexes, list) or not top_risk_indexes:
         raise RuntimeError(f"Expected review_summary.top_risk_indexes, got: {payload!r}")
+    _require_action_queues(review_summary, total)
     return review_summary
+
+
+def _require_action_queues(review_summary: dict, total: int) -> None:
+    action_queues = review_summary.get("action_queues")
+    if not isinstance(action_queues, dict):
+        raise RuntimeError(f"Expected review_summary.action_queues, got: {review_summary!r}")
+    if set(action_queues) != set(REVIEW_ACTION_QUEUE_KEYS):
+        raise RuntimeError(f"Unexpected review_summary.action_queues keys, got: {review_summary!r}")
+    for key, indexes in action_queues.items():
+        if not isinstance(indexes, list) or not all(isinstance(index, int) for index in indexes):
+            raise RuntimeError(f"Expected integer list in action_queues.{key}, got: {review_summary!r}")
+        if any(index < 0 or index >= total for index in indexes):
+            raise RuntimeError(f"Expected action_queues indexes within batch bounds, got: {review_summary!r}")
 
 
 def _require_audit_citations_payload(payload: dict) -> None:
@@ -411,6 +465,28 @@ def _require_audit_citations_payload(payload: dict) -> None:
         raise RuntimeError(f"Expected audit review_summary next_action keep count, got: {payload!r}")
     if review_summary["next_actions"].get("resolve_identifier_or_replace") != 1:
         raise RuntimeError(f"Expected audit review_summary not_found action count, got: {payload!r}")
+    queues = review_summary["action_queues"]
+    if queues["safe_to_keep_indexes"] != [0] or queues["identity_resolution_indexes"] != [1]:
+        raise RuntimeError(f"Expected audit action_queues to route keep and identity work, got: {payload!r}")
+
+
+def _require_high_risk_filtered_payload(payload: dict, total: int, returned_indexes: List[int]) -> None:
+    filtered = payload.get("filtered")
+    if not isinstance(filtered, dict) or filtered.get("high_risk_only") is not True:
+        raise RuntimeError(f"Expected high-risk-only filtered metadata, got: {payload!r}")
+    if filtered.get("original_results") != total:
+        raise RuntimeError(f"Expected filtered.original_results={total}, got: {payload!r}")
+    if filtered.get("returned_indexes") != returned_indexes:
+        raise RuntimeError(f"Expected filtered.returned_indexes={returned_indexes}, got: {payload!r}")
+    expected_omitted = [index for index in range(total) if index not in set(returned_indexes)]
+    if filtered.get("omitted_indexes") != expected_omitted:
+        raise RuntimeError(f"Expected filtered.omitted_indexes={expected_omitted}, got: {payload!r}")
+    results = payload.get("results")
+    if not isinstance(results, list) or len(results) != len(returned_indexes):
+        raise RuntimeError(f"Expected filtered results to match returned indexes, got: {payload!r}")
+    risk_ranking = payload.get("risk_ranking")
+    if not isinstance(risk_ranking, list) or any(item.get("risk") != "high" for item in risk_ranking):
+        raise RuntimeError(f"Expected high-risk-only risk_ranking, got: {payload!r}")
 
 
 def _require_support_audit_set_payload(payload: dict) -> None:
@@ -452,6 +528,8 @@ def _require_support_audit_set_payload(payload: dict) -> None:
         raise RuntimeError(f"Expected support-audit top_risk_indexes=[0], got: {payload!r}")
     if review_summary["next_actions"].get(risk_item["next_action"]) != 1:
         raise RuntimeError(f"Expected support-audit next_action count for risk item, got: {payload!r}")
+    if risk_item["next_action"] == "keep_claim" and review_summary["action_queues"]["safe_to_keep_indexes"] != [0]:
+        raise RuntimeError(f"Expected supported citation-set action queue to keep index 0, got: {payload!r}")
 
 
 def _require_support_next_action(payload: dict) -> None:

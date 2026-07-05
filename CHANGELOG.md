@@ -8,6 +8,12 @@
   LaTeX/BibTeX, DOCX, and plain text reference extraction.
 - Added batch `risk_ranking`, recommendations, and `--high-risk-only` filtering
   for citation and claim-support audits.
+- Added batch `review_summary.action_queues` so agents can route identity,
+  metadata, evidence, source retry, rewrite/replace, and keep decisions without
+  parsing prose.
+- Added `filtered.returned_indexes` and `filtered.omitted_indexes` to
+  `--high-risk-only` / MCP `high_risk_only` batch outputs for traceability back
+  to original inputs.
 - Added `citeguard support-set` and `check_claim_support_set_tool` for
   abstract-level checks of one claim against multiple cited papers.
 - Added machine-readable `evidence_scope` to claim-support outputs so agents can

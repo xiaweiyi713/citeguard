@@ -20,6 +20,7 @@ from citeguard.verification import (
     clear_cache,
     enrich_support_payload_with_counterevidence,
     export_cache_records,
+    filter_high_risk_payload,
     inspect_cache,
     load_citation_candidates,
     parse_citation,
@@ -386,7 +387,7 @@ def run(
             active_source = source or build_configured_source()
             payload = audit_citations(candidates, active_source).to_dict()
             if args.high_risk_only:
-                payload = _filter_high_risk_payload(payload)
+                payload = filter_high_risk_payload(payload)
             _print_json(payload, out, compact=args.compact)
             return 0
         if args.command == "support-audit":
@@ -413,7 +414,7 @@ def run(
                     top_k=args.counterevidence_top_k,
                 )
             if args.high_risk_only:
-                payload = _filter_high_risk_payload(payload)
+                payload = filter_high_risk_payload(payload)
             _print_json(payload, out, compact=args.compact)
             return 0
     except CLIUsageError as exc:
@@ -846,23 +847,6 @@ def _normalize_claim_support_audit_item(item: dict, index: Optional[int] = None)
 
 def _item_has_citation_input(item: dict) -> bool:
     return bool(item.get("raw_text") or item.get("title") or item.get("doi") or item.get("arxiv_id"))
-
-
-def _filter_high_risk_payload(payload: dict) -> dict:
-    high_risk_indexes = {item["index"] for item in payload.get("risk_ranking", []) if item.get("risk") == "high"}
-    filtered = dict(payload)
-    filtered["results"] = [
-        result for index, result in enumerate(payload.get("results", [])) if index in high_risk_indexes
-    ]
-    filtered["risk_ranking"] = [
-        item for item in payload.get("risk_ranking", []) if item.get("index") in high_risk_indexes
-    ]
-    filtered["filtered"] = {
-        "high_risk_only": True,
-        "returned": len(filtered["results"]),
-        "original_results": len(payload.get("results", [])),
-    }
-    return filtered
 
 
 def _validate_citation_scalar_fields(

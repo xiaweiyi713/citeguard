@@ -91,7 +91,14 @@ For batch workflows, `audit_claim_support_tool` and
 review-worthy results.
 Batch tools return `review_summary` alongside `summary` and `risk_ranking`.
 Use it as the agent entry point for high/medium/low risk counts,
-`next_action` counts, and top risk indexes before expanding individual rows.
+`next_action` counts, top risk indexes, and `action_queues` such as
+`identity_resolution_indexes`, `evidence_review_indexes`,
+`rewrite_or_replace_indexes`, `source_retry_indexes`, and
+`safe_to_keep_indexes` before expanding individual rows.
+Both `audit_citations_tool` and `audit_claim_support_tool` accept
+`high_risk_only=true`; filtered responses preserve full `review_summary` counts
+and include `filtered.returned_indexes` / `filtered.omitted_indexes` using the
+original batch indexes.
 `audit_claim_support_tool` items can be single-citation objects with `claim`
 plus citation fields, or citation-set objects with `claim` plus `citations`, a
 non-empty list of citation objects. Citation-set rows return

@@ -419,6 +419,7 @@ License-File: LICENSE
         self.assertIn("_require_support_audit_set_payload", smoke)
         self.assertIn("_require_audit_citations_payload", smoke)
         self.assertIn("_require_review_summary", smoke)
+        self.assertIn("_require_action_queues", smoke)
         self.assertIn("--require-sdk", smoke)
         self.assertIn("require_sdk", smoke)
         self.assertIn("source_health", smoke)
@@ -434,6 +435,10 @@ License-File: LICENSE
         self.assertIn("audit_citations_tool", smoke)
         self.assertIn("audit_claim_support_tool", smoke)
         self.assertIn("review_summary", smoke)
+        self.assertIn("action_queues", smoke)
+        self.assertIn("high_risk_only", smoke)
+        self.assertIn("_require_high_risk_filtered_payload", smoke)
+        self.assertIn("filtered.returned_indexes", smoke)
         self.assertIn("search_counterevidence_tool", smoke)
         self.assertIn("_require_counterevidence_payload", smoke)
         self.assertIn("review_counterevidence_leads", smoke)
@@ -446,6 +451,9 @@ License-File: LICENSE
         self.assertIn("check_claim_support_tool", setup_doc)
         self.assertIn("audit_claim_support_tool", setup_doc)
         self.assertIn("review_summary", setup_doc)
+        self.assertIn("action_queues", setup_doc)
+        self.assertIn("high_risk_only=true", setup_doc)
+        self.assertIn("filtered.returned_indexes", setup_doc)
         self.assertIn("top risk indexes", setup_doc)
         self.assertIn("python scripts/smoke_mcp.py --require-sdk", setup_doc)
         self.assertIn("missing MCP dependencies are a failure", setup_doc)
@@ -551,6 +559,8 @@ License-File: LICENSE
             "details.line",
             "details.column",
             "JSON/JSONL parse errors",
+            "filtered.returned_indexes",
+            "filtered.omitted_indexes",
         ]
         for phrase in required_phrases:
             with self.subTest(phrase=phrase):
@@ -707,6 +717,7 @@ License-File: LICENSE
             "Sort or summarize by risk first",
             "Always include a next step",
             "review_summary",
+            "action_queues",
             "top risk indexes",
             "next_action",
             "review_counterevidence_leads",

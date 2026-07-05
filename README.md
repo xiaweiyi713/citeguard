@@ -187,7 +187,10 @@ stable `next_action` enum plus human-readable context, so agents can triage
 `not_found`, `ambiguous`, `metadata_mismatch`, contradicted, and unresolved
 support checks without parsing prose. Batch `audit` and `support-audit` reports
 also include `review_summary` with full-batch risk counts, next-action counts,
-and top risk indexes for compact review queues. Common `next_action` values include
+top risk indexes, and `action_queues` grouped into stable index lists such as
+`identity_resolution_indexes`, `evidence_review_indexes`,
+`rewrite_or_replace_indexes`, `source_retry_indexes`, and
+`safe_to_keep_indexes`. Common `next_action` values include
 `keep`, `keep_claim`,
 `review_metadata`,
 `resolve_identifier_or_replace`, `disambiguate_identifier`,
@@ -197,6 +200,9 @@ and top risk indexes for compact review queues. Common `next_action` values incl
 `counterevidence_review`; when it is `true`, treat the item as needing
 human/full-text review for contradiction, weak support, insufficient evidence, or
 unresolved citation identity.
+When using `--high-risk-only`, the `filtered` block includes
+`returned_indexes` and `omitted_indexes` so the compact result list can still be
+mapped back to the original batch input.
 Use `--with-counterevidence` on support batch commands when you want CiteGuard to
 attach possible counter-evidence candidates to those review-worthy items; these
 are leads to inspect, not contradiction verdicts. Counter-evidence reports

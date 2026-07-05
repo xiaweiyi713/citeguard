@@ -38,6 +38,7 @@ from citeguard.verification import (
     check_claim_support,
     check_claim_support_set,
     enrich_support_payload_with_counterevidence,
+    filter_high_risk_payload,
     parse_citation,
     search_counterevidence_candidates,
     verify_citation,
@@ -148,12 +149,15 @@ def verify_citation_tool(
 
 
 @mcp.tool()
-def audit_citations_tool(citations: List[dict]) -> dict:
+def audit_citations_tool(citations: List[dict], high_risk_only: bool = False) -> dict:
     """Verify MANY citations at once.
 
     `citations` is a list of objects, each with any of:
     `raw_text`, `title`, `authors`, `year`, `venue`, `doi`, `arxiv_id`.
-    Returns a per-citation report plus a summary counting each verdict.
+    Returns a per-citation report plus a summary counting each verdict. Set
+    `high_risk_only=true` to return only high-risk result rows while preserving
+    full-batch `review_summary` counts and `filtered.returned_indexes` /
+    `filtered.omitted_indexes` for original-input traceability.
     """
     if not isinstance(citations, list):
         return error_payload(
@@ -185,7 +189,10 @@ def audit_citations_tool(citations: List[dict]) -> dict:
             candidates.append(_parse_citation_item(item, tool="audit_citations_tool", index=index))
         except MCPInputError as exc:
             return exc.to_payload()
-    return audit_citations(candidates, _source()).to_dict()
+    result = audit_citations(candidates, _source()).to_dict()
+    if high_risk_only:
+        result = filter_high_risk_payload(result)
+    return result
 
 
 @mcp.tool()
@@ -353,6 +360,7 @@ def audit_claim_support_tool(
     lang: str = "",
     include_counterevidence: bool = False,
     counterevidence_top_k: int = 3,
+    high_risk_only: bool = False,
 ) -> dict:
     """Judge MANY claim-citation support pairs at once.
 
@@ -361,7 +369,10 @@ def audit_claim_support_tool(
     `year`, `venue`, `doi`, `arxiv_id`, and optional per-item `lang`. An item may
     alternatively provide `citations`, a non-empty list of citation objects, to
     assess whether a claim is supported by the cited set. Returns a per-item
-    support report plus a verdict-count summary.
+    support report plus a verdict-count summary. Set `high_risk_only=true` to
+    return only high-risk rows while preserving full-batch `review_summary`
+    counts and `filtered.returned_indexes` / `filtered.omitted_indexes` for
+    original-input traceability.
     """
     if not isinstance(items, list):
         return error_payload(
@@ -490,6 +501,8 @@ def audit_claim_support_tool(
     ).to_dict()
     if include_counterevidence:
         result = enrich_support_payload_with_counterevidence(result, _source(), top_k=parsed_counterevidence_top_k)
+    if high_risk_only:
+        result = filter_high_risk_payload(result)
     return result
 
 

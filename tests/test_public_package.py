@@ -15,6 +15,8 @@ class PublicPackageTests(unittest.TestCase):
             CounterEvidenceSearchReport,
             ERROR_CODE_NEXT_ACTION,
             ERROR_SCHEMA_VERSION,
+            REVIEW_ACTION_QUEUE_BY_NEXT_ACTION,
+            REVIEW_ACTION_QUEUE_KEYS,
             STABLE_NEXT_ACTIONS,
             Verdict,
             __version__,
@@ -22,6 +24,7 @@ class PublicPackageTests(unittest.TestCase):
             available_sources,
             check_claim_support_set,
             error_payload,
+            filter_high_risk_payload,
             infer_evidence_scope,
             parse_citation,
             search_counterevidence_candidates,
@@ -41,6 +44,9 @@ class PublicPackageTests(unittest.TestCase):
         self.assertEqual(available_sources(["openalex", "arxiv"], ["arxiv"]), ["openalex"])
         self.assertEqual(source_failure_recovery_code([{"code": "timeout"}]), "timeout")
         self.assertIn("resolve_identifier_or_replace", STABLE_NEXT_ACTIONS)
+        self.assertIn("identity_resolution_indexes", REVIEW_ACTION_QUEUE_KEYS)
+        self.assertEqual(REVIEW_ACTION_QUEUE_BY_NEXT_ACTION["resolve_identifier_or_replace"], "identity_resolution_indexes")
+        self.assertEqual(REVIEW_ACTION_QUEUE_BY_NEXT_ACTION["keep_claim"], "safe_to_keep_indexes")
         self.assertEqual(stable_next_action("keep"), "keep")
         self.assertEqual(verification_recovery_code(Verdict.AMBIGUOUS, []), "ambiguous_citation")
         self.assertEqual(verification_next_action(Verdict.NOT_FOUND), "resolve_identifier_or_replace")
@@ -53,6 +59,7 @@ class PublicPackageTests(unittest.TestCase):
         self.assertEqual(error_payload("timeout", "Timed out")["error"]["recovery"], "Retry, raise the timeout, or continue with reduced confidence.")
         self.assertEqual(error_payload("timeout", "Timed out")["error"]["next_action"], "retry_or_check_source_health")
         self.assertEqual(ERROR_CODE_NEXT_ACTION["missing_citation_input"], "provide_missing_input")
+        self.assertTrue(callable(filter_high_risk_payload))
         self.assertTrue(callable(verify_citation))
 
     def test_public_errors_module_exports_error_payload(self):

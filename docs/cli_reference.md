@@ -128,9 +128,16 @@ or plain text references.
 
 Batch audit output includes `review_summary` and `risk_ranking`, sorted
 highest-risk first. `review_summary` gives full-batch counts for high/medium/low
-risk, next-action counts, and the top risk indexes for review queues. Use
+risk, next-action counts, top risk indexes, and `action_queues` for common agent
+work queues: identity resolution, metadata review, evidence review,
+rewrite/replace, source retry, input repair, and safe-to-keep indexes. Use
+`next_actions` for exact action counts; every stable `next_action` is assigned
+to one `action_queues` list for compact routing.
 `--high-risk-only` to return only high-risk results while preserving the full
-summary and review-summary counts. Each risk-ranking row includes `next_action`, a stable
+summary and review-summary counts. The `filtered` block includes
+`returned_indexes` and `omitted_indexes`, both using original input indexes, so
+agents can map filtered result rows back to the source batch. Each risk-ranking
+row includes `next_action`, a stable
 machine-readable action for agents (`keep`, `review_metadata`,
 `resolve_identifier_or_replace`, `disambiguate_identifier`,
 `inspect_source_health`, or `retry_or_check_source_health`), plus a
@@ -294,7 +301,8 @@ Support-audit output also includes `review_summary` and `risk_ranking`;
 contradicted claims and unresolved/ambiguous citations are high-risk, while weak
 support and insufficient evidence receive recommendations to inspect full text or
 revise the claim. `review_summary` gives full-batch risk counts, next-action
-counts, and top high-risk indexes so agents can build a compact review plan.
+counts, top high-risk indexes, and `action_queues` so agents can build a compact
+review plan without parsing prose.
 Each risk-ranking row includes a stable `next_action` such as
 `keep_claim`, `resolve_citation_identity`, `disambiguate_identifier`,
 `retry_or_check_source_health`, `tighten_claim_or_inspect_full_text`,
@@ -309,6 +317,9 @@ supporting/contradicting citation counts, and per-citation child `results`.
 Use `--with-counterevidence` to run that search for review-worthy items and
 attach `counterevidence` reports to the relevant results and risk-ranking rows.
 Use `--counterevidence-top-k` to limit candidates per claim.
+When `--high-risk-only` is enabled, the `filtered.returned_indexes` and
+`filtered.omitted_indexes` arrays preserve the original batch indexes for
+traceability.
 
 ## support-set
 

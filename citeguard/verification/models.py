@@ -48,6 +48,36 @@ NEXT_ACTION_DESCRIPTIONS = {
 
 STABLE_NEXT_ACTIONS = frozenset(NEXT_ACTION_DESCRIPTIONS)
 
+REVIEW_ACTION_QUEUE_KEYS = (
+    "rewrite_or_replace_indexes",
+    "identity_resolution_indexes",
+    "metadata_review_indexes",
+    "evidence_review_indexes",
+    "source_retry_indexes",
+    "safe_to_keep_indexes",
+    "input_repair_indexes",
+)
+
+REVIEW_ACTION_QUEUE_BY_NEXT_ACTION = {
+    "continue": "safe_to_keep_indexes",
+    "keep": "safe_to_keep_indexes",
+    "keep_claim": "safe_to_keep_indexes",
+    "rewrite_or_replace_evidence": "rewrite_or_replace_indexes",
+    "resolve_identifier_or_replace": "identity_resolution_indexes",
+    "resolve_citation_identity": "identity_resolution_indexes",
+    "disambiguate_identifier": "identity_resolution_indexes",
+    "review_metadata": "metadata_review_indexes",
+    "review_counterevidence_leads": "evidence_review_indexes",
+    "tighten_claim_or_inspect_full_text": "evidence_review_indexes",
+    "inspect_full_text_or_find_stronger_citation": "evidence_review_indexes",
+    "inspect_source_health": "source_retry_indexes",
+    "retry_or_check_source_health": "source_retry_indexes",
+    "fix_configuration": "input_repair_indexes",
+    "provide_missing_input": "input_repair_indexes",
+    "repair_input": "input_repair_indexes",
+    "install_or_configure_dependency": "input_repair_indexes",
+}
+
 
 def stable_next_action(action: str) -> str:
     """Validate and return a stable next-action value."""
@@ -152,6 +182,7 @@ def review_summary_from_risk_ranking(total: int, risk_ranking: List[Dict[str, An
 
     risk_counts: Dict[str, int] = {"high": 0, "medium": 0, "low": 0}
     next_actions: Dict[str, int] = {}
+    action_queues: Dict[str, List[int]] = {key: [] for key in REVIEW_ACTION_QUEUE_KEYS}
     for item in risk_ranking:
         risk = str(item.get("risk") or "")
         if risk:
@@ -159,6 +190,9 @@ def review_summary_from_risk_ranking(total: int, risk_ranking: List[Dict[str, An
         next_action = str(item.get("next_action") or "")
         if next_action:
             next_actions[next_action] = next_actions.get(next_action, 0) + 1
+        index = item.get("index")
+        if isinstance(index, int):
+            _append_review_queue_index(action_queues, next_action, index)
 
     top_risk_indexes = [
         item["index"]
@@ -178,9 +212,48 @@ def review_summary_from_risk_ranking(total: int, risk_ranking: List[Dict[str, An
         "low_risk_count": risk_counts.get("low", 0),
         "risk_counts": risk_counts,
         "next_actions": next_actions,
+        "action_queues": action_queues,
         "top_risk_indexes": top_risk_indexes,
         "top_high_risk_indexes": top_high_risk_indexes,
     }
+
+
+def filter_high_risk_payload(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """Return a batch payload containing only high-risk results with traceability metadata."""
+
+    original_count = len(payload.get("results", []))
+    high_risk_indexes = set()
+    for item in payload.get("risk_ranking", []):
+        if not isinstance(item, dict) or item.get("risk") != "high":
+            continue
+        index = item.get("index")
+        if isinstance(index, int) and 0 <= index < original_count:
+            high_risk_indexes.add(index)
+    returned_indexes = [index for index in range(original_count) if index in high_risk_indexes]
+    omitted_indexes = [index for index in range(original_count) if index not in high_risk_indexes]
+    filtered = dict(payload)
+    filtered["results"] = [
+        result for index, result in enumerate(payload.get("results", [])) if index in returned_indexes
+    ]
+    filtered["risk_ranking"] = [
+        item
+        for item in payload.get("risk_ranking", [])
+        if isinstance(item, dict) and item.get("index") in high_risk_indexes
+    ]
+    filtered["filtered"] = {
+        "high_risk_only": True,
+        "returned": len(filtered["results"]),
+        "original_results": original_count,
+        "returned_indexes": returned_indexes,
+        "omitted_indexes": omitted_indexes,
+    }
+    return filtered
+
+
+def _append_review_queue_index(action_queues: Dict[str, List[int]], next_action: str, index: int) -> None:
+    queue = REVIEW_ACTION_QUEUE_BY_NEXT_ACTION.get(next_action)
+    if queue:
+        action_queues[queue].append(index)
 
 
 def verification_risk_item(index: int, result: VerificationResult) -> Dict[str, Any]:
