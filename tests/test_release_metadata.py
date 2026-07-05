@@ -1,5 +1,6 @@
 """Release metadata and public-interface guardrails."""
 
+import json
 from pathlib import Path
 import re
 import subprocess
@@ -10,8 +11,10 @@ from unittest import mock
 from citeguard.errors import ERROR_CODE_NEXT_ACTION, ERROR_SCHEMA_VERSION, STABLE_ERROR_CODES
 from citeguard.retrieval.scholarly_clients.factory import DEFAULT_USER_AGENT
 from citeguard.verification import STABLE_NEXT_ACTIONS
+from citeguard.verification.support_eval import ALLOWED_SUPPORT_LABELS
 from citeguard.version import __version__
 from scripts.release_package_gate import (
+    _annotation_conflict_probe_case,
     _record_agent_skill_contract_gate,
     _record_batch_workflow_examples_gate,
     _record_benchmark_claim_safety_gate,
@@ -412,6 +415,9 @@ License-File: LICENSE
             "support_review_queue_annotation_packet",
             "_record_support_review_queue_gate",
             "_record_support_review_queue_annotation_packet_gate",
+            "merge_report.adjudication_queue",
+            "adjudication_template",
+            "reviewer rationales",
             "--review-queue-only",
             "--from-review-queue",
             '"review_queue_rank"',
@@ -1070,6 +1076,44 @@ License-File: LICENSE
     def test_release_gate_records_support_review_queue_annotation_packet_contract(self):
         summary = {"ok": True, "steps": []}
         completed = mock.Mock(stdout="")
+        probe_case_id, probe_label = _annotation_conflict_probe_case(ROOT / "data" / "eval" / "support_eval.json")
+        merge_stdout = json.dumps(
+            {
+                "merge_report": {
+                    "ok": False,
+                    "conflicts": [
+                        {
+                            "code": "label_mismatch",
+                            "annotation_examples": [
+                                {
+                                    "packet_id": "support-packet-release-gate-conflict",
+                                    "packet_case_index": 1,
+                                    "annotator_id": "release-gate-reviewer",
+                                    "label": probe_label,
+                                    "rationale": "probe",
+                                    "confidence": "low",
+                                }
+                            ],
+                        }
+                    ],
+                    "adjudication_queue": [
+                        {
+                            "conflict_code": "label_mismatch",
+                            "adjudication_template": {
+                                "case_id": probe_case_id,
+                                "annotator_labels": [probe_label],
+                                "adjudicated_label": "",
+                                "adjudicator": "",
+                                "rationale": "",
+                                "source_locator": "",
+                                "source_packet_ids": ["support-packet-release-gate-conflict"],
+                            },
+                        }
+                    ],
+                }
+            }
+        )
+        merge_completed = mock.Mock(returncode=1, stdout=merge_stdout, stderr="")
 
         def fake_run(cmd, *, cwd):
             packet_path = Path(cmd[cmd.index("--output") + 1])
@@ -1088,7 +1132,10 @@ License-File: LICENSE
             instructions_path.write_text("Use `review_queue_rank` only as assignment priority.", encoding="utf-8")
             return completed
 
-        with mock.patch("scripts.release_package_gate._run", side_effect=fake_run) as run:
+        with mock.patch("scripts.release_package_gate._run", side_effect=fake_run) as run, mock.patch(
+            "scripts.release_package_gate.subprocess.run",
+            return_value=merge_completed,
+        ) as subprocess_run:
             _record_support_review_queue_annotation_packet_gate(
                 summary,
                 python="python3",
@@ -1098,17 +1145,39 @@ License-File: LICENSE
             )
 
         run.assert_called_once()
+        subprocess_run.assert_called_once()
         command = run.call_args.args[0]
+        merge_command = subprocess_run.call_args.args[0]
         self.assertIn("scripts/prepare_support_label_sidecar.py", command)
         self.assertIn("--from-review-queue", command)
         self.assertIn("--review-backend", command)
         self.assertIn("heuristic", command)
+        self.assertIn("--merge-annotation-packet", merge_command)
         self.assertEqual(summary["steps"][0]["name"], "support_review_queue_annotation_packet")
         self.assertEqual(summary["steps"][0]["status"], "passed")
         self.assertEqual(summary["steps"][0]["packet_case_ids"], ["s10", "s16"])
         self.assertEqual(summary["steps"][0]["review_queue_case_ids"], ["s10", "s16"])
         self.assertEqual(summary["steps"][0]["review_queue_ranks"], [1, 2])
         self.assertEqual(summary["steps"][0]["leaked_hidden_fields"], [])
+        self.assertEqual(summary["steps"][0]["merge_conflict_probe"]["case_id"], probe_case_id)
+        self.assertEqual(summary["steps"][0]["merge_conflict_probe"]["probe_label"], probe_label)
+        self.assertEqual(summary["steps"][0]["merge_conflict_probe"]["conflict_code"], "label_mismatch")
+        self.assertEqual(summary["steps"][0]["merge_conflict_probe"]["adjudication_queue_count"], 1)
+        self.assertIn("adjudicated_label", summary["steps"][0]["merge_conflict_probe"]["adjudication_template_fields"])
+        self.assertIn("packet_id", summary["steps"][0]["merge_conflict_probe"]["annotation_example_fields"])
+        self.assertIn("packet_case_index", summary["steps"][0]["merge_conflict_probe"]["annotation_example_fields"])
+        self.assertIn("source_packet_ids", summary["steps"][0]["merge_conflict_probe"]["adjudication_template_fields"])
+        self.assertIn("rationale", summary["steps"][0]["merge_conflict_probe"]["annotation_example_fields"])
+
+    def test_release_gate_annotation_conflict_probe_uses_dataset_case(self):
+        case_id, probe_label = _annotation_conflict_probe_case(ROOT / "data" / "eval" / "support_eval.json")
+        data = json.loads((ROOT / "data" / "eval" / "support_eval.json").read_text(encoding="utf-8"))
+        gold_by_id = {case["id"]: case["gold"] for case in data["cases"]}
+
+        self.assertTrue(case_id)
+        self.assertIn(case_id, gold_by_id)
+        self.assertIn(probe_label, ALLOWED_SUPPORT_LABELS)
+        self.assertNotEqual(probe_label, gold_by_id[case_id])
 
     def test_mcp_smoke_checks_structured_errors(self):
         smoke = (ROOT / "scripts" / "smoke_mcp.py").read_text(encoding="utf-8")

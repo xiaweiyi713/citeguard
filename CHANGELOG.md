@@ -161,6 +161,12 @@
   reviewer-batch archives.
 - Added `merge_report.source_packet_ids` to preserve reviewer-batch provenance
   after annotation-packet merges.
+- Added `merge_report.adjudication_queue` with reviewer rationales and blank
+  adjudication templates for unresolved annotation disagreements.
+- Added source packet ids and packet case indexes to annotation conflict
+  examples so adjudication can trace disagreements back to reviewer batches.
+- Added `source_packet_ids` to adjudication templates, reports, and sidecar
+  notes so resolved disagreements preserve reviewer-batch provenance.
 - Added high-risk case-count-by-language metrics to support-label gates so
   release checks can report reviewed and unreviewed language coverage in one
   place.

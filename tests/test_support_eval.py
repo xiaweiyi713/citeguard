@@ -1185,6 +1185,8 @@ class SupportEvalTests(unittest.TestCase):
             packet_path = os.path.join(tmpdir, "conflict_packet.jsonl")
             rows = [
                 {
+                    "packet_id": "support-packet-conflict",
+                    "packet_case_index": 1,
                     "case_id": "s04",
                     "annotation": {
                         "annotator_id": "reviewer-a",
@@ -1219,6 +1221,85 @@ class SupportEvalTests(unittest.TestCase):
         self.assertEqual(completed.returncode, 1)
         self.assertFalse(payload["merge_report"]["ok"])
         self.assertEqual(payload["merge_report"]["conflicts"][0]["code"], "label_mismatch")
+        self.assertEqual(payload["merge_report"]["conflicts"][0]["annotation_examples"][0]["packet_id"], "support-packet-conflict")
+        self.assertEqual(payload["merge_report"]["conflicts"][0]["annotation_examples"][0]["packet_case_index"], 1)
+        self.assertEqual(payload["merge_report"]["conflicts"][0]["annotation_examples"][0]["annotator_id"], "reviewer-a")
+        self.assertEqual(payload["merge_report"]["conflicts"][0]["annotation_examples"][0]["label"], "supported")
+        self.assertIn("Intentionally conflicts", payload["merge_report"]["conflicts"][0]["annotation_examples"][0]["rationale"])
+        self.assertEqual(payload["merge_report"]["adjudication_queue"][0]["case_id"], "s04")
+        self.assertEqual(payload["merge_report"]["adjudication_queue"][0]["conflict_code"], "label_mismatch")
+        self.assertEqual(payload["merge_report"]["adjudication_queue"][0]["adjudication_template"]["case_id"], "s04")
+        self.assertEqual(payload["merge_report"]["adjudication_queue"][0]["adjudication_template"]["annotator_labels"], ["supported"])
+        self.assertEqual(payload["merge_report"]["adjudication_queue"][0]["adjudication_template"]["adjudicated_label"], "")
+        self.assertEqual(payload["merge_report"]["adjudication_queue"][0]["adjudication_template"]["source_packet_ids"], ["support-packet-conflict"])
+        self.assertEqual(cases["s04"]["adjudication_status"], "not_human_reviewed")
+        self.assertEqual(cases["s04"]["annotator_labels"], [])
+
+    def test_prepare_support_label_sidecar_reports_annotator_disagreement_queue(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            packet_path = os.path.join(tmpdir, "disagreement_packet.json")
+            packet = {
+                "cases": [
+                    {
+                        "packet_id": "support-packet-disagreement",
+                        "packet_case_index": 1,
+                        "case_id": "s04",
+                        "annotation": {
+                            "annotator_id": "reviewer-a",
+                            "annotator_label": "contradicted",
+                            "rationale": "The evidence rejects the claimed improvement.",
+                            "confidence": "high",
+                        },
+                    },
+                    {
+                        "packet_id": "support-packet-disagreement",
+                        "packet_case_index": 2,
+                        "case_id": "s04",
+                        "annotation": {
+                            "annotator_id": "reviewer-b",
+                            "annotator_label": "weakly_supported",
+                            "rationale": "The evidence seems related but not decisive.",
+                            "confidence": "low",
+                        },
+                    },
+                ]
+            }
+            with open(packet_path, "w", encoding="utf-8") as handle:
+                json.dump(packet, handle)
+
+            completed = subprocess.run(
+                [
+                    sys.executable,
+                    "scripts/prepare_support_label_sidecar.py",
+                    "--dataset",
+                    os.path.join("data", "eval", "support_eval.json"),
+                    "--existing-sidecar",
+                    os.path.join("data", "eval", "support_eval_label_sidecar.json"),
+                    "--merge-annotation-packet",
+                    packet_path,
+                ],
+                check=False,
+                cwd=os.getcwd(),
+                capture_output=True,
+                text=True,
+            )
+        payload = json.loads(completed.stdout)
+        cases = {item["case_id"]: item for item in payload["cases"]}
+        conflict = payload["merge_report"]["conflicts"][0]
+        queue_item = payload["merge_report"]["adjudication_queue"][0]
+
+        self.assertEqual(completed.returncode, 1)
+        self.assertFalse(payload["merge_report"]["ok"])
+        self.assertEqual(conflict["code"], "annotator_disagreement")
+        self.assertEqual(conflict["annotator_labels"], ["contradicted", "weakly_supported"])
+        self.assertEqual([item["packet_id"] for item in conflict["annotation_examples"]], ["support-packet-disagreement", "support-packet-disagreement"])
+        self.assertEqual([item["packet_case_index"] for item in conflict["annotation_examples"]], [1, 2])
+        self.assertEqual([item["annotator_id"] for item in conflict["annotation_examples"]], ["reviewer-a", "reviewer-b"])
+        self.assertEqual([item["confidence"] for item in conflict["annotation_examples"]], ["high", "low"])
+        self.assertEqual(queue_item["conflict_code"], "annotator_disagreement")
+        self.assertEqual(queue_item["adjudication_template"]["annotator_labels"], ["contradicted", "weakly_supported"])
+        self.assertEqual(queue_item["adjudication_template"]["source_packet_ids"], ["support-packet-disagreement"])
+        self.assertIn("--apply-adjudications", queue_item["recommended_action"])
         self.assertEqual(cases["s04"]["adjudication_status"], "not_human_reviewed")
         self.assertEqual(cases["s04"]["annotator_labels"], [])
 
@@ -1319,6 +1400,7 @@ class SupportEvalTests(unittest.TestCase):
                         "adjudicator": "reviewer-c",
                         "rationale": "The evidence explicitly rejects the improvement claim.",
                         "source_locator": "doi:10.123/adjudicated",
+                        "source_packet_ids": ["support-packet-conflict"],
                     }
                 ]
             }
@@ -1346,11 +1428,13 @@ class SupportEvalTests(unittest.TestCase):
 
         self.assertTrue(output["adjudication_report"]["ok"])
         self.assertEqual(output["adjudication_report"]["applied_case_ids"], ["s04"])
+        self.assertEqual(output["adjudication_report"]["source_packet_ids"], ["support-packet-conflict"])
         self.assertEqual(cases["s04"]["adjudication_status"], "dual_annotator_adjudicated")
         self.assertEqual(cases["s04"]["disagreement"], "resolved")
         self.assertEqual(cases["s04"]["adjudicator"], "reviewer-c")
         self.assertEqual(cases["s04"]["source_locator"], "doi:10.123/adjudicated")
         self.assertIn("annotator_labels=supported, contradicted", cases["s04"]["notes"])
+        self.assertIn("source_packet_ids=support-packet-conflict", cases["s04"]["notes"])
 
     def test_prepare_support_label_sidecar_reports_adjudication_gold_conflict(self):
         with tempfile.TemporaryDirectory() as tmpdir:

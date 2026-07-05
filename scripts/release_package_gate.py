@@ -2268,6 +2268,13 @@ def _record_support_review_queue_annotation_packet_gate(
             packet_text = packet_path.read_text(encoding="utf-8")
             instructions_text = instructions_path.read_text(encoding="utf-8")
             payload = json.loads(packet_text)
+            merge_probe = _run_annotation_conflict_merge_probe(
+                python=python,
+                project_root=project_root,
+                dataset=dataset,
+                label_sidecar=label_sidecar,
+                tmpdir=Path(tmpdir),
+            )
         except subprocess.CalledProcessError as exc:
             summary["steps"].append(
                 {
@@ -2280,13 +2287,13 @@ def _record_support_review_queue_annotation_packet_gate(
             )
             summary["ok"] = False
             return
-        except (OSError, json.JSONDecodeError) as exc:
+        except (OSError, json.JSONDecodeError, RuntimeError) as exc:
             summary["steps"].append(
                 {
                     "name": "support_review_queue_annotation_packet",
                     "status": "failed",
                     "command": cmd,
-                    "message": f"Could not read or parse review-queue annotation packet: {exc}",
+                    "message": f"Could not read, parse, or probe review-queue annotation packet workflow: {exc}",
                     "stdout_tail": _tail(locals().get("completed", subprocess.CompletedProcess(cmd, 0, "")).stdout or ""),
                 }
             )
@@ -2313,6 +2320,7 @@ def _record_support_review_queue_annotation_packet_gate(
         and len(ranks) == len(cases)
         and not leaked_fields
         and "review_queue_rank" in instructions_text
+        and merge_probe.get("ok") is True
     )
     summary["steps"].append(
         {
@@ -2325,11 +2333,116 @@ def _record_support_review_queue_annotation_packet_gate(
             "review_queue_case_ids": filters.get("review_queue_case_ids", []) if isinstance(filters, dict) else [],
             "review_queue_ranks": ranks,
             "leaked_hidden_fields": leaked_fields,
+            "merge_conflict_probe": merge_probe,
             "stdout_tail": _tail(completed.stdout),
         }
     )
     if not passed:
         summary["ok"] = False
+
+
+def _run_annotation_conflict_merge_probe(
+    *,
+    python: str,
+    project_root: Path,
+    dataset: str,
+    label_sidecar: str,
+    tmpdir: Path,
+) -> Dict[str, Any]:
+    probe_case_id, probe_label = _annotation_conflict_probe_case(project_root / dataset)
+    conflict_packet = tmpdir / "completed-support-label-conflict.jsonl"
+    conflict_packet.write_text(
+        json.dumps(
+            {
+                "packet_id": "support-packet-release-gate-conflict",
+                "packet_case_index": 1,
+                "case_id": probe_case_id,
+                "annotation": {
+                    "annotator_id": "release-gate-reviewer",
+                    "annotator_label": probe_label,
+                    "rationale": "Release gate deliberately checks adjudication_queue conflict provenance.",
+                    "confidence": "low",
+                },
+            },
+            ensure_ascii=False,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    cmd = [
+        python,
+        "scripts/prepare_support_label_sidecar.py",
+        "--dataset",
+        dataset,
+        "--existing-sidecar",
+        label_sidecar,
+        "--merge-annotation-packet",
+        str(conflict_packet),
+    ]
+    completed = subprocess.run(
+        cmd,
+        cwd=str(project_root),
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    if completed.returncode == 0:
+        raise RuntimeError("annotation conflict merge probe unexpectedly succeeded")
+    if completed.stderr.strip():
+        raise RuntimeError(f"annotation conflict merge probe wrote unexpected stderr: {completed.stderr.strip()}")
+    try:
+        payload = json.loads(completed.stdout)
+    except json.JSONDecodeError as exc:
+        raise RuntimeError(f"annotation conflict merge probe did not return JSON stdout: {exc}") from exc
+    merge_report = payload.get("merge_report", {}) if isinstance(payload, dict) else {}
+    conflicts = merge_report.get("conflicts", []) if isinstance(merge_report, dict) else []
+    adjudication_queue = merge_report.get("adjudication_queue", []) if isinstance(merge_report, dict) else []
+    first_conflict = conflicts[0] if conflicts and isinstance(conflicts[0], dict) else {}
+    first_queue_item = adjudication_queue[0] if adjudication_queue and isinstance(adjudication_queue[0], dict) else {}
+    template = first_queue_item.get("adjudication_template", {}) if isinstance(first_queue_item, dict) else {}
+    examples = first_conflict.get("annotation_examples", []) if isinstance(first_conflict, dict) else []
+    ok = (
+        merge_report.get("ok") is False
+        and first_conflict.get("code") == "label_mismatch"
+        and first_queue_item.get("conflict_code") == "label_mismatch"
+        and template.get("case_id") == probe_case_id
+        and template.get("adjudicated_label") == ""
+        and bool(examples)
+        and examples[0].get("packet_id") == "support-packet-release-gate-conflict"
+        and examples[0].get("packet_case_index") == 1
+        and examples[0].get("annotator_id") == "release-gate-reviewer"
+        and examples[0].get("label") == probe_label
+    )
+    if not ok:
+        raise RuntimeError("annotation conflict merge probe did not expose adjudication_queue provenance")
+    return {
+        "ok": True,
+        "command": cmd,
+        "exit_code": completed.returncode,
+        "case_id": probe_case_id,
+        "probe_label": probe_label,
+        "conflict_code": first_conflict.get("code"),
+        "adjudication_queue_count": len(adjudication_queue),
+        "adjudication_template_fields": sorted(template),
+        "annotation_example_fields": sorted(examples[0]) if examples and isinstance(examples[0], dict) else [],
+    }
+
+
+def _annotation_conflict_probe_case(dataset_path: Path) -> tuple[str, str]:
+    from citeguard.verification.support_eval import ALLOWED_SUPPORT_LABELS
+
+    data = json.loads(dataset_path.read_text(encoding="utf-8"))
+    cases = data.get("cases", []) if isinstance(data, dict) else []
+    for case in cases:
+        if not isinstance(case, dict):
+            continue
+        case_id = str(case.get("id", "")).strip()
+        gold = str(case.get("gold", "")).strip()
+        if not case_id or gold not in ALLOWED_SUPPORT_LABELS:
+            continue
+        probe_label = next(label for label in sorted(ALLOWED_SUPPORT_LABELS) if label != gold)
+        return case_id, probe_label
+    raise RuntimeError("annotation conflict merge probe could not find a labeled support eval case")
 
 
 def _record_mcp_extra_smoke(

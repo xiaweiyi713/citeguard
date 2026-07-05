@@ -255,9 +255,15 @@ The merge is conservative. A single returned label matching the dataset gold is
 recorded as `single_annotator`; two or more matching labels are recorded as
 `dual_annotator_agreed`. Any annotator disagreement or label that conflicts with
 the current dataset gold is reported in `merge_report.conflicts`, exits non-zero,
-and is not silently applied. Resolve those cases by adjudication before raising
-human-review gates or making benchmark claims. Missing annotator ids are reported
-in `merge_report.skipped`; duplicate annotator ids for the same case are reported
+and is not silently applied. Those conflicts also populate
+`merge_report.adjudication_queue` with annotator ids, labels, rationales,
+confidence notes, source packet ids, packet case indexes, and a blank
+adjudication template with `source_packet_ids` so the disagreement can be
+reviewed without losing provenance. `--apply-adjudications` records those packet
+ids in `adjudication_report.source_packet_ids` and sidecar notes. Resolve those
+cases by adjudication before raising human-review
+gates or making benchmark claims. Missing annotator ids are reported in
+`merge_report.skipped`; duplicate annotator ids for the same case are reported
 as `duplicate_annotator` conflicts so duplicate rows cannot inflate
 dual-annotation maturity.
 

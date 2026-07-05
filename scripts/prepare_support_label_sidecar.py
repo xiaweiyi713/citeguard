@@ -354,6 +354,7 @@ def _merge_annotation_packet(sidecar: dict, cases: list, annotation_rows: list) 
     grouped = {}
     conflicts = []
     skipped = []
+    adjudication_queue = []
     source_packet_ids = []
     for index, row in enumerate(annotation_rows, start=1):
         if not isinstance(row, dict):
@@ -421,38 +422,42 @@ def _merge_annotation_packet(sidecar: dict, cases: list, annotation_rows: list) 
         )
         if duplicate_annotator_ids:
             conflicts.append(
-                {
-                    "case_id": case_id,
-                    "code": "duplicate_annotator",
-                    "message": "The same annotator appears more than once for this case.",
-                    "annotator_ids": duplicate_annotator_ids,
-                    "annotator_labels": labels,
-                }
+                _merge_conflict(
+                    case_id=case_id,
+                    code="duplicate_annotator",
+                    message="The same annotator appears more than once for this case.",
+                    case=case,
+                    labels=labels,
+                    annotations=annotations,
+                    extra={"annotator_ids": duplicate_annotator_ids},
+                )
             )
             continue
         unique_labels = sorted(set(labels))
         if len(unique_labels) > 1:
-            conflicts.append(
-                {
-                    "case_id": case_id,
-                    "code": "annotator_disagreement",
-                    "message": "Annotation packet contains unresolved annotator disagreement.",
-                    "dataset_gold": case.gold,
-                    "annotator_labels": labels,
-                }
+            conflict = _merge_conflict(
+                case_id=case_id,
+                code="annotator_disagreement",
+                message="Annotation packet contains unresolved annotator disagreement.",
+                case=case,
+                labels=labels,
+                annotations=annotations,
             )
+            conflicts.append(conflict)
+            adjudication_queue.append(_adjudication_queue_item(conflict))
             continue
         label = unique_labels[0]
         if label != case.gold:
-            conflicts.append(
-                {
-                    "case_id": case_id,
-                    "code": "label_mismatch",
-                    "message": "Annotation label does not match the current dataset gold label.",
-                    "dataset_gold": case.gold,
-                    "annotator_labels": labels,
-                }
+            conflict = _merge_conflict(
+                case_id=case_id,
+                code="label_mismatch",
+                message="Annotation label does not match the current dataset gold label.",
+                case=case,
+                labels=labels,
+                annotations=annotations,
             )
+            conflicts.append(conflict)
+            adjudication_queue.append(_adjudication_queue_item(conflict))
             continue
         item = sidecar_by_id[case_id]
         item["annotator_count"] = len(annotations)
@@ -474,13 +479,87 @@ def _merge_annotation_packet(sidecar: dict, cases: list, annotation_rows: list) 
         "applied_case_ids": applied_case_ids,
         "source_packet_ids": sorted(set(source_packet_ids)),
         "conflicts": conflicts,
+        "adjudication_queue": adjudication_queue,
         "skipped": skipped,
         "next_actions": _merge_next_actions(conflicts, skipped),
     }
 
 
+def _merge_conflict(
+    *,
+    case_id: str,
+    code: str,
+    message: str,
+    case,
+    labels: list,
+    annotations: list,
+    extra: Optional[dict] = None,
+) -> dict:
+    conflict = {
+        "case_id": case_id,
+        "code": code,
+        "message": message,
+        "dataset_gold": case.gold,
+        "annotator_labels": labels,
+        "annotation_examples": _conflict_annotation_examples(annotations),
+    }
+    if extra:
+        conflict.update(extra)
+    return conflict
+
+
+def _conflict_annotation_examples(annotations: list) -> list:
+    examples = []
+    for item in annotations:
+        examples.append(
+            {
+                "packet_id": item.get("packet_id", ""),
+                "packet_case_index": item.get("packet_case_index", ""),
+                "annotator_id": item.get("annotator_id", ""),
+                "label": item.get("label", ""),
+                "rationale": item.get("rationale", ""),
+                "confidence": item.get("confidence", ""),
+                "notes": item.get("notes", ""),
+                "source_locator": item.get("source_locator", ""),
+            }
+        )
+    return examples
+
+
+def _adjudication_queue_item(conflict: dict) -> dict:
+    source_packet_ids = sorted(
+        {
+            str(item.get("packet_id", "")).strip()
+            for item in conflict.get("annotation_examples", [])
+            if str(item.get("packet_id", "")).strip()
+        }
+    )
+    return {
+        "case_id": conflict.get("case_id", ""),
+        "conflict_code": conflict.get("code", ""),
+        "dataset_gold": conflict.get("dataset_gold", ""),
+        "annotator_labels": list(conflict.get("annotator_labels", [])),
+        "annotation_examples": [dict(item) for item in conflict.get("annotation_examples", [])],
+        "adjudication_template": {
+            "case_id": conflict.get("case_id", ""),
+            "annotator_labels": list(conflict.get("annotator_labels", [])),
+            "adjudicated_label": "",
+            "adjudicator": "",
+            "rationale": "",
+            "source_locator": "",
+            "source_packet_ids": source_packet_ids,
+        },
+        "recommended_action": (
+            "Review annotation rationales, update dataset gold if needed, then rerun "
+            "--apply-adjudications with an explicit adjudicator."
+        ),
+    }
+
+
 def _annotation_summary(row: dict, annotation: dict, label: str) -> dict:
     return {
+        "packet_id": str(row.get("packet_id", "")).strip(),
+        "packet_case_index": row.get("packet_case_index", ""),
         "label": label,
         "annotator_id": str(annotation.get("annotator_id") or row.get("annotator_id") or "").strip(),
         "rationale": str(annotation.get("rationale") or row.get("rationale") or "").strip(),
@@ -525,6 +604,7 @@ def _apply_adjudications(sidecar: dict, cases: list, adjudication_rows: list) ->
         if isinstance(item, dict) and item.get("case_id")
     }
     applied_case_ids = []
+    source_packet_ids = []
     conflicts = []
     skipped = []
     for index, row in enumerate(adjudication_rows, start=1):
@@ -598,6 +678,7 @@ def _apply_adjudications(sidecar: dict, cases: list, adjudication_rows: list) ->
         item["adjudicator"] = adjudicator
         if row.get("source_locator"):
             item["source_locator"] = str(row.get("source_locator", "")).strip()
+        source_packet_ids.extend(_adjudication_source_packet_ids(row))
         item["notes"] = _adjudication_notes(row, annotator_labels)
         applied_case_ids.append(case_id)
 
@@ -608,6 +689,7 @@ def _apply_adjudications(sidecar: dict, cases: list, adjudication_rows: list) ->
         "conflict_count": len(conflicts),
         "skipped_count": len(skipped),
         "applied_case_ids": applied_case_ids,
+        "source_packet_ids": sorted(set(source_packet_ids)),
         "conflicts": conflicts,
         "skipped": skipped,
         "next_actions": _adjudication_next_actions(conflicts, skipped),
@@ -621,12 +703,24 @@ def _adjudication_annotator_labels(row: dict, existing_item: dict) -> list:
     return [str(label) for label in labels if str(label) in ALLOWED_SUPPORT_LABELS]
 
 
+def _adjudication_source_packet_ids(row: dict) -> list:
+    packet_ids = row.get("source_packet_ids", [])
+    if isinstance(packet_ids, str):
+        packet_ids = [packet_ids]
+    if not isinstance(packet_ids, list):
+        return []
+    return [str(packet_id).strip() for packet_id in packet_ids if str(packet_id).strip()]
+
+
 def _adjudication_notes(row: dict, annotator_labels: list) -> str:
     rationale = str(row.get("rationale", "") or row.get("notes", "")).strip()
+    source_packet_ids = _adjudication_source_packet_ids(row)
     parts = [
         "Resolved adjudication from blinded annotation workflow.",
         "annotator_labels=" + ", ".join(annotator_labels),
     ]
+    if source_packet_ids:
+        parts.append("source_packet_ids=" + ", ".join(source_packet_ids))
     if rationale:
         parts.append("rationale=" + rationale)
     return " ".join(parts)

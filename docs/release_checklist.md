@@ -151,7 +151,15 @@ agent skill bundle.
   `high_risk_reviewed_by_language`, and
   `high_risk_unreviewed_by_language` for release triage. Raise
   `--min-high-risk-reviewed` first for contradiction, hard-negative,
-  full-text-required, and contradiction-set cases.
+  full-text-required, and contradiction-set cases. When annotation packet merge
+  exits non-zero, inspect `merge_report.conflicts` and
+  `merge_report.adjudication_queue`; the queue preserves reviewer rationales,
+  `packet_id`, `packet_case_index`, and blank `adjudication_template` rows so
+  supported-label disagreements are resolved explicitly instead of silently
+  folded into benchmark labels. Adjudication templates carry
+  `source_packet_ids`; after `--apply-adjudications`, verify
+  `adjudication_report.source_packet_ids` and sidecar notes still identify the
+  reviewer packet archive.
   Keep `--max-unresolved-disagreements 0`; add `--min-raw-dual-agreement-rate` for
   release evidence once dual annotation exists. Use
   `--max-supported-disagreements 0` for release-grade benchmark claims and inspect
