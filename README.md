@@ -285,7 +285,7 @@ turns that into a failure for CI and release checks. The core package supports
 Python 3.9+, but the MCP SDK requires Python 3.10+; run real MCP stdio
 acceptance from a Python 3.10+ environment.
 
-For agent clients that support skills or reusable instructions, [`skills/citeguard-verify/SKILL.md`](skills/citeguard-verify/SKILL.md) makes CiteGuard **proactively** verify citations while you write (and present results without silently editing your text). It is written for MCP-compatible agents such as Codex, Claude Code, Cursor, and similar clients.
+For agent clients that support skills or reusable instructions, [`skills/citeguard-verify/SKILL.md`](skills/citeguard-verify/SKILL.md) makes CiteGuard **proactively** verify citations while you write (and present results without silently editing your text). It includes scenario routing for bibliographies, generated related-work citations, claim-support checks, ambiguity, metadata mismatches, and source-limited results, and is written for MCP-compatible agents such as Codex, Claude Code, Cursor, and similar clients.
 
 ### As a Python library
 
@@ -428,9 +428,9 @@ python3 scripts/smoke_published_package.py --version 0.1.0  # dry-run post-publi
 The unit suite, verification eval, support fixture eval, and support dataset
 validation are network-free and run in CI. Eval datasets live in [`data/eval/`](data/eval/).
 The claim-support seed eval includes 36 evidence-level cases plus citation-set
-policy cases. It reports accuracy, supported precision/recall/F1, abstention
-rate, false-support rate, contradiction recall, optional breakdowns by
-`case_type`, `evidence_scope`, language, and split, a confusion matrix,
+policy cases. It reports accuracy, supported precision/recall/F1,
+per-label precision/recall/F1, abstention rate, false-support rate, contradiction recall,
+optional breakdowns by `case_type`, `evidence_scope`, language, and split, a confusion matrix,
 high-risk error buckets such as false support and missed contradiction, and
 provenance fields for each synthetic seed case. Reports also include
 `false_support_analysis`, which summarizes total support overcalls, high-risk
@@ -494,9 +494,13 @@ second-reviewer batches for cases that already have one label. Add
 across languages, high-risk families, or evidence scopes instead of only taking
 the first filtered rows. Each packet includes a machine-readable deterministic
 `packet_id` plus `packet_summary` with case ids and counts by language, case
-type, evidence scope, split, and priority for release evidence. The summary uses
+type, evidence scope, split, priority, and current review status for release evidence. The summary uses
 stable keys such as `case_count_by_language`, `case_count_by_case_type`, and
-`case_count_by_evidence_scope`.
+`case_count_by_evidence_scope`, plus `case_count_by_review_status` for assigning
+single-reviewer, second-reviewer, and adjudication batches.
+The `--audit` report also includes `recommended_packets` with ready-to-run
+commands for balanced high-risk first review, language-specific high-risk
+review, and second-reviewer batches when `single_annotator` cases exist.
 
 The instruction sheet tells reviewers how to label conservatively without
 exposing hidden gold or adjudication fields. Merge completed packets back
@@ -537,7 +541,7 @@ citeguard/
   citation/ graph/ audit/                 # shared models and helpers
   orchestrator/ planner/ writer/ benchmark/ api/   # writing-agent and benchmark surfaces
 src/                       # legacy compatibility shims for older imports
-skills/citeguard-verify/   # Claude Code skill
+skills/citeguard-verify/   # reusable Codex/Claude/Cursor agent skill
 scripts/                   # demo + eval + corpus/model utilities
 data/eval/                 # offline benchmarks
 docs/                      # design specs, plans, architecture, spike notes

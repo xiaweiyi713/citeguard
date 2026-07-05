@@ -1,0 +1,14 @@
+interface:
+  display_name: "CiteGuard Verify"
+  short_description: "Skeptical citation auditing for agents"
+  default_prompt: "Use $citeguard-verify to audit citations for existence, metadata accuracy, and claim support."
+
+dependencies:
+  tools:
+    - type: "mcp"
+      value: "citeguard"
+      description: "CiteGuard MCP stdio server for citation verification and claim-support auditing"
+      transport: "stdio"
+
+policy:
+  allow_implicit_invocation: true

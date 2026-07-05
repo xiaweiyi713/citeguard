@@ -6,6 +6,6 @@ include requirements-optional.txt
 recursive-include docs *.md *.svg *.csv *.yml
 recursive-include examples *.json *.jsonl *.md
 recursive-include data/eval *.json
-recursive-include skills *.md
+recursive-include skills *.md *.yaml
 recursive-include scripts *.py
 recursive-include configs *.yaml

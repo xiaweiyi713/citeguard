@@ -153,9 +153,13 @@ agent skill bundle.
   cases, the global and language-specific high-risk unreviewed gates pass, a
   filtered high-risk test annotation packet plus any unreviewed-only balanced
   language/case-type/evidence-scope reviewer batches have been archived with their
-  deterministic `packet_id` and `packet_summary` coverage metadata, any
+  deterministic `packet_id` and `packet_summary` coverage metadata, including
+  `case_count_by_review_status`, any
   `--review-status single_annotator` second-reviewer batches have been archived, or
-  intentionally skipped, and the sidecar gate is raised accordingly.
+  intentionally skipped, and the sidecar gate is raised accordingly. Use the
+  audit report's `recommended_packets` entries to preserve the exact commands
+  used for balanced first-review, language-specific high-risk, and second-reviewer
+  packets in release evidence.
 
 - Run production support eval when model dependencies and cached/downloadable
   weights are available:
@@ -204,7 +208,9 @@ agent skill bundle.
 - Call `citeguard_status_tool` before live verification.
 - Confirm expected input errors return the machine-readable error contract.
 - Review `skills/citeguard-verify/SKILL.md` for current tool names, trigger
-  rules, and safety wording.
+  rules, safety wording, and progressive-disclosure references. Review
+  `skills/citeguard-verify/agents/openai.yaml` so Codex-style skill lists show
+  the current display name, default prompt, and MCP dependency.
 
 ## Safety and Compliance
 

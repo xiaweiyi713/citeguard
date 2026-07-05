@@ -70,7 +70,7 @@ class ReleaseMetadataTests(unittest.TestCase):
             r"recursive-include docs \*\.md \*\.svg \*\.csv \*\.yml",
             r"recursive-include examples \*\.json \*\.jsonl \*\.md",
             r"recursive-include data/eval \*\.json",
-            r"recursive-include skills \*\.md",
+            r"recursive-include skills \*\.md \*\.yaml",
             r"recursive-include scripts \*\.py",
         ]
         for pattern in expected_patterns:
@@ -180,6 +180,8 @@ License-File: LICENSE
     def test_public_api_migration_documents_legacy_deprecation(self):
         migration = (ROOT / "docs" / "public_api_migration.md").read_text(encoding="utf-8")
         legacy_init = (ROOT / INTERNAL_PACKAGE / "__init__.py").read_text(encoding="utf-8")
+        legacy_retrieval_init = (ROOT / INTERNAL_PACKAGE / "retrieval" / "__init__.py").read_text(encoding="utf-8")
+        legacy_verification_init = (ROOT / INTERNAL_PACKAGE / "verification" / "__init__.py").read_text(encoding="utf-8")
 
         for public_package in [
             "citeguard.verification",
@@ -193,8 +195,14 @@ License-File: LICENSE
 
         self.assertIn("DeprecationWarning", migration)
         self.assertIn("temporary compatibility bridge", migration)
+        self.assertIn("same public `__all__` lists", migration)
+        self.assertIn("local export", migration)
         self.assertIn("compatibility package is deprecated", legacy_init)
         self.assertIn("from citeguard.version import __version__", legacy_init)
+        self.assertIn("from citeguard.retrieval import *", legacy_retrieval_init)
+        self.assertIn("from citeguard.retrieval import __all__", legacy_retrieval_init)
+        self.assertIn("from citeguard.verification import *", legacy_verification_init)
+        self.assertIn("from citeguard.verification import __all__", legacy_verification_init)
 
     def test_historical_superpowers_docs_do_not_look_like_current_api_guidance(self):
         docs_root = ROOT / "docs" / "superpowers"
@@ -868,6 +876,9 @@ License-File: LICENSE
         combined = f"{readme}\n{benchmark_design}\n{benchmark_todo}\n{compare_script}"
 
         required_phrases = [
+            "per-label precision/recall/F1",
+            "per-label precision / recall / F1",
+            "`per_label`",
             "false_support_analysis",
             "total_overcall_count",
             "high-risk false support case ids",
@@ -966,8 +977,10 @@ License-File: LICENSE
         self.assertIn("packet_id", combined)
         self.assertIn("packet_summary", combined)
         self.assertIn("merge_report.source_packet_ids", combined)
+        self.assertIn("recommended_packets", combined)
         self.assertIn("case_count_by_language", combined)
         self.assertIn("case_count_by_evidence_scope", combined)
+        self.assertIn("case_count_by_review_status", combined)
         self.assertIn("label_maturity", combined)
         self.assertIn("high_risk_unreviewed_by_language", combined)
         self.assertIn("raw_dual_agreement_rate", combined)
@@ -1000,6 +1013,18 @@ License-File: LICENSE
 
     def test_agent_skill_documents_product_contract(self):
         skill = (ROOT / "skills" / "citeguard-verify" / "SKILL.md").read_text(encoding="utf-8")
+        examples = (ROOT / "skills" / "citeguard-verify" / "references" / "examples.md").read_text(encoding="utf-8")
+        openai_yaml = (ROOT / "skills" / "citeguard-verify" / "agents" / "openai.yaml").read_text(encoding="utf-8")
+        combined = f"{skill}\n{examples}"
+
+        self.assertLessEqual(len(skill.splitlines()), 500)
+        self.assertIn("references/examples.md", skill)
+        self.assertIn('display_name: "CiteGuard Verify"', openai_yaml)
+        self.assertIn('short_description: "Skeptical citation auditing for agents"', openai_yaml)
+        self.assertIn("Use $citeguard-verify", openai_yaml)
+        self.assertIn('type: "mcp"', openai_yaml)
+        self.assertIn('value: "citeguard"', openai_yaml)
+        self.assertIn('transport: "stdio"', openai_yaml)
 
         required_phrases = [
             "related work",
@@ -1053,10 +1078,17 @@ License-File: LICENSE
             "`index`, `citation/claim`, `verdict`, `risk`, `next_action`, `why`, `next step`",
             "source retry is inconclusive",
             "Scope / limitations",
+            "## Scenario routing",
+            "User pasted a bibliography",
+            "LaTeX `\\bibitem`",
+            "User is writing related work and asks for citations you generated",
+            "User gives a claim with one cited paper",
+            "User gives one claim backed by several papers",
+            "Result is `not_found`, `source_unavailable`, or `timeout`",
         ]
         for phrase in required_phrases:
             with self.subTest(phrase=phrase):
-                self.assertIn(phrase, skill)
+                self.assertIn(phrase, combined)
 
     def test_security_compliance_boundaries_are_documented(self):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")

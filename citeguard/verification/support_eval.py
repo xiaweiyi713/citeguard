@@ -1515,9 +1515,10 @@ def _error_bucket_row(case: SupportCase, prediction: str) -> Dict[str, str]:
     }
 
 
-def compute_support_metrics(preds: List[Tuple[str, str]]) -> Dict[str, float]:
+def compute_support_metrics(preds: List[Tuple[str, str]]) -> Dict[str, Any]:
     n = len(preds)
     correct = sum(1 for gold, pred in preds if gold == pred)
+    per_label = _compute_per_label_metrics(preds)
     supported_tp = sum(1 for gold, pred in preds if gold == "supported" and pred == "supported")
     supported_pred = sum(1 for _, pred in preds if pred == "supported")
     supported_total = sum(1 for gold, _ in preds if gold == "supported")
@@ -1546,4 +1547,25 @@ def compute_support_metrics(preds: List[Tuple[str, str]]) -> Dict[str, float]:
         "abstention_rate": round(abstentions / n, 4) if n else 0.0,
         "misjudged_support_rate": round(misjudged_support / supported_total, 4) if supported_total else 0.0,
         "contradiction_recall": round(contra_hit / contra_total, 4) if contra_total else 0.0,
+        "per_label": per_label,
     }
+
+
+def _compute_per_label_metrics(preds: List[Tuple[str, str]]) -> Dict[str, Dict[str, float]]:
+    metrics: Dict[str, Dict[str, float]] = {}
+    for label in SUPPORT_LABEL_ORDER:
+        tp = sum(1 for gold, pred in preds if gold == label and pred == label)
+        predicted = sum(1 for _, pred in preds if pred == label)
+        gold_total = sum(1 for gold, _ in preds if gold == label)
+        precision = tp / predicted if predicted else 0.0
+        recall = tp / gold_total if gold_total else 0.0
+        f1 = 2 * precision * recall / (precision + recall) if precision + recall else 0.0
+        metrics[label] = {
+            "tp": tp,
+            "predicted": predicted,
+            "gold": gold_total,
+            "precision": round(precision, 4),
+            "recall": round(recall, 4),
+            "f1": round(f1, 4),
+        }
+    return metrics

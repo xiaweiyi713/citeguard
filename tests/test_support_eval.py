@@ -39,6 +39,15 @@ from citeguard.verification.support_eval import (
 from citeguard.verification.support import build_evidence_spans
 
 
+def _rewrite_recommended_packet_command(command, *, output_path, instructions_path):
+    rewritten = list(command)
+    rewritten[0] = sys.executable
+    for flag, value in (("--output", output_path), ("--instructions-output", instructions_path)):
+        index = rewritten.index(flag)
+        rewritten[index + 1] = value
+    return rewritten
+
+
 class SupportEvalTests(unittest.TestCase):
     def test_compute_metrics_counts_correct_and_misjudgments(self):
         preds = [
@@ -56,6 +65,14 @@ class SupportEvalTests(unittest.TestCase):
         self.assertEqual(m["false_support_rate"], 0.0)
         self.assertEqual(m["abstention_rate"], 0.25)
         self.assertEqual(m["misjudged_support_rate"], 0.5)
+        self.assertEqual(m["per_label"]["supported"]["tp"], 1)
+        self.assertEqual(m["per_label"]["supported"]["gold"], 2)
+        self.assertEqual(m["per_label"]["supported"]["predicted"], 1)
+        self.assertEqual(m["per_label"]["supported"]["precision"], 1.0)
+        self.assertEqual(m["per_label"]["supported"]["recall"], 0.5)
+        self.assertEqual(round(m["per_label"]["supported"]["f1"], 4), 0.6667)
+        self.assertEqual(m["per_label"]["contradicted"]["precision"], 0.5)
+        self.assertEqual(m["per_label"]["insufficient_evidence"]["recall"], 1.0)
 
     def test_compute_confusion_matrix_counts_gold_predicted_pairs(self):
         matrix = compute_support_confusion_matrix(
@@ -558,6 +575,48 @@ class SupportEvalTests(unittest.TestCase):
         self.assertIn("zh", payload["unreviewed_by_language"])
         self.assertIn("zh", payload["high_risk_unreviewed_by_language"])
         self.assertTrue(any("high-priority" in action for action in payload["next_actions"]))
+        recommendations = {item["id"]: item for item in payload["recommended_packets"]}
+        self.assertIn("high_risk_unreviewed_balanced", recommendations)
+        self.assertIn("high_risk_unreviewed_zh", recommendations)
+        balanced_command = recommendations["high_risk_unreviewed_balanced"]["command"]
+        self.assertIn("--annotation-packet", balanced_command)
+        self.assertIn("--unreviewed-only", balanced_command)
+        self.assertIn("--limit-per-language", balanced_command)
+        self.assertIn("--limit-per-case-type", balanced_command)
+        self.assertIn("--limit-per-evidence-scope", balanced_command)
+        self.assertEqual(
+            recommendations["high_risk_unreviewed_balanced"]["candidate_case_count"],
+            payload["high_risk_unreviewed_count"],
+        )
+        zh_recommendation = recommendations["high_risk_unreviewed_zh"]
+        self.assertEqual(zh_recommendation["candidate_case_count"], payload["high_risk_unreviewed_by_language"]["zh"])
+        self.assertIn("--lang", zh_recommendation["command"])
+        self.assertIn("zh", zh_recommendation["command"])
+        with tempfile.TemporaryDirectory() as tmpdir:
+            packet_path = os.path.join(tmpdir, "recommended-zh-packet.json")
+            instructions_path = os.path.join(tmpdir, "recommended-zh-instructions.md")
+            command = _rewrite_recommended_packet_command(
+                zh_recommendation["command"],
+                output_path=packet_path,
+                instructions_path=instructions_path,
+            )
+            subprocess.run(
+                command,
+                check=True,
+                cwd=os.getcwd(),
+                capture_output=True,
+                text=True,
+            )
+            with open(packet_path, encoding="utf-8") as handle:
+                packet = json.load(handle)
+            with open(instructions_path, encoding="utf-8") as handle:
+                instructions = handle.read()
+
+        self.assertEqual(packet["packet_type"], "support_label_annotation_packet")
+        self.assertEqual(packet["packet_summary"]["case_count_by_language"], {"zh": 5})
+        self.assertEqual(packet["packet_summary"]["case_count_by_review_status"], {"not_human_reviewed": 5})
+        self.assertTrue(all(item["lang"] == "zh" for item in packet["cases"]))
+        self.assertIn("Packet summary", instructions)
 
     def test_prepare_support_label_sidecar_can_filter_annotation_packet(self):
         completed = subprocess.run(
@@ -633,6 +692,7 @@ class SupportEvalTests(unittest.TestCase):
         self.assertEqual(payload["packet_summary"]["case_count_by_evidence_scope"], {"abstract": 1, "metadata_snippet": 1})
         self.assertEqual(payload["packet_summary"]["case_count_by_split"], {"test": 2})
         self.assertEqual(payload["packet_summary"]["case_count_by_priority"], {"high": 2})
+        self.assertEqual(payload["packet_summary"]["case_count_by_review_status"], {"not_human_reviewed": 2})
         self.assertTrue(all(item["packet_id"] == payload["packet_id"] for item in payload["cases"]))
         self.assertEqual([item["packet_case_index"] for item in payload["cases"]], [1, 2])
         self.assertEqual(payload["label_options"][0], "supported")
@@ -830,7 +890,49 @@ class SupportEvalTests(unittest.TestCase):
 
         self.assertEqual(payload["filters"], {"case_id": ["s04", "s10"], "review_status": ["single_annotator"]})
         self.assertEqual(payload["packet_summary"]["case_ids"], ["s04"])
+        self.assertEqual(payload["packet_summary"]["case_count_by_review_status"], {"single_annotator": 1})
         self.assertEqual(payload["cases"][0]["review_status"], "single_annotator")
+
+    def test_prepare_support_label_sidecar_audit_recommends_second_reviewer_packets(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            sidecar_path = os.path.join(tmpdir, "sidecar.json")
+            with open(os.path.join("data", "eval", "support_eval_label_sidecar.json"), encoding="utf-8") as handle:
+                sidecar = json.load(handle)
+            for item in sidecar["cases"]:
+                if item["case_id"] == "s04":
+                    item["adjudication_status"] = "single_annotator"
+                    item["annotator_count"] = 1
+                    item["annotator_labels"] = [item["adjudicated_label"]]
+                    item["disagreement"] = "none"
+                    item["notes"] = "Unit test first review complete."
+                    break
+            with open(sidecar_path, "w", encoding="utf-8") as handle:
+                json.dump(sidecar, handle)
+
+            completed = subprocess.run(
+                [
+                    sys.executable,
+                    "scripts/prepare_support_label_sidecar.py",
+                    "--dataset",
+                    os.path.join("data", "eval", "support_eval.json"),
+                    "--existing-sidecar",
+                    sidecar_path,
+                    "--audit",
+                ],
+                check=True,
+                cwd=os.getcwd(),
+                capture_output=True,
+                text=True,
+            )
+        payload = json.loads(completed.stdout)
+        recommendations = {item["id"]: item for item in payload["recommended_packets"]}
+
+        self.assertEqual(payload["label_maturity"]["single_annotator_count"], 1)
+        self.assertIn("single_annotator_second_reviewer", recommendations)
+        command = recommendations["single_annotator_second_reviewer"]["command"]
+        self.assertIn("--review-status", command)
+        self.assertIn("single_annotator", command)
+        self.assertEqual(recommendations["single_annotator_second_reviewer"]["candidate_case_count"], 1)
 
     def test_prepare_support_label_sidecar_rejects_conflicting_review_status_filters(self):
         completed = subprocess.run(
@@ -896,6 +998,7 @@ class SupportEvalTests(unittest.TestCase):
         self.assertIn("Packet summary", instructions)
         self.assertIn("case_count_by_language", instructions)
         self.assertIn("case_count_by_evidence_scope", instructions)
+        self.assertIn("case_count_by_review_status", instructions)
         self.assertIn("label hint", instructions)
         self.assertIn("Do not edit `case_id`", instructions)
         self.assertNotIn("adjudicated_label", instructions)
@@ -1806,6 +1909,8 @@ class SupportEvalTests(unittest.TestCase):
         self.assertEqual(report["dataset"]["splits"]["test"], 3)
         self.assertEqual(report["overall"]["n"], 3)
         self.assertEqual(report["overall"]["false_support_rate"], 0.5)
+        self.assertEqual(report["overall"]["per_label"]["supported"]["precision"], 0.5)
+        self.assertEqual(report["overall"]["per_label"]["contradicted"]["recall"], 1.0)
         self.assertEqual(report["confusion_matrix"]["insufficient_evidence"]["supported"], 1)
         self.assertEqual(report["error_bucket_counts"]["false_support"], 1)
         self.assertEqual(report["error_bucket_counts"]["missed_contradiction"], 0)
@@ -1814,6 +1919,7 @@ class SupportEvalTests(unittest.TestCase):
         self.assertEqual(report["false_support_analysis"]["by_case_type"]["hard_negative"]["case_ids"], ["b"])
         self.assertEqual(report["false_support_analysis"]["by_language"]["zh"]["case_ids"], ["b"])
         self.assertEqual(report["by_case_type"]["direct_support"]["accuracy"], 1.0)
+        self.assertEqual(report["by_case_type"]["direct_support"]["per_label"]["supported"]["f1"], 1.0)
         self.assertEqual(report["by_case_type"]["hard_negative"]["false_support_rate"], 1.0)
         self.assertEqual(report["by_evidence_scope"]["abstract"]["n"], 2)
         self.assertEqual(report["by_evidence_scope"]["title"]["contradiction_recall"], 1.0)

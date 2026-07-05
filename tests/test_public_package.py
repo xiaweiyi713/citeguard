@@ -310,6 +310,21 @@ class PublicPackageTests(unittest.TestCase):
         self.assertTrue(callable(MetadataSourceRetriever))
         self.assertTrue(hasattr(RetrievedCitation, "__dataclass_fields__"))
 
+    def test_legacy_package_entrypoints_are_public_shims(self):
+        import citeguard.retrieval as public_retrieval
+        import citeguard.verification as public_verification
+
+        legacy_retrieval = importlib.import_module("s" + "rc.retrieval")
+        legacy_verification = importlib.import_module("s" + "rc.verification")
+
+        self.assertEqual(legacy_retrieval.__all__, public_retrieval.__all__)
+        self.assertEqual(legacy_verification.__all__, public_verification.__all__)
+        self.assertIs(legacy_retrieval.BM25LikeRetriever, public_retrieval.BM25LikeRetriever)
+        self.assertIs(legacy_retrieval.MetadataSourceRetriever, public_retrieval.MetadataSourceRetriever)
+        self.assertIs(legacy_verification.verify_citation, public_verification.verify_citation)
+        self.assertIs(legacy_verification.audit_claim_support, public_verification.audit_claim_support)
+        self.assertIs(legacy_verification.stable_next_action, public_verification.stable_next_action)
+
     def test_legacy_retrieval_modules_are_public_shims(self):
         from citeguard.retrieval import bm25_retriever as public_bm25
         from citeguard.retrieval import dense_retriever as public_dense

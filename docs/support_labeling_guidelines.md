@@ -211,7 +211,10 @@ boundary hint, and blank annotation fields. It omits `gold`, `adjudicated_label`
 `annotator_labels`, and `label_notes` so reviewers can label independently
 before adjudication. `review_focus` tells reviewers what support boundary to
 inspect, for example full-text gaps or topical overclaims, but it is not a
-label hint. Use `--packet-format jsonl` when you want one case per line for
+label hint. Each JSON packet also carries a deterministic `packet_id` and
+`packet_summary` with `case_count_by_review_status` so maintainers can tell
+whether the batch is for first review, second review, or adjudication follow-up.
+Use `--packet-format jsonl` when you want one case per line for
 spreadsheets or lightweight annotation tools. Use repeated `--lang` values to
 prepare language-specific review batches, such as Chinese high-risk cases.
 Use `--instructions-output` to write a reviewer-facing Markdown instruction
@@ -267,7 +270,10 @@ python3 scripts/prepare_support_label_sidecar.py \
 
 The audit reports coverage, human-reviewed count, unreviewed cases by split,
 language, and case type, plus a risk-sorted `high_risk_unreviewed` list and
-`high_risk_unreviewed_by_language`. Use
+`high_risk_unreviewed_by_language`. It also emits machine-readable
+`recommended_packets` entries with ready-to-run annotation-packet commands for
+balanced high-risk first review, language-specific high-risk review, and
+second-reviewer batches when `single_annotator` cases exist. Use
 `--fail-on-high-risk-unreviewed-language LANG` when a language-specific review
 batch, such as Chinese high-risk cases, must block release readiness. Use
 `--unreviewed-only` when assigning reviewer packets from a sidecar that already

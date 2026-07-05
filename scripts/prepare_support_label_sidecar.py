@@ -264,6 +264,8 @@ def main(argv: Optional[list[str]] = None) -> int:
             cases,
             summary,
             dataset_name=Path(args.dataset).name,
+            dataset_path=args.dataset,
+            existing_sidecar_path=args.existing_sidecar,
             include_context=args.include_context,
             filters=_filter_summary(args),
         )
@@ -667,6 +669,7 @@ def _build_annotation_packet(
             "case_count_by_evidence_scope": _count_by(packet_cases, "evidence_scope"),
             "case_count_by_split": _count_by(packet_cases, "split"),
             "case_count_by_priority": _count_by(packet_cases, "priority"),
+            "case_count_by_review_status": _count_by(packet_cases, "review_status"),
         },
         "label_options": [
             "supported",
@@ -699,6 +702,7 @@ def _annotation_packet_id(dataset_name: str, filters: dict, packet_cases: list) 
                 "split": item.get("split", ""),
                 "lang": item.get("lang", ""),
                 "evidence_scope": item.get("evidence_scope", ""),
+                "review_status": item.get("review_status", ""),
             }
             for item in packet_cases
         ],
@@ -774,6 +778,8 @@ def _build_audit_report(
     cases: list,
     summary: dict,
     dataset_name: str,
+    dataset_path: str,
+    existing_sidecar_path: str,
     include_context: bool = False,
     filters: Optional[dict] = None,
 ) -> dict:
@@ -811,10 +817,11 @@ def _build_audit_report(
         for item in sidecar_by_id.values()
         if item.get("case_id") in cases_by_id and item.get("adjudication_status") != "not_human_reviewed"
     )
-    return {
+    active_filters = filters or {}
+    report = {
         "ok": True,
         "dataset": dataset_name,
-        "filters": filters or {},
+        "filters": active_filters,
         "summary": summary,
         "label_maturity": summary.get("label_maturity", {}),
         "reviewed_count": reviewed_count,
@@ -828,6 +835,147 @@ def _build_audit_report(
         "unreviewed": unreviewed,
         "next_actions": _next_actions(unreviewed),
     }
+    report["recommended_packets"] = _recommended_annotation_packets(
+        dataset_path=dataset_path,
+        existing_sidecar_path=existing_sidecar_path,
+        filters=active_filters,
+        high_risk_unreviewed=high_risk_unreviewed,
+        label_maturity=summary.get("label_maturity", {}),
+    )
+    return report
+
+
+def _recommended_annotation_packets(
+    *,
+    dataset_path: str,
+    existing_sidecar_path: str,
+    filters: dict,
+    high_risk_unreviewed: list,
+    label_maturity: dict,
+) -> list:
+    recommendations = []
+    if high_risk_unreviewed:
+        recommendations.append(
+            _recommended_packet(
+                packet_id="high_risk_unreviewed_balanced",
+                purpose="Assign a balanced first-review packet for unreviewed high-risk support cases.",
+                dataset_path=dataset_path,
+                existing_sidecar_path=existing_sidecar_path,
+                filters=filters,
+                extra_args=[
+                    "--priority",
+                    "high",
+                    "--unreviewed-only",
+                    "--limit-per-language",
+                    "1",
+                    "--limit-per-case-type",
+                    "1",
+                    "--limit-per-evidence-scope",
+                    "1",
+                ],
+                output_stem="support-label-packet-high-risk-unreviewed-balanced",
+                candidate_rows=high_risk_unreviewed,
+            )
+        )
+        for language, rows in _group_rows_by(high_risk_unreviewed, "lang").items():
+            recommendations.append(
+                _recommended_packet(
+                    packet_id=f"high_risk_unreviewed_{language}",
+                    purpose=f"Assign first-review packet for unreviewed high-risk `{language}` cases.",
+                    dataset_path=dataset_path,
+                    existing_sidecar_path=existing_sidecar_path,
+                    filters=filters,
+                    extra_args=["--priority", "high", "--lang", language, "--unreviewed-only"],
+                    output_stem=f"support-label-packet-high-risk-unreviewed-{language}",
+                    candidate_rows=rows,
+                )
+            )
+    single_annotator_count = int(label_maturity.get("single_annotator_count") or 0)
+    if single_annotator_count > 0:
+        recommendations.append(
+            _recommended_packet(
+                packet_id="single_annotator_second_reviewer",
+                purpose="Assign a second-reviewer packet for cases with exactly one annotator label.",
+                dataset_path=dataset_path,
+                existing_sidecar_path=existing_sidecar_path,
+                filters=filters,
+                extra_args=["--review-status", "single_annotator", "--limit", "10"],
+                output_stem="support-label-packet-second-reviewer",
+                candidate_rows=[],
+                candidate_case_count=single_annotator_count,
+            )
+        )
+    return recommendations
+
+
+def _recommended_packet(
+    *,
+    packet_id: str,
+    purpose: str,
+    dataset_path: str,
+    existing_sidecar_path: str,
+    filters: dict,
+    extra_args: list[str],
+    output_stem: str,
+    candidate_rows: list,
+    candidate_case_count: Optional[int] = None,
+) -> dict:
+    output_path = f"experiments/{output_stem}.json"
+    instructions_path = f"experiments/{output_stem}-instructions.md"
+    command = [
+        "python3",
+        "scripts/prepare_support_label_sidecar.py",
+        "--dataset",
+        dataset_path,
+    ]
+    if existing_sidecar_path:
+        command.extend(["--existing-sidecar", existing_sidecar_path])
+    command.append("--annotation-packet")
+    command.extend(_selection_filter_args(filters, extra_args))
+    command.extend(extra_args)
+    command.extend(["--output", output_path, "--instructions-output", instructions_path])
+    case_ids = [str(item.get("case_id")) for item in candidate_rows if item.get("case_id")]
+    return {
+        "id": packet_id,
+        "purpose": purpose,
+        "candidate_case_count": candidate_case_count if candidate_case_count is not None else len(case_ids),
+        "candidate_case_ids": case_ids,
+        "command": command,
+        "output": output_path,
+        "instructions_output": instructions_path,
+    }
+
+
+def _selection_filter_args(filters: dict, extra_args: list[str]) -> list[str]:
+    args = []
+    extra_flags = {value for value in extra_args if value.startswith("--")}
+    for key, flag in (
+        ("priority", "--priority"),
+        ("split", "--split"),
+        ("case_type", "--case-type"),
+        ("lang", "--lang"),
+        ("case_id", "--case-id"),
+    ):
+        if flag in extra_flags:
+            continue
+        values = filters.get(key)
+        if not values:
+            continue
+        if not isinstance(values, list):
+            values = [values]
+        for value in values:
+            args.extend([flag, str(value)])
+    return args
+
+
+def _group_rows_by(rows: list, field: str) -> dict:
+    grouped = {}
+    for row in rows:
+        key = str(row.get(field, "")).strip()
+        if not key:
+            continue
+        grouped.setdefault(key, []).append(row)
+    return dict(sorted(grouped.items()))
 
 
 def _build_audit_gate(

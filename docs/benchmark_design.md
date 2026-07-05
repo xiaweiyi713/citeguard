@@ -23,6 +23,7 @@ hard negatives、contradictions、title-only weak support、source-outage 安全
 
 - accuracy
 - supported precision / recall / F1
+- per-label precision / recall / F1 in `per_label`
 - abstention rate
 - false-support rate
 - misjudged-support rate
@@ -290,7 +291,10 @@ split 统计的未审阅样本,完整 `unreviewed` 列表,以及只包含 contra
 hard_negative 和 full_text_required 的 `high_risk_unreviewed` /
 `high_risk_unreviewed_count` / `high_risk_unreviewed_by_language`。优先审阅
 contradiction、hard_negative 和 full_text_required 样本,因为这些最能暴露
-false support、过度支撑和 abstract/full-text 边界问题。
+false support、过度支撑和 abstract/full-text 边界问题。`recommended_packets`
+会给出机器可读的下一批 annotation-packet 命令,覆盖 balanced high-risk
+first review、按语言 high-risk review,以及存在 `single_annotator` case 时的二审
+packet。
 需要在分配标注前阻断某个语言的高风险缺口时,使用
 `--fail-on-high-risk-unreviewed-language zh`;audit 输出的 `audit_gate.failures`
 会列出 `high_risk_unreviewed_by_language` 的 failure code 和 case ids。
@@ -333,8 +337,10 @@ case；用 `--review-status single_annotator` 可以导出已经有一名 review
 `--limit-per-evidence-scope` 可以生成更均衡的小批次,避免第一轮 high-risk
 packet 只覆盖一种语言、风险类型或证据层级。每个 packet 都带确定性的
 `packet_id` 和 `packet_summary`,记录 case ids 以及按语言、case type、
-evidence scope、split、priority 的计数,包括 `case_count_by_language`、
-`case_count_by_case_type` 和 `case_count_by_evidence_scope`,便于归档和发布前审计。
+evidence scope、split、priority、当前 review status 的计数,包括
+`case_count_by_language`、`case_count_by_case_type`、
+`case_count_by_evidence_scope` 和 `case_count_by_review_status`,便于归档、分配二审
+或 adjudication 批次,并用于发布前审计。
 
 需要把人工标注成熟度作为发布阻断条件时,加上:
 

@@ -85,8 +85,10 @@
   can skip cases that already have human-review provenance.
 - Added `prepare_support_label_sidecar.py --review-status` for second-reviewer
   and status-specific annotation packets.
-- Added annotation-packet `packet_summary` coverage metadata for review-batch
-  provenance.
+- Added annotation-packet `packet_summary` coverage metadata, including
+  `case_count_by_review_status`, for review-batch provenance.
+- Added support-label audit `recommended_packets` so maintainers and agents can
+  turn review-readiness gaps into reviewer-packet commands without parsing prose.
 - Added deterministic annotation-packet `packet_id` values for reproducible
   reviewer-batch archives.
 - Added `merge_report.source_packet_ids` to preserve reviewer-batch provenance
@@ -116,12 +118,24 @@
 - Expanded the CiteGuard agent skill with client-specific MCP setup notes,
   structured-error recovery guidance, and safe wording examples for ambiguous,
   metadata-mismatch, not-found, outage, and claim-support results.
+- Added an agent-skill scenario routing table for bibliographies, generated
+  related-work citations, single/multi-citation claim-support checks,
+  ambiguity, metadata mismatches, and source-limited results.
+- Moved detailed agent-skill MCP payload and wording examples into
+  `skills/citeguard-verify/references/examples.md` so the main skill stays
+  concise while examples remain packaged.
+- Added `skills/citeguard-verify/agents/openai.yaml` with display metadata,
+  default prompt, and the CiteGuard MCP stdio dependency for Codex-style skill
+  surfaces.
 - Added a reusable agent response template for batch audit summaries, action
   queues, high-risk filtering indexes, evidence-scope limits, and next steps.
 - Added release metadata guard tests for console scripts, distribution manifests,
   and public `citeguard.*` import hygiene.
 - Added a legacy import deprecation signal plus public API migration notes so
   new code can standardize on `citeguard.*` while older imports keep working.
+- Converted legacy retrieval and verification package entrypoints into thin
+  public `citeguard.*` shims so compatibility imports share the stable public
+  export lists.
 - Refreshed the roadmap around the current agent-auditor package status,
   implemented MCP/batch/cache/source-health foundations, and remaining
   benchmark/full-text/release gaps.

@@ -219,6 +219,8 @@ def _assert_sdist_contains_release_files(sdist_path: Path) -> None:
         "data/eval/support_eval.json",
         "data/eval/support_eval_label_sidecar.json",
         "skills/citeguard-verify/SKILL.md",
+        "skills/citeguard-verify/agents/openai.yaml",
+        "skills/citeguard-verify/references/examples.md",
         "scripts/smoke_mcp.py",
         "scripts/smoke_package.py",
         "scripts/smoke_published_package.py",

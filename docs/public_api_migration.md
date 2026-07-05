@@ -36,5 +36,10 @@ suites and release checks can opt into seeing the migration signal with:
 python -Wd -c "import src"
 ```
 
+Legacy package entrypoints are thin public facades: compatibility imports for
+retrieval and verification re-export the same public `__all__` lists as
+`citeguard.retrieval` and `citeguard.verification`. Do not add local export
+lists, lazy loaders, or new behavior under compatibility entrypoints.
+
 The eventual release target is a package whose public documentation, tests,
 scripts, examples, and agent skills all point to the `citeguard.*` interfaces.
