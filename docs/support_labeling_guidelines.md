@@ -146,8 +146,14 @@ python3 scripts/eval_support.py --validate-only \
   --min-human-reviewed 10 \
   --min-dual-annotated 10 \
   --max-unresolved-disagreements 0 \
-  --min-raw-dual-agreement-rate 0.8
+  --min-raw-dual-agreement-rate 0.8 \
+  --max-supported-disagreements 0
 ```
+
+Use `--max-supported-disagreements 0` for release-grade benchmark claims. It
+fails with `sidecar_supported_disagreements` when any dual-annotation
+disagreement includes a `supported` label, forcing explicit adjudication before
+the benchmark can be described as mature.
 
 Generate a complete sidecar template before an annotation pass:
 

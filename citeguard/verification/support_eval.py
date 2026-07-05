@@ -718,6 +718,7 @@ def compute_support_label_sidecar_gate(
     min_dual_annotated: int = 0,
     max_unresolved_disagreements: int = 0,
     min_raw_dual_agreement_rate: Optional[float] = None,
+    max_supported_disagreements: Optional[int] = None,
 ) -> Dict[str, Any]:
     """Evaluate provenance sidecar coverage gates from a validation summary."""
 
@@ -728,6 +729,7 @@ def compute_support_label_sidecar_gate(
         maturity = {}
     dual_annotated = _safe_int(maturity.get("dual_annotated_count", 0))
     unresolved_disagreements = _safe_int(maturity.get("unresolved_disagreement_count", 0))
+    supported_disagreements = _safe_int(maturity.get("supported_disagreement_count", 0))
     raw_dual_agreement_rate = maturity.get("raw_dual_agreement_rate")
     failures: List[Dict[str, Any]] = []
     if coverage < min_coverage:
@@ -786,6 +788,16 @@ def compute_support_label_sidecar_gate(
                     "threshold": min_raw_dual_agreement_rate,
                 }
             )
+    if max_supported_disagreements is not None and supported_disagreements > max_supported_disagreements:
+        failures.append(
+            {
+                "code": "sidecar_supported_disagreements",
+                "message": "Supported-label disagreements exceed the configured threshold.",
+                "actual": supported_disagreements,
+                "threshold": max_supported_disagreements,
+                "case_ids": list(maturity.get("supported_disagreement_case_ids", [])),
+            }
+        )
     return {
         "ok": not failures,
         "thresholds": {
@@ -794,12 +806,14 @@ def compute_support_label_sidecar_gate(
             "min_dual_annotated": min_dual_annotated,
             "max_unresolved_disagreements": max_unresolved_disagreements,
             "min_raw_dual_agreement_rate": min_raw_dual_agreement_rate,
+            "max_supported_disagreements": max_supported_disagreements,
         },
         "metrics": {
             "coverage": coverage,
             "human_reviewed": human_reviewed,
             "dual_annotated": dual_annotated,
             "unresolved_disagreements": unresolved_disagreements,
+            "supported_disagreements": supported_disagreements,
             "raw_dual_agreement_rate": raw_dual_agreement_rate,
             "dataset_cases": int(summary.get("dataset_cases", 0)),
             "sidecar_cases": int(summary.get("n", 0)),

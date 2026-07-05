@@ -106,6 +106,15 @@ def main() -> None:
         help="Minimum raw agreement rate among dual-annotated labels when --label-sidecar is provided.",
     )
     parser.add_argument(
+        "--max-supported-disagreements",
+        type=int,
+        default=None,
+        help=(
+            "Maximum dual-annotation disagreements involving a supported label when --label-sidecar is provided. "
+            "Use 0 for release-grade human-reviewed benchmarks."
+        ),
+    )
+    parser.add_argument(
         "--output-dir",
         help="Optional directory for standardized experiment artifacts, e.g. experiments/.",
     )
@@ -130,6 +139,7 @@ def main() -> None:
                 min_dual_annotated=args.min_dual_annotated,
                 max_unresolved_disagreements=args.max_unresolved_disagreements,
                 min_raw_dual_agreement_rate=args.min_raw_dual_agreement_rate,
+                max_supported_disagreements=args.max_supported_disagreements,
             )
         print(json.dumps(validation, indent=2, ensure_ascii=False))
         if sidecar_data is not None and not validation["label_sidecar_gate"]["ok"]:
@@ -161,6 +171,7 @@ def main() -> None:
             min_dual_annotated=args.min_dual_annotated,
             max_unresolved_disagreements=args.max_unresolved_disagreements,
             min_raw_dual_agreement_rate=args.min_raw_dual_agreement_rate,
+            max_supported_disagreements=args.max_supported_disagreements,
         )
     if args.quality_gate and isinstance(result, dict):
         result["quality_gate"] = compute_support_quality_gate(
@@ -194,6 +205,7 @@ def main() -> None:
                     "min_dual_annotated": args.min_dual_annotated,
                     "max_unresolved_disagreements": args.max_unresolved_disagreements,
                     "min_raw_dual_agreement_rate": args.min_raw_dual_agreement_rate,
+                    "max_supported_disagreements": args.max_supported_disagreements,
                 },
                 "case_count": len(cases),
             },

@@ -385,7 +385,7 @@ CNKI (知网) and Wanfang (万方) are **not** integrated: they have no open/fre
 ## Tests & reproducibility
 
 ```bash
-python3 -m unittest discover -s tests -v   # full unit suite (328 tests; standard library only except optional MCP smoke)
+python3 -m unittest discover -s tests -v   # full unit suite (329 tests; standard library only except optional MCP smoke)
 python3 scripts/smoke_mcp.py               # optional MCP stdio smoke; skips without the MCP SDK
 python3 scripts/smoke_mcp.py --require-sdk # CI/release MCP stdio smoke; fails without the MCP SDK
 python3 scripts/eval_verification.py       # offline, deterministic existence/metadata eval

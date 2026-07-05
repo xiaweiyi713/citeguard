@@ -36,6 +36,8 @@
   benchmark expansion.
 - Added support-label sidecar maturity diagnostics for dual-label disagreement
   pairs and supported-label disagreement case ids.
+- Added a release gate option for blocking benchmark claims when supported-label
+  disagreements remain unresolved.
 - Expanded the CiteGuard agent skill with client-specific MCP setup notes,
   structured-error recovery guidance, and safe wording examples for ambiguous,
   metadata-mismatch, not-found, outage, and claim-support results.

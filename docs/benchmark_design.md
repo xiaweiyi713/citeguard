@@ -159,7 +159,8 @@ python3 scripts/eval_support.py \
   --min-human-reviewed 10 \
   --min-dual-annotated 10 \
   --max-unresolved-disagreements 0 \
-  --min-raw-dual-agreement-rate 0.8
+  --min-raw-dual-agreement-rate 0.8 \
+  --max-supported-disagreements 0
 ```
 
 sidecar 用于保存不适合塞进 compact seed case 的标注元数据,例如
@@ -172,9 +173,10 @@ sidecar 用于保存不适合塞进 compact seed case 的标注元数据,例如
 `supported_disagreement_case_ids`,用于判断人工标注成熟度而不只看 coverage。
 任何 supported-label disagreement 都应优先复核,因为把不充分证据误标成
 `supported` 是最危险的 benchmark 误差。`label_sidecar_gate` 可显式要求
-`--min-dual-annotated`、`--max-unresolved-disagreements` 和
-`--min-raw-dual-agreement-rate`,让发布报告在双标不足、分歧未解决或一致率过低
-时以机器可读 failure code 失败。validation 还会检查 status consistency:
+`--min-dual-annotated`、`--max-unresolved-disagreements`、
+`--min-raw-dual-agreement-rate` 和 `--max-supported-disagreements`,让发布报告
+在双标不足、分歧未解决、一致率过低或 supported-label 分歧未清零时以机器可读
+failure code 失败。validation 还会检查 status consistency:
 `not_human_reviewed` 不能携带 annotator label,`dual_annotator_agreed` 的
 annotator labels 必须一致,`dual_annotator_adjudicated` 必须记录 resolved
 disagreement 和 adjudicator,`published_benchmark` 必须有 source locator,避免

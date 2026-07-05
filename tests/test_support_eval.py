@@ -256,11 +256,14 @@ class SupportEvalTests(unittest.TestCase):
                     "unresolved_disagreement_count": 1,
                     "unresolved_disagreement_case_ids": ["case-b"],
                     "raw_dual_agreement_rate": 0.5,
+                    "supported_disagreement_count": 1,
+                    "supported_disagreement_case_ids": ["case-b"],
                 },
             },
             min_dual_annotated=2,
             max_unresolved_disagreements=0,
             min_raw_dual_agreement_rate=0.8,
+            max_supported_disagreements=0,
         )
         missing_rate = compute_support_label_sidecar_gate(
             {
@@ -284,12 +287,17 @@ class SupportEvalTests(unittest.TestCase):
                 "sidecar_dual_annotated",
                 "sidecar_unresolved_disagreements",
                 "sidecar_raw_dual_agreement_rate",
+                "sidecar_supported_disagreements",
             },
         )
         unresolved = next(
             failure for failure in gate["failures"] if failure["code"] == "sidecar_unresolved_disagreements"
         )
         self.assertEqual(unresolved["case_ids"], ["case-b"])
+        supported = next(
+            failure for failure in gate["failures"] if failure["code"] == "sidecar_supported_disagreements"
+        )
+        self.assertEqual(supported["case_ids"], ["case-b"])
         self.assertFalse(missing_rate["ok"])
         self.assertEqual(missing_rate["failures"][0]["actual"], None)
 
@@ -1377,6 +1385,51 @@ class SupportEvalTests(unittest.TestCase):
                 "sidecar_raw_dual_agreement_rate",
             },
         )
+
+    def test_eval_support_cli_sidecar_gate_can_block_supported_disagreements(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            sidecar_path = os.path.join(tmpdir, "sidecar.json")
+            with open(os.path.join("data", "eval", "support_eval_label_sidecar.json"), encoding="utf-8") as handle:
+                sidecar = json.load(handle)
+            for item in sidecar["cases"]:
+                if item["case_id"] == "s04":
+                    item.update(
+                        {
+                            "adjudication_status": "dual_annotator_adjudicated",
+                            "annotator_count": 2,
+                            "annotator_labels": ["supported", "contradicted"],
+                            "adjudicated_label": "contradicted",
+                            "disagreement": "resolved",
+                            "adjudicator": "reviewer-c",
+                            "notes": "Unit test resolved supported-label disagreement.",
+                        }
+                    )
+                    break
+            with open(sidecar_path, "w", encoding="utf-8") as handle:
+                json.dump(sidecar, handle)
+
+            completed = subprocess.run(
+                [
+                    sys.executable,
+                    "scripts/eval_support.py",
+                    "--validate-only",
+                    "--label-sidecar",
+                    sidecar_path,
+                    "--max-supported-disagreements",
+                    "0",
+                ],
+                check=False,
+                cwd=os.getcwd(),
+                capture_output=True,
+                text=True,
+            )
+
+        self.assertEqual(completed.returncode, 1)
+        payload = json.loads(completed.stdout)
+        self.assertFalse(payload["label_sidecar_gate"]["ok"])
+        failure = payload["label_sidecar_gate"]["failures"][0]
+        self.assertEqual(failure["code"], "sidecar_supported_disagreements")
+        self.assertEqual(failure["case_ids"], ["s04"])
 
     def test_diagnostics_flag_missed_contradictions_for_nli_review(self):
         cases = [

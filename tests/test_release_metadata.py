@@ -663,6 +663,7 @@ License-File: LICENSE
         self.assertIn("--min-dual-annotated", combined)
         self.assertIn("--max-unresolved-disagreements", combined)
         self.assertIn("--min-raw-dual-agreement-rate", combined)
+        self.assertIn("--max-supported-disagreements", combined)
         self.assertIn("status consistency", combined)
         self.assertIn("not_human_reviewed", combined)
         self.assertIn("dual_annotator_agreed", combined)

@@ -84,7 +84,11 @@ python scripts/prepare_support_label_sidecar.py --existing-sidecar data/eval/sup
 python scripts/eval_support.py --validate-only \
   --label-sidecar data/eval/support_eval_label_sidecar.json \
   --min-sidecar-coverage 1.0 \
-  --min-human-reviewed <required-count>
+  --min-human-reviewed <required-count> \
+  --min-dual-annotated <required-count> \
+  --max-unresolved-disagreements 0 \
+  --min-raw-dual-agreement-rate <threshold> \
+  --max-supported-disagreements 0
 ```
 
 If the gate reports zero human-reviewed cases, or if the high-risk audit gate
