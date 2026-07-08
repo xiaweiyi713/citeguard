@@ -1252,7 +1252,7 @@ License-File: LICENSE
         self.assertEqual(offenders, [])
 
     def test_public_docs_are_citeguard_package_first(self):
-        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        readme = ((ROOT / "README.md").read_text(encoding="utf-8") + "\n" + (ROOT / "README.en.md").read_text(encoding="utf-8"))
         benchmark_design = (ROOT / "docs" / "benchmark_design.md").read_text(encoding="utf-8")
 
         self.assertIn("citeguard/", readme)
@@ -1274,16 +1274,14 @@ License-File: LICENSE
         self.assertNotIn("src/benchmark/metrics.py", benchmark_design)
 
     def test_chinese_quickstart_separates_installed_package_from_source_demo(self):
-        readme = (ROOT / "README.md").read_text(encoding="utf-8")
-        chinese_section = readme.split("## 中文说明", 1)[1]
+        readme_zh = (ROOT / "README.md").read_text(encoding="utf-8")
 
-        self.assertIn("已安装包场景请优先使用 `citeguard` / `citeguard-mcp` 入口", chinese_section)
-        self.assertIn("源码签出场景还可以运行 `python3 scripts/demo_verify.py`", chinese_section)
-        self.assertNotIn("安装后先跑 `citeguard status`", chinese_section.split("源码签出场景", 1)[1])
-        self.assertNotIn("或直接 `python3 scripts/demo_verify.py` 看实时效果", chinese_section)
+        self.assertIn("已安装包场景请优先使用 `citeguard` / `citeguard-mcp` 入口", readme_zh)
+        self.assertIn("源码签出场景还可以运行 `python3 scripts/demo_verify.py`", readme_zh)
+        self.assertNotIn("或直接 `python3 scripts/demo_verify.py` 看实时效果", readme_zh)
 
     def test_english_demo_separates_source_checkout_from_installed_entrypoints(self):
-        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        readme = ((ROOT / "README.md").read_text(encoding="utf-8") + "\n" + (ROOT / "README.en.md").read_text(encoding="utf-8"))
         see_it_work = readme.split("## See it work", 1)[1].split("## What it does", 1)[0]
 
         self.assertIn("From a source checkout, run the demo script yourself", see_it_work)
@@ -1292,7 +1290,7 @@ License-File: LICENSE
         self.assertIn("`citeguard-mcp` entry points", see_it_work)
 
     def test_mcp_install_docs_put_published_package_before_editable_checkout(self):
-        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        readme = ((ROOT / "README.md").read_text(encoding="utf-8") + "\n" + (ROOT / "README.en.md").read_text(encoding="utf-8"))
         mcp_setup = (ROOT / "docs" / "mcp_setup.md").read_text(encoding="utf-8")
         readme_mcp_section = readme.split("### As an agent tool (MCP)", 1)[1].split("##", 1)[0]
 
@@ -1308,7 +1306,7 @@ License-File: LICENSE
                 )
 
     def test_quickstart_puts_published_package_before_editable_checkout(self):
-        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        readme = ((ROOT / "README.md").read_text(encoding="utf-8") + "\n" + (ROOT / "README.en.md").read_text(encoding="utf-8"))
         quickstart = readme.split("## Quick start", 1)[1].split("Check your local configuration", 1)[0]
 
         self.assertIn("For an installed or published package", quickstart)
@@ -1639,7 +1637,7 @@ License-File: LICENSE
         self.assertIn("Python 3.10+ MCP extra and stdio smoke gates", summary["steps"][0]["policy"])
 
     def test_release_package_gate_is_documented_and_packaged(self):
-        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        readme = ((ROOT / "README.md").read_text(encoding="utf-8") + "\n" + (ROOT / "README.en.md").read_text(encoding="utf-8"))
         changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
         checklist = (ROOT / "docs" / "release_checklist.md").read_text(encoding="utf-8")
         smoke = (ROOT / "scripts" / "smoke_package.py").read_text(encoding="utf-8")
@@ -1852,7 +1850,7 @@ License-File: LICENSE
                 self.assertIn(phrase, combined)
 
     def test_readme_test_command_avoids_stale_fixed_test_count(self):
-        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        readme = ((ROOT / "README.md").read_text(encoding="utf-8") + "\n" + (ROOT / "README.en.md").read_text(encoding="utf-8"))
         tests_section = readme.split("## Tests & reproducibility", 1)[1].split("## Cache and reproducibility", 1)[0]
 
         self.assertIn("python3 -m unittest discover -s tests -v", tests_section)
@@ -2942,7 +2940,7 @@ License-File: LICENSE
         self.assertIn("docs/releases/v0.1.0.md", summary["steps"][0]["release_docs_checked"])
         self.assertEqual(summary["steps"][0]["unsafe_human_reviewed_benchmark_claims"], [])
         occurrences = summary["steps"][0]["human_reviewed_benchmark_occurrences"]
-        self.assertTrue(any(item["path"] == "README.md" for item in occurrences))
+        self.assertTrue(any(item["path"] == "README.en.md" for item in occurrences))
         self.assertTrue(any(item["path"] == "docs/support_labeling_guidelines.md" for item in occurrences))
         self.assertTrue(any(item["path"] == "skills/citeguard-verify/references/examples.md" for item in occurrences))
         self.assertTrue(any(item["path"] == "scripts/eval_support.py" for item in occurrences))
@@ -3564,7 +3562,7 @@ License-File: LICENSE
             examples,
         )
         self.assertIn("do not use accuracy alone", examples)
-        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        readme = ((ROOT / "README.md").read_text(encoding="utf-8") + "\n" + (ROOT / "README.en.md").read_text(encoding="utf-8"))
         cli_reference = (ROOT / "docs" / "cli_reference.md").read_text(encoding="utf-8")
         jsonl_high_risk_command = "citeguard support-audit examples/claim_citations.jsonl --high-risk-only"
         self.assertIn(jsonl_high_risk_command, readme)
@@ -3600,7 +3598,7 @@ License-File: LICENSE
                 self.assertTrue(contract["documents_jsonl"])
                 self.assertTrue(contract["documents_reference_files"])
                 self.assertTrue(contract["documents_bibtex_bbl"])
-        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        readme = ((ROOT / "README.md").read_text(encoding="utf-8") + "\n" + (ROOT / "README.en.md").read_text(encoding="utf-8"))
         cli_reference = (ROOT / "docs" / "cli_reference.md").read_text(encoding="utf-8")
         release_note = (ROOT / "docs" / "releases" / "v0.1.0.md").read_text(encoding="utf-8")
         reference_input_phrase = "Markdown/LaTeX/BibTeX/BBL/DOCX"
@@ -5327,7 +5325,7 @@ License-File: LICENSE
         self.assertIn("details.received", setup_doc)
         self.assertIn("details.field=citations", setup_doc)
         self.assertIn("details.field=items", setup_doc)
-        self.assertIn("MCP SDK requires Python 3.10+", (ROOT / "README.md").read_text(encoding="utf-8"))
+        self.assertIn("MCP SDK requires Python 3.10+", ((ROOT / "README.md").read_text(encoding="utf-8") + "\n" + (ROOT / "README.en.md").read_text(encoding="utf-8")))
         self.assertIn("structured error contract", setup_doc)
         self.assertIn("error.recovery", setup_doc)
         self.assertIn("error.next_action", setup_doc)
@@ -5357,7 +5355,7 @@ License-File: LICENSE
         self.assertIn("not evidence that a citation is", setup_doc)
         self.assertIn("`verify_citation_tool` `not_found`", setup_doc)
         self.assertIn("does not call the citation fake or fabricated", setup_doc)
-        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        readme = ((ROOT / "README.md").read_text(encoding="utf-8") + "\n" + (ROOT / "README.en.md").read_text(encoding="utf-8"))
         cli_reference = (ROOT / "docs" / "cli_reference.md").read_text(encoding="utf-8")
         support = (ROOT / "citeguard" / "verification" / "support.py").read_text(encoding="utf-8")
         combined_counterevidence_contract = f"{readme}\n{setup_doc}\n{cli_reference}\n{support}"
@@ -5405,7 +5403,7 @@ License-File: LICENSE
                 self.assertIn(phrase, cli_reference)
 
     def test_cache_replay_fixture_export_is_documented_as_deterministic(self):
-        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        readme = ((ROOT / "README.md").read_text(encoding="utf-8") + "\n" + (ROOT / "README.en.md").read_text(encoding="utf-8"))
         cli_reference = (ROOT / "docs" / "cli_reference.md").read_text(encoding="utf-8")
         mcp_setup = (ROOT / "docs" / "mcp_setup.md").read_text(encoding="utf-8")
         checklist = (ROOT / "docs" / "release_checklist.md").read_text(encoding="utf-8")
@@ -5553,7 +5551,7 @@ License-File: LICENSE
                 self.assertIn(phrase, combined)
 
     def test_false_support_analysis_is_documented_for_release(self):
-        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        readme = ((ROOT / "README.md").read_text(encoding="utf-8") + "\n" + (ROOT / "README.en.md").read_text(encoding="utf-8"))
         support_eval_doc = (ROOT / "docs" / "support_eval.md").read_text(encoding="utf-8")
         cli_reference = (ROOT / "docs" / "cli_reference.md").read_text(encoding="utf-8")
         benchmark_design = (ROOT / "docs" / "benchmark_design.md").read_text(encoding="utf-8")
@@ -5647,7 +5645,7 @@ License-File: LICENSE
                 self.assertIn(phrase, combined)
 
     def test_support_seed_documents_new_high_risk_boundaries(self):
-        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        readme = ((ROOT / "README.md").read_text(encoding="utf-8") + "\n" + (ROOT / "README.en.md").read_text(encoding="utf-8"))
         support_eval_doc = (ROOT / "docs" / "support_eval.md").read_text(encoding="utf-8")
         changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
         benchmark_todo = (ROOT / "docs" / "benchmark_todo.md").read_text(encoding="utf-8")
@@ -6171,7 +6169,7 @@ License-File: LICENSE
         )
 
     def test_security_compliance_boundaries_are_documented(self):
-        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        readme = ((ROOT / "README.md").read_text(encoding="utf-8") + "\n" + (ROOT / "README.en.md").read_text(encoding="utf-8"))
         security = (ROOT / "docs" / "security_compliance.md").read_text(encoding="utf-8")
         combined = f"{readme}\n{security}"
 

@@ -680,6 +680,7 @@ def _literal_module_all(path: Path) -> set[str]:
 def _public_api_contract_paths(project_root: Path) -> List[Path]:
     paths = [
         project_root / "README.md",
+        project_root / "README.en.md",
         project_root / "CHANGELOG.md",
         project_root / "ROADMAP.md",
         project_root / "pyproject.toml",
@@ -1380,7 +1381,7 @@ def _check_configuration_contract_gate(*, project_root: Path) -> Dict[str, Any]:
     from citeguard.runtime import environment_status
 
     docs = {
-        "README.md": _read_required_text(project_root / "README.md"),
+        "README.md": (_read_required_text(project_root / "README.md") + "\n" + _read_required_text(project_root / "README.en.md")),
         "docs/configuration.md": _read_required_text(project_root / "docs" / "configuration.md"),
         "docs/release_checklist.md": _read_required_text(project_root / "docs" / "release_checklist.md"),
     }
@@ -1578,7 +1579,7 @@ def _check_mcp_stdio_smoke_contract_gate(*, project_root: Path) -> Dict[str, Any
     script = _read_required_text(project_root / "scripts" / "smoke_mcp.py")
     docs = _read_required_text(project_root / "docs" / "mcp_setup.md")
     checklist = _read_required_text(project_root / "docs" / "release_checklist.md")
-    readme = _read_required_text(project_root / "README.md")
+    readme = (_read_required_text(project_root / "README.md") + "\n" + _read_required_text(project_root / "README.en.md"))
     mcp_server = _read_required_text(project_root / "citeguard" / "mcp" / "server.py")
     normalized_script = _normalize_markdown_text(script)
     normalized_docs = _normalize_markdown_text("\n".join([docs, checklist, readme]))
@@ -1829,7 +1830,7 @@ def _record_ci_mcp_smoke_contract_gate(summary: Dict[str, Any], *, project_root:
 
 def _check_ci_mcp_smoke_contract_gate(*, project_root: Path) -> Dict[str, Any]:
     workflow = _read_required_text(project_root / ".github" / "workflows" / "ci.yml")
-    readme = _read_required_text(project_root / "README.md")
+    readme = (_read_required_text(project_root / "README.md") + "\n" + _read_required_text(project_root / "README.en.md"))
     checklist = _read_required_text(project_root / "docs" / "release_checklist.md")
     mcp_job = _extract_github_actions_job(workflow, "mcp-smoke")
     required_job_phrases = {
@@ -2570,7 +2571,7 @@ def _check_counterevidence_safety_contract_gate(*, project_root: Path) -> Dict[s
     from citeguard.verification import CitationRecord, search_counterevidence_candidates
     from citeguard.verification.models import STABLE_NEXT_ACTIONS
 
-    readme = _read_required_text(project_root / "README.md")
+    readme = (_read_required_text(project_root / "README.md") + "\n" + _read_required_text(project_root / "README.en.md"))
     cli_reference = _read_required_text(project_root / "docs" / "cli_reference.md")
     mcp_setup = _read_required_text(project_root / "docs" / "mcp_setup.md")
     skill = _read_required_text(project_root / "skills" / "citeguard-verify" / "SKILL.md")
@@ -2726,7 +2727,7 @@ def _check_full_text_evidence_boundary_contract_gate(*, project_root: Path) -> D
     from citeguard.retrieval.scholarly_clients import InMemoryMetadataSource
     from citeguard.verification import CitationRecord, check_claim_support
 
-    readme = _read_required_text(project_root / "README.md")
+    readme = (_read_required_text(project_root / "README.md") + "\n" + _read_required_text(project_root / "README.en.md"))
     cli_reference = _read_required_text(project_root / "docs" / "cli_reference.md")
     mcp_setup = _read_required_text(project_root / "docs" / "mcp_setup.md")
     security = _read_required_text(project_root / "docs" / "security_compliance.md")
@@ -2896,7 +2897,7 @@ def _check_support_set_aggregation_contract_gate(*, project_root: Path) -> Dict[
                 rationale="Release-gate fixture marks evidence as related but not entailing.",
             )
 
-    readme = _read_required_text(project_root / "README.md")
+    readme = (_read_required_text(project_root / "README.md") + "\n" + _read_required_text(project_root / "README.en.md"))
     cli_reference = _read_required_text(project_root / "docs" / "cli_reference.md")
     mcp_setup = _read_required_text(project_root / "docs" / "mcp_setup.md")
     skill = _read_required_text(project_root / "skills" / "citeguard-verify" / "SKILL.md")
@@ -3098,7 +3099,7 @@ def _check_live_source_health_contract_gate(*, project_root: Path) -> Dict[str, 
     from citeguard.runtime import SOURCE_HEALTH_SCHEMA_VERSION, canonical_source_names, source_health_status
 
     docs = {
-        "README.md": _read_required_text(project_root / "README.md"),
+        "README.md": (_read_required_text(project_root / "README.md") + "\n" + _read_required_text(project_root / "README.en.md")),
         "docs/cli_reference.md": _read_required_text(project_root / "docs" / "cli_reference.md"),
         "docs/release_checklist.md": _read_required_text(project_root / "docs" / "release_checklist.md"),
         "docs/security_compliance.md": _read_required_text(project_root / "docs" / "security_compliance.md"),
@@ -3610,7 +3611,7 @@ def _check_security_compliance_contract_gate(*, project_root: Path) -> Dict[str,
     from citeguard.runtime import environment_status, polite_access_status, source_health_status
 
     docs = {
-        "README.md": _read_required_text(project_root / "README.md"),
+        "README.md": (_read_required_text(project_root / "README.md") + "\n" + _read_required_text(project_root / "README.en.md")),
         "docs/chinaxiv_spike.md": _read_required_text(project_root / "docs" / "chinaxiv_spike.md"),
         "docs/security_compliance.md": _read_required_text(project_root / "docs" / "security_compliance.md"),
         "docs/release_checklist.md": _read_required_text(project_root / "docs" / "release_checklist.md"),
@@ -5761,7 +5762,7 @@ def _run_json_command(cmd: List[str], *, cwd: Path, env_overrides: Dict[str, str
 def _check_project_metadata_contract(project_root: Path) -> Dict[str, Any]:
     pyproject = _read_required_text(project_root / "pyproject.toml")
     setup = _read_required_text(project_root / "setup.py")
-    readme = _read_required_text(project_root / "README.md")
+    readme = (_read_required_text(project_root / "README.md") + "\n" + _read_required_text(project_root / "README.en.md"))
     changelog = _read_required_text(project_root / "CHANGELOG.md")
     citation = _read_required_text(project_root / "CITATION.cff")
     github_launch = _read_required_text(project_root / "docs" / "github_launch.md")
@@ -6898,6 +6899,7 @@ def _check_benchmark_claim_safety_gate(*, project_root: Path, dataset: str, labe
 
     release_docs = {
         "README.md": project_root / "README.md",
+        "README.en.md": project_root / "README.en.md",
         "CHANGELOG.md": project_root / "CHANGELOG.md",
         "ROADMAP.md": project_root / "ROADMAP.md",
         "docs/benchmark_design.md": project_root / "docs" / "benchmark_design.md",
@@ -6925,7 +6927,7 @@ def _check_benchmark_claim_safety_gate(*, project_root: Path, dataset: str, labe
                 unsafe_occurrences.append(occurrence)
 
     required_guard_docs = {
-        "README.md": "not a final human-reviewed benchmark",
+        "README.en.md": "not a final human-reviewed benchmark",
         "docs/release_checklist.md": "should not call it a human-reviewed benchmark",
         "docs/benchmark_todo.md": "not a human-reviewed benchmark",
     }
