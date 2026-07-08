@@ -5,10 +5,12 @@ from __future__ import annotations
 import argparse
 import importlib
 import json
+import os
+import re
 import sys
 from typing import Any, Iterable, Optional, TextIO
 
-from citeguard.errors import error_payload
+from citeguard.errors import error_payload, runtime_config_error_details
 from citeguard.runtime import build_configured_source, build_configured_support_backend, cache_path, environment_status
 from citeguard.verification import (
     ClaimSupportAuditItem,
@@ -42,7 +44,34 @@ class CiteGuardArgumentParser(argparse.ArgumentParser):
     """argparse parser that lets us return JSON errors instead of plain text."""
 
     def error(self, message: str) -> None:
-        raise CLIUsageError("argument_parse_error", message)
+        raise CLIUsageError(
+            "argument_parse_error",
+            message,
+            details=_argument_parse_error_details(self.prog, message),
+        )
+
+
+def _argument_parse_error_details(prog: str, message: str) -> dict:
+    details = {"prog": prog}
+    command = _command_from_prog(prog)
+    if command:
+        details["command"] = command
+    argument_names = _argument_names_from_error_message(message)
+    if argument_names:
+        details["arguments"] = argument_names
+    return details
+
+
+def _command_from_prog(prog: str) -> str:
+    parts = str(prog or "").split()
+    if parts and parts[0] == "citeguard":
+        return " ".join(parts[1:])
+    return ""
+
+
+def _argument_names_from_error_message(message: str) -> list:
+    names = re.findall(r"(?<!\w)-{1,2}[A-Za-z0-9][A-Za-z0-9_-]*", message)
+    return list(dict.fromkeys(names))
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -71,8 +100,30 @@ def build_parser() -> argparse.ArgumentParser:
     cache_subparsers = cache_parser.add_subparsers(dest="cache_command", required=True, parser_class=CiteGuardArgumentParser)
     cache_inspect_parser = cache_subparsers.add_parser("inspect", help="Print cache schema and entry counts.")
     cache_inspect_parser.add_argument("--path", default="", help="Cache path; defaults to CITEGUARD_CACHE.")
+    cache_inspect_parser.add_argument(
+        "--operation",
+        choices=["search", "lookup"],
+        default="",
+        help="Only count cache rows produced by cached search or lookup operations in selected_* fields.",
+    )
+    cache_inspect_parser.add_argument(
+        "--source",
+        default="",
+        help="Only count cache rows produced by this source name in selected_* fields.",
+    )
     cache_clear_parser = cache_subparsers.add_parser("clear", help="Delete cached search and lookup rows.")
     cache_clear_parser.add_argument("--path", default="", help="Cache path; defaults to CITEGUARD_CACHE.")
+    cache_clear_parser.add_argument(
+        "--operation",
+        choices=["search", "lookup"],
+        default="",
+        help="Only delete cache rows produced by cached search or lookup operations.",
+    )
+    cache_clear_parser.add_argument(
+        "--source",
+        default="",
+        help="Only delete cache rows produced by this source name.",
+    )
     cache_export_parser = cache_subparsers.add_parser(
         "export",
         help="Export cached citation records as an offline replay fixture.",
@@ -87,6 +138,22 @@ def build_parser() -> argparse.ArgumentParser:
         "--deterministic",
         action="store_true",
         help="Strip timestamp-only cache provenance from exported records for reproducible fixture files.",
+    )
+    cache_export_parser.add_argument(
+        "--include-manifest",
+        action="store_true",
+        help="Write a fixture object with fixture_manifest plus records instead of the legacy records-only list.",
+    )
+    cache_export_parser.add_argument(
+        "--operation",
+        choices=["search", "lookup"],
+        default="",
+        help="Only export records produced by cached search or lookup rows.",
+    )
+    cache_export_parser.add_argument(
+        "--source",
+        default="",
+        help="Only export records from cache rows produced by this source name, such as openalex or crossref.",
     )
 
     verify_parser = subparsers.add_parser("verify", help="Verify one citation.")
@@ -112,7 +179,10 @@ def build_parser() -> argparse.ArgumentParser:
         help="Check whether a claim is supported by a set of citations.",
     )
     _add_output_args(support_set_parser)
-    support_set_parser.add_argument("path", help="Path to a JSON/JSONL list of citation objects.")
+    support_set_parser.add_argument(
+        "path",
+        help="Path to a JSON/JSONL list of citation objects or a Markdown/LaTeX/BibTeX/BBL/DOCX/plain-text reference file.",
+    )
     support_set_parser.add_argument("--claim", required=True, help="Claim sentence to check against the citation set.")
     support_set_parser.add_argument("--lang", default="", help="Optional language hint for the claim.")
     support_set_parser.add_argument(
@@ -124,25 +194,30 @@ def build_parser() -> argparse.ArgumentParser:
 
     extract_parser = subparsers.add_parser(
         "extract",
-        help="Extract citation candidates from Markdown, LaTeX, DOCX, or plain text.",
+        help="Extract citation candidates from Markdown, LaTeX, BibTeX, BBL, DOCX, or plain text.",
     )
     _add_output_args(extract_parser)
     extract_parser.add_argument("path", help="Manuscript or bibliography file to scan.")
     extract_parser.add_argument(
         "--format",
-        choices=["auto", "markdown", "md", "latex", "tex", "bibtex", "docx", "text", "txt"],
+        choices=["auto", "markdown", "md", "latex", "tex", "bibtex", "bbl", "docx", "text", "txt"],
         default="auto",
         help="Input format; defaults to extension-based auto detection.",
     )
 
     support_audit_parser = subparsers.add_parser(
         "support-audit",
-        help="Check claim-support pairs from a JSON file.",
+        help="Check claim-support pairs from JSON/JSONL or one claim against extracted reference candidates.",
     )
     _add_output_args(support_audit_parser)
     support_audit_parser.add_argument(
         "path",
-        help="Path to a JSON file containing claim/citation objects.",
+        help="Path to JSON/JSONL claim-citation objects, or a Markdown/LaTeX/BibTeX/BBL/DOCX/plain-text reference file when --claim is provided.",
+    )
+    support_audit_parser.add_argument(
+        "--claim",
+        default="",
+        help="Default claim for citation rows that do not include claim, and required for non-JSON reference files.",
     )
     support_audit_parser.add_argument("--lang", default="", help="Default language hint for claim items.")
     support_audit_parser.add_argument("--high-risk-only", action="store_true", help="Only return high-risk items in results.")
@@ -153,11 +228,14 @@ def build_parser() -> argparse.ArgumentParser:
     )
     support_audit_parser.add_argument("--counterevidence-top-k", type=int, default=3, help="Counter-evidence candidates per claim.")
 
-    audit_parser = subparsers.add_parser("audit", help="Verify citations from a JSON file.")
+    audit_parser = subparsers.add_parser(
+        "audit",
+        help="Verify citations from JSON/JSONL or extracted reference candidates.",
+    )
     _add_output_args(audit_parser)
     audit_parser.add_argument(
         "path",
-        help="Path to a JSON file containing a list of citation objects.",
+        help="Path to a JSON/JSONL list of citation objects or a Markdown/LaTeX/BibTeX/BBL/DOCX/plain-text reference file.",
     )
     audit_parser.add_argument("--high-risk-only", action="store_true", help="Only return high-risk items in results.")
     return parser
@@ -196,6 +274,30 @@ def _add_citation_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--arxiv-id", default="", help="arXiv identifier.")
 
 
+def _cache_fixture_with_manifest(payload: dict) -> dict:
+    manifest_keys = [
+        "schema_version",
+        "cache_entry_count",
+        "cache_entry_prefixes",
+        "selected_cache_entry_count",
+        "selected_cache_entry_prefixes",
+        "export_filters",
+        "cache_oldest_entry_timestamp",
+        "cache_newest_entry_timestamp",
+        "exported_at",
+        "deterministic",
+        "record_count",
+        "exists",
+    ]
+    manifest = {key: payload.get(key) for key in manifest_keys}
+    manifest["fixture_format"] = "manifest_records"
+    manifest["provenance_policy"] = "cache_export_replay_fixture"
+    return {
+        "fixture_manifest": manifest,
+        "records": payload["records"],
+    }
+
+
 def run(
     argv: Optional[Iterable[str]] = None,
     source=None,
@@ -223,17 +325,41 @@ def run(
         if args.command == "cache":
             active_cache_path = args.path or cache_path()
             if args.cache_command == "inspect":
-                _print_json(inspect_cache(active_cache_path), out, compact=args.compact)
+                _print_json(
+                    inspect_cache(
+                        active_cache_path,
+                        operation=args.operation or None,
+                        source=args.source or None,
+                    ),
+                    out,
+                    compact=args.compact,
+                )
                 return 0
             if args.cache_command == "clear":
-                _print_json(clear_cache(active_cache_path), out, compact=args.compact)
+                _print_json(
+                    clear_cache(
+                        active_cache_path,
+                        operation=args.operation or None,
+                        source=args.source or None,
+                    ),
+                    out,
+                    compact=args.compact,
+                )
                 return 0
             if args.cache_command == "export":
-                payload = export_cache_records(active_cache_path, deterministic=args.deterministic)
+                payload = export_cache_records(
+                    active_cache_path,
+                    deterministic=args.deterministic,
+                    operation=args.operation or None,
+                    source=args.source or None,
+                )
                 if args.output:
+                    fixture_payload: Any = payload["records"]
+                    if args.include_manifest:
+                        fixture_payload = _cache_fixture_with_manifest(payload)
                     try:
                         with open(args.output, "w", encoding="utf-8") as handle:
-                            json.dump(payload["records"], handle, indent=2, sort_keys=True)
+                            json.dump(fixture_payload, handle, indent=2, sort_keys=True)
                             handle.write("\n")
                     except OSError as exc:
                         raise _output_file_error(
@@ -249,10 +375,14 @@ def run(
                             "schema_version": payload["schema_version"],
                             "cache_entry_count": payload["cache_entry_count"],
                             "cache_entry_prefixes": payload["cache_entry_prefixes"],
+                            "selected_cache_entry_count": payload["selected_cache_entry_count"],
+                            "selected_cache_entry_prefixes": payload["selected_cache_entry_prefixes"],
+                            "export_filters": payload["export_filters"],
                             "cache_oldest_entry_timestamp": payload["cache_oldest_entry_timestamp"],
                             "cache_newest_entry_timestamp": payload["cache_newest_entry_timestamp"],
                             "exported_at": payload["exported_at"],
                             "deterministic": payload["deterministic"],
+                            "fixture_format": "manifest_records" if args.include_manifest else "records",
                             "record_count": payload["record_count"],
                             "exists": payload["exists"],
                         },
@@ -334,7 +464,7 @@ def run(
                     compact=args.compact,
                     details={"command": args.command},
                 )
-            citations = _load_citation_file(args.path, command=args.command, label="support-set input")
+            citations = _load_citation_or_reference_input(args.path, command=args.command, label="support-set input")
             if not citations:
                 raise CLIUsageError(
                     "missing_citation_input",
@@ -399,7 +529,7 @@ def run(
             _print_json(payload, out, compact=args.compact)
             return 0
         if args.command == "support-audit":
-            items = _load_citation_file(args.path, command=args.command, label="support-audit input")
+            items = _load_support_audit_input(args.path, claim=args.claim)
             requests = [
                 _normalize_claim_support_audit_item(item, index=index)
                 for index, item in enumerate(items, start=1)
@@ -444,7 +574,13 @@ def run(
             details={"errno": getattr(exc, "errno", None), "filename": getattr(exc, "filename", None)},
         )
     except ValueError as exc:
-        return _write_error(err, "invalid_input", str(exc), compact=compact_hint)
+        return _write_error(
+            err,
+            "invalid_input",
+            str(exc),
+            compact=compact_hint,
+            details=_value_error_details(exc, locals().get("args")),
+        )
 
     return _write_error(err, "unsupported_command", f"Unsupported command {args.command!r}.", compact=args.compact)
 
@@ -535,12 +671,45 @@ def _load_citation_file(path: str, command: str = "audit", label: str = "audit i
 
 
 def _load_audit_input(path: str) -> list:
+    return _load_citation_or_reference_input(path, command="audit", label="audit input")
+
+
+def _load_support_audit_input(path: str, claim: str = "") -> list:
+    default_claim = str(claim or "").strip()
     if path.lower().endswith((".json", ".jsonl")):
-        return _load_citation_file(path, command="audit", label="audit input")
+        items = _load_citation_file(path, command="support-audit", label="support-audit input")
+        if not default_claim:
+            return items
+        return [
+            item if str(item.get("claim", "")).strip() else {**item, "claim": default_claim}
+            for item in items
+        ]
+    if not default_claim:
+        raise CLIUsageError(
+            "missing_claim",
+            "Provide --claim when support-audit reads a Markdown, LaTeX, BibTeX, BBL, DOCX, or plain-text reference file.",
+            details={"command": "support-audit", "field": "claim"},
+        )
+    try:
+        citations = load_citation_candidates(path)
+    except OSError as exc:
+        raise _input_file_error(exc, command="support-audit", path=path) from exc
+    if not citations:
+        raise CLIUsageError(
+            "missing_citation_input",
+            "support-audit input must include at least one extracted citation candidate",
+            details={"command": "support-audit"},
+        )
+    return [{**item, "claim": default_claim} for item in citations]
+
+
+def _load_citation_or_reference_input(path: str, command: str, label: str) -> list:
+    if path.lower().endswith((".json", ".jsonl")):
+        return _load_citation_file(path, command=command, label=label)
     try:
         return load_citation_candidates(path)
     except OSError as exc:
-        raise _input_file_error(exc, command="audit", path=path) from exc
+        raise _input_file_error(exc, command=command, path=path) from exc
 
 
 def _normalize_citation_item(
@@ -559,6 +728,7 @@ def _normalize_citation_item(
         "abstract": item.get("abstract", ""),
         "doi": item.get("doi", ""),
         "arxiv_id": item.get("arxiv_id", ""),
+        "metadata": _citation_input_metadata(item),
         "evidence_chunks": _normalize_evidence_chunks(
             item,
             index=index,
@@ -566,6 +736,24 @@ def _normalize_citation_item(
             citation_index=citation_index,
         ),
     }
+
+
+def _citation_input_metadata(item: dict) -> dict:
+    metadata = dict(item.get("metadata") or {})
+    source_fields = {
+        "input_source_path": item.get("source_path", ""),
+        "input_source_format": item.get("source_format", ""),
+        "input_source_type": item.get("source_type", ""),
+        "input_source_id": item.get("source_id", ""),
+        "input_source_index": item.get("source_index"),
+        "input_source_locator": item.get("source_locator", ""),
+        "input_source_line_start": item.get("source_line_start"),
+        "input_source_line_end": item.get("source_line_end"),
+    }
+    for key, value in source_fields.items():
+        if value not in (None, ""):
+            metadata.setdefault(key, value)
+    return metadata
 
 
 def _chunks_from_cli_args(args) -> list:
@@ -622,14 +810,14 @@ def _normalize_evidence_chunks(
         + _as_list(item.get("full_text_excerpt"))
         + _as_list(item.get("full_text_excerpts"))
     )
-    for index, value in enumerate(full_text_values, start=1):
+    for full_text_index, value in enumerate(full_text_values, start=1):
         if isinstance(value, dict):
             chunk = dict(value)
-            chunk.setdefault("source_field", f"user_full_text_excerpt_{index}")
+            chunk.setdefault("source_field", f"user_full_text_excerpt_{full_text_index}")
             chunk["evidence_scope"] = "full_text"
             chunks.append(chunk)
         elif str(value).strip():
-            chunks.append(_chunk(str(value), f"user_full_text_excerpt_{index}", "full_text"))
+            chunks.append(_chunk(str(value), f"user_full_text_excerpt_{full_text_index}", "full_text"))
     full_text_files = (
         _as_list(item.get("full_text_file"))
         + _as_list(item.get("full_text_files"))
@@ -945,6 +1133,14 @@ def _input_details(
     if field:
         details["field"] = field
     return details
+
+
+def _value_error_details(exc: ValueError, args: Any = None) -> dict:
+    details = {}
+    command = getattr(args, "command", "")
+    if command:
+        details["command"] = command
+    return runtime_config_error_details(str(exc), base=details, env=os.environ)
 
 
 def _write_error(

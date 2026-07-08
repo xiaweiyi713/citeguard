@@ -98,6 +98,8 @@ class EvidenceTimeoutHTTPClient(FakeHTTPClient):
         self.last_error_kind = ""
         self.last_status_code = None
         self.last_url = ""
+        self.last_final_url = ""
+        self.last_redirected = False
         self.last_error = ""
         self.last_cache_hit = False
 
@@ -110,6 +112,87 @@ class EvidenceTimeoutHTTPClient(FakeHTTPClient):
         self.last_error = "TimeoutError"
         self.last_cache_hit = False
         return ""
+
+
+class EvidenceRateLimitHTTPClient(FakeHTTPClient):
+    def __init__(self):
+        self.requested_urls = []
+        self.last_error_code = ""
+        self.last_error_kind = ""
+        self.last_status_code = None
+        self.last_url = ""
+        self.last_final_url = ""
+        self.last_redirected = False
+        self.last_error = ""
+        self.last_cache_hit = False
+        self.last_attempt_count = 0
+        self.last_retry_count = 0
+        self.last_retry_after_seconds = None
+        self.last_retry_delay_seconds = None
+
+    def get_text(self, url, params=None, headers=None, use_cache=True, timeout=None):
+        self.requested_urls.append(url)
+        self.last_error_code = "source_unavailable"
+        self.last_error_kind = "rate_limited"
+        self.last_status_code = 429
+        self.last_url = url
+        self.last_final_url = "https://publisher.example/rate-limited"
+        self.last_redirected = True
+        self.last_error = "http_429"
+        self.last_cache_hit = False
+        self.last_attempt_count = 1
+        self.last_retry_count = 0
+        self.last_retry_after_seconds = 3.0
+        self.last_retry_delay_seconds = None
+        return ""
+
+
+class EvidenceNonHtmlHTTPClient(FakeHTTPClient):
+    def __init__(self):
+        self.last_error_code = ""
+        self.last_error_kind = ""
+        self.last_status_code = None
+        self.last_url = ""
+        self.last_final_url = ""
+        self.last_redirected = False
+        self.last_error = ""
+        self.last_cache_hit = False
+        self.last_attempt_count = 0
+        self.last_retry_count = 0
+        self.last_retry_after_seconds = None
+        self.last_retry_delay_seconds = None
+
+    def get_text(self, url, params=None, headers=None, use_cache=True, timeout=None):
+        self.last_status_code = 200
+        self.last_url = url
+        self.last_final_url = "https://publisher.example/final-landing-page"
+        self.last_redirected = True
+        self.last_cache_hit = False
+        self.last_attempt_count = 1
+        self.last_retry_count = 0
+        return "%PDF-1.7 publisher landing page returned a PDF shell"
+
+
+class EvidenceNoExtractableHTMLHTTPClient(FakeHTTPClient):
+    def __init__(self):
+        self.last_error_code = ""
+        self.last_error_kind = ""
+        self.last_status_code = None
+        self.last_url = ""
+        self.last_error = ""
+        self.last_cache_hit = False
+        self.last_attempt_count = 0
+        self.last_retry_count = 0
+        self.last_retry_after_seconds = None
+        self.last_retry_delay_seconds = None
+
+    def get_text(self, url, params=None, headers=None, use_cache=True, timeout=None):
+        self.last_status_code = 200
+        self.last_url = url
+        self.last_cache_hit = False
+        self.last_attempt_count = 1
+        self.last_retry_count = 0
+        return "<html><head><title>Publisher</title></head><body><div></div></body></html>"
 
 
 class CapturingHTTPClient(FakeHTTPClient):
@@ -180,6 +263,32 @@ class CrossrefEvidenceTimeoutHTTPClient(CrossrefSparseHTTPClient):
         return ""
 
 
+class CrossrefLookupHTTPClient:
+    def __init__(self):
+        self.json_calls = []
+
+    def get_json(self, url, params=None, headers=None, use_cache=True, timeout=None):
+        self.json_calls.append(
+            {
+                "url": url,
+                "params": dict(params or {}),
+                "headers": dict(headers or {}),
+                "use_cache": use_cache,
+                "timeout": timeout,
+            }
+        )
+        return {
+            "message": {
+                "title": ["Crossref DOI Resolver Normalization"],
+                "DOI": "10.5555/MixedCase",
+                "issued": {"date-parts": [[2026]]},
+            }
+        }
+
+    def get_text(self, url, params=None, headers=None, use_cache=True, timeout=None):
+        return ""
+
+
 class SemanticScholarSparseHTTPClient:
     def get_json(self, url, params=None, headers=None, use_cache=True, timeout=None):
         return {
@@ -235,6 +344,30 @@ class ArxivSparseHTTPClient:
         return {}
 
 
+class ArxivLookupHTTPClient:
+    def __init__(self):
+        self.text_calls = []
+
+    def get_text(self, url, params=None, headers=None, use_cache=True, timeout=None):
+        params = dict(params or {})
+        self.text_calls.append({"url": url, "params": params})
+        arxiv_id = params.get("id_list", "1706.03762v5")
+        return f"""<?xml version="1.0" encoding="UTF-8"?>
+        <feed xmlns="http://www.w3.org/2005/Atom">
+          <entry>
+            <id>https://arxiv.org/abs/{arxiv_id}</id>
+            <title>Attention Is All You Need</title>
+            <summary>Transformer networks use attention mechanisms.</summary>
+            <author><name>Ashish Vaswani</name></author>
+            <published>2017-06-12T00:00:00Z</published>
+          </entry>
+        </feed>
+        """
+
+    def get_json(self, url, params=None, headers=None, use_cache=True, timeout=None):
+        return {}
+
+
 class RateLimitedHTTPClient:
     def __init__(self):
         self.last_error_code = ""
@@ -242,13 +375,47 @@ class RateLimitedHTTPClient:
         self.last_status_code = None
         self.last_url = ""
         self.last_error = ""
+        self.last_retry_after_seconds = None
+        self.last_retry_delay_seconds = None
 
     def get_json(self, url, params=None, headers=None, use_cache=True, timeout=None):
         self.last_error_code = "source_unavailable"
         self.last_error_kind = "rate_limited"
         self.last_status_code = 429
         self.last_url = url
+        self.last_final_url = "https://publisher.example/rate-limited"
+        self.last_redirected = True
         self.last_error = "http_429"
+        self.last_retry_after_seconds = 3.0
+        self.last_retry_delay_seconds = None
+        return {}
+
+    def get_text(self, url, params=None, headers=None, use_cache=True, timeout=None):
+        return ""
+
+
+class MalformedJSONHTTPClient:
+    def __init__(self):
+        self.last_error_code = ""
+        self.last_error_kind = ""
+        self.last_status_code = None
+        self.last_url = ""
+        self.last_error = ""
+        self.last_cache_hit = False
+        self.last_attempt_count = 0
+        self.last_retry_count = 0
+        self.last_retry_after_seconds = None
+        self.last_retry_delay_seconds = None
+
+    def get_json(self, url, params=None, headers=None, use_cache=True, timeout=None):
+        self.last_error_code = "source_unavailable"
+        self.last_error_kind = "invalid_json"
+        self.last_status_code = 200
+        self.last_url = url
+        self.last_error = "JSONDecodeError"
+        self.last_cache_hit = False
+        self.last_attempt_count = 1
+        self.last_retry_count = 0
         return {}
 
     def get_text(self, url, params=None, headers=None, use_cache=True, timeout=None):
@@ -313,6 +480,30 @@ class ScholarlySourceTests(unittest.TestCase):
         self.assertEqual(source.last_failure_details[0]["code"], "source_unavailable")
         self.assertEqual(source.last_failure_details[0]["kind"], "rate_limited")
         self.assertEqual(source.last_failure_details[0]["status_code"], 429)
+        self.assertEqual(source.last_failure_details[0]["url"], "https://api.openalex.org/works")
+        self.assertEqual(source.last_failure_details[0]["final_url"], "https://publisher.example/rate-limited")
+        self.assertTrue(source.last_failure_details[0]["redirected"])
+        self.assertEqual(source.last_failure_details[0]["attempt_count"], 0)
+        self.assertEqual(source.last_failure_details[0]["retry_count"], 0)
+        self.assertEqual(source.last_failure_details[0]["retry_after_seconds"], 3.0)
+        self.assertIsNone(source.last_failure_details[0]["retry_delay_seconds"])
+
+    def test_multi_source_records_malformed_json_as_source_unavailable(self):
+        failing = OpenAlexMetadataSource(http_client=MalformedJSONHTTPClient())
+        source = MultiSourceMetadataSource([failing])
+
+        results = source.search("anything", top_k=1)
+
+        self.assertEqual(results, [])
+        self.assertEqual(source.last_failures, ["openalex"])
+        detail = source.last_failure_details[0]
+        self.assertEqual(detail["source"], "openalex")
+        self.assertEqual(detail["code"], "source_unavailable")
+        self.assertEqual(detail["kind"], "invalid_json")
+        self.assertEqual(detail["status_code"], 200)
+        self.assertEqual(detail["error"], "JSONDecodeError")
+        self.assertEqual(detail["attempt_count"], 1)
+        self.assertEqual(detail["retry_count"], 0)
 
     def test_multi_source_classifies_direct_timeouts(self):
         source = MultiSourceMetadataSource([TimeoutMetadataSource()])
@@ -357,6 +548,8 @@ class ScholarlySourceTests(unittest.TestCase):
                     authors=["Zhe Xu"],
                     year=2026,
                     doi="10.1000/ghostcite",
+                    abstract="This paper studies phantom references and fabricated metadata.",
+                    venue="arXiv",
                     metadata={
                         "evidence_chunks": [
                             {
@@ -402,6 +595,17 @@ class ScholarlySourceTests(unittest.TestCase):
         self.assertIsNotNone(match)
         self.assertEqual(len(match.metadata["evidence_chunks"]), 2)
         self.assertEqual(len(match.metadata["evidence_spans"]), 2)
+        chunk_sources = {chunk["source_field"]: chunk.get("source_name") for chunk in match.metadata["evidence_chunks"]}
+        self.assertEqual(chunk_sources["openalex_remote_1_paragraph_1"], "openalex")
+        self.assertEqual(chunk_sources["crossref_remote_1_paragraph_1"], "crossref")
+        quality = match.metadata["metadata_quality"]
+        self.assertIn("identifier", quality["present_fields"])
+        self.assertIn("abstract", quality["present_fields"])
+        self.assertNotIn("title", quality["missing_fields"])
+        self.assertEqual(
+            quality["confidence_effect"],
+            "missing_metadata_lowers_confidence_not_fabrication_evidence",
+        )
 
     def test_openalex_search_harvests_remote_evidence_chunks(self):
         source = OpenAlexMetadataSource(http_client=FakeHTTPClient())
@@ -410,6 +614,7 @@ class ScholarlySourceTests(unittest.TestCase):
         chunks = results[0].metadata.get("evidence_chunks", [])
         self.assertTrue(chunks)
         self.assertTrue(any("phantom references" in chunk["text"].lower() for chunk in chunks))
+        self.assertTrue(all(chunk.get("source_name") == "openalex" for chunk in chunks))
 
     def test_openalex_requests_include_configured_mailto(self):
         http_client = CapturingHTTPClient()
@@ -438,6 +643,20 @@ class ScholarlySourceTests(unittest.TestCase):
         self.assertEqual(http_client.json_calls[1]["params"]["mailto"], "maintainer@example.org")
         self.assertIn("doi:10.1000/ghostcite", http_client.json_calls[1]["params"]["filter"])
 
+    def test_openalex_omits_unconfigured_mailto(self):
+        http_client = CapturingHTTPClient()
+        source = OpenAlexMetadataSource(
+            mailto="research@example.com",
+            http_client=http_client,
+            harvest_evidence=False,
+        )
+
+        source.search("phantom references fabricated metadata", top_k=1)
+
+        self.assertEqual(source.mailto, "")
+        self.assertEqual(http_client.json_calls[0]["params"]["search"], "phantom references fabricated metadata")
+        self.assertNotIn("mailto", http_client.json_calls[0]["params"])
+
     def test_crossref_handles_sparse_or_unexpected_record_shapes(self):
         http_client = CrossrefSparseHTTPClient()
         source = CrossrefMetadataSource(http_client=http_client, harvest_evidence=True)
@@ -453,6 +672,37 @@ class ScholarlySourceTests(unittest.TestCase):
         self.assertEqual(record.doi, "10.5555/sparse")
         self.assertEqual(record.url, "")
         self.assertEqual(http_client.text_calls, ["https://publisher.example/sparse", "https://doi.org/10.5555/sparse"])
+        quality = record.metadata["metadata_quality"]
+        self.assertEqual(quality["schema_version"], 1)
+        self.assertIn("year", quality["missing_fields"])
+        self.assertIn("venue", quality["missing_fields"])
+        self.assertIn("abstract", quality["missing_fields"])
+        self.assertIn("url", quality["missing_fields"])
+        self.assertIn("identifier", quality["present_fields"])
+        self.assertTrue(quality["identifiers"]["doi"])
+        self.assertEqual(
+            quality["confidence_effect"],
+            "missing_metadata_lowers_confidence_not_fabrication_evidence",
+        )
+
+    def test_crossref_lookup_normalizes_common_doi_resolver_prefixes(self):
+        http_client = CrossrefLookupHTTPClient()
+        source = CrossrefMetadataSource(http_client=http_client, harvest_evidence=False)
+
+        record = source.lookup(
+            CitationRecord(
+                citation_id="candidate",
+                title="Crossref DOI Resolver Normalization",
+                doi="DOI: HTTPS://DX.DOI.ORG/10.5555/MixedCase.",
+            )
+        )
+
+        self.assertIsNotNone(record)
+        self.assertEqual(record.doi, "10.5555/mixedcase")
+        self.assertEqual(
+            http_client.json_calls[0]["url"],
+            "https://api.crossref.org/works/10.5555%2Fmixedcase",
+        )
 
     def test_semantic_scholar_handles_sparse_or_unexpected_record_shapes(self):
         source = SemanticScholarMetadataSource(http_client=SemanticScholarSparseHTTPClient())
@@ -469,6 +719,17 @@ class ScholarlySourceTests(unittest.TestCase):
         self.assertEqual(record.doi, "")
         self.assertEqual(record.url, "")
         self.assertEqual(record.metadata["paper_id"], "")
+        quality = record.metadata["metadata_quality"]
+        self.assertIn("venue", quality["missing_fields"])
+        self.assertIn("abstract", quality["missing_fields"])
+        self.assertIn("identifier", quality["missing_fields"])
+        self.assertIn("url", quality["missing_fields"])
+        self.assertFalse(quality["identifiers"]["doi"])
+        self.assertFalse(quality["identifiers"]["arxiv_id"])
+        self.assertEqual(
+            quality["confidence_effect"],
+            "missing_metadata_lowers_confidence_not_fabrication_evidence",
+        )
 
     def test_arxiv_handles_sparse_atom_entries_and_skips_blank_records(self):
         source = ArxivMetadataSource(http_client=ArxivSparseHTTPClient(), harvest_evidence=False)
@@ -484,6 +745,84 @@ class ScholarlySourceTests(unittest.TestCase):
         self.assertEqual(record.doi, "10.48550/arxiv.2401.01234")
         self.assertEqual(record.arxiv_id, "2401.01234v2")
         self.assertEqual(record.url, "https://arxiv.org/abs/2401.01234v2")
+        quality = record.metadata["metadata_quality"]
+        self.assertIn("year", quality["missing_fields"])
+        self.assertIn("identifier", quality["present_fields"])
+        self.assertTrue(quality["identifiers"]["arxiv_id"])
+        self.assertEqual(
+            quality["confidence_effect"],
+            "missing_metadata_lowers_confidence_not_fabrication_evidence",
+        )
+
+    def test_arxiv_lookup_normalizes_common_arxiv_url_forms(self):
+        cases = {
+            "HTTPS://ARXIV.ORG/PDF/1706.03762V5.PDF.": "1706.03762v5",
+            "https://arxiv.org/abs/hep-th/9901001V2": "hep-th/9901001v2",
+            "arXiv: math.AG/0601001": "math.ag/0601001",
+        }
+        for arxiv_id, expected in cases.items():
+            with self.subTest(arxiv_id=arxiv_id):
+                http_client = ArxivLookupHTTPClient()
+                source = ArxivMetadataSource(http_client=http_client, harvest_evidence=False)
+
+                record = source.lookup(
+                    CitationRecord(
+                        citation_id="candidate",
+                        title="Attention Is All You Need",
+                        arxiv_id=arxiv_id,
+                    )
+                )
+
+                self.assertIsNotNone(record)
+                self.assertEqual(record.arxiv_id, expected)
+                self.assertEqual(http_client.text_calls[0]["params"]["id_list"], expected)
+
+    def test_in_memory_lookup_normalizes_identifier_url_forms(self):
+        record = CitationRecord(
+            citation_id="fixture",
+            title="Attention Is All You Need",
+            doi="10.48550/arxiv.1706.03762",
+            arxiv_id="1706.03762v5",
+        )
+        source = InMemoryMetadataSource([record])
+
+        self.assertIs(
+            source.lookup(
+                CitationRecord(
+                    citation_id="candidate",
+                    title="",
+                    arxiv_id="https://arxiv.org/pdf/1706.03762v5.pdf",
+                )
+            ),
+            record,
+        )
+
+        old_style_record = CitationRecord(
+            citation_id="old-fixture",
+            title="Old Style arXiv Fixture",
+            arxiv_id="math.AG/0601001v2",
+        )
+        old_style_source = InMemoryMetadataSource([old_style_record])
+        self.assertIs(
+            old_style_source.lookup(
+                CitationRecord(
+                    citation_id="candidate",
+                    title="",
+                    arxiv_id="https://arxiv.org/abs/math.AG/0601001V2",
+                )
+            ),
+            old_style_record,
+        )
+        self.assertIs(
+            source.lookup(
+                CitationRecord(
+                    citation_id="candidate",
+                    title="",
+                    doi="DOI: https://doi.org/10.48550/arxiv.1706.03762",
+                )
+            ),
+            record,
+        )
 
     def test_openalex_can_skip_remote_evidence_harvesting(self):
         http_client = CountingHTTPClient()
@@ -510,6 +849,69 @@ class ScholarlySourceTests(unittest.TestCase):
         self.assertEqual(report["failures"][0]["code"], "timeout")
         self.assertEqual(report["failures"][0]["kind"], "timeout")
         self.assertEqual(report["failures"][0]["url"], "https://example.org/paper")
+
+    def test_remote_evidence_report_preserves_retry_after_hint(self):
+        http_client = EvidenceRateLimitHTTPClient()
+
+        report = harvest_remote_evidence_report(
+            http_client,
+            urls=["https://example.org/paper"],
+            source_name="openalex",
+            timeout=1,
+        )
+
+        failure = report["failures"][0]
+        self.assertEqual(report["chunks"], [])
+        self.assertEqual(failure["stage"], "remote_evidence")
+        self.assertEqual(failure["code"], "source_unavailable")
+        self.assertEqual(failure["kind"], "rate_limited")
+        self.assertEqual(failure["status_code"], 429)
+        self.assertEqual(failure["retry_after_seconds"], 3.0)
+        self.assertIsNone(failure["retry_delay_seconds"])
+        self.assertEqual(failure["attempt_count"], 1)
+        self.assertEqual(failure["retry_count"], 0)
+
+    def test_remote_evidence_report_records_non_html_landing_page(self):
+        http_client = EvidenceNonHtmlHTTPClient()
+
+        report = harvest_remote_evidence_report(
+            http_client,
+            urls=["https://example.org/paper.pdf"],
+            source_name="crossref",
+            timeout=1,
+        )
+
+        failure = report["failures"][0]
+        self.assertEqual(report["chunks"], [])
+        self.assertEqual(failure["stage"], "remote_evidence")
+        self.assertEqual(failure["code"], "source_unavailable")
+        self.assertEqual(failure["kind"], "non_html_response")
+        self.assertEqual(failure["status_code"], 200)
+        self.assertEqual(failure["url"], "https://example.org/paper.pdf")
+        self.assertEqual(failure["final_url"], "https://publisher.example/final-landing-page")
+        self.assertTrue(failure["redirected"])
+        self.assertEqual(failure["attempt_count"], 1)
+        self.assertEqual(failure["retry_count"], 0)
+
+    def test_remote_evidence_report_records_html_without_extractable_text(self):
+        http_client = EvidenceNoExtractableHTMLHTTPClient()
+
+        report = harvest_remote_evidence_report(
+            http_client,
+            urls=["https://example.org/empty-landing-page"],
+            source_name="crossref",
+            timeout=1,
+        )
+
+        failure = report["failures"][0]
+        self.assertEqual(report["chunks"], [])
+        self.assertEqual(failure["stage"], "remote_evidence")
+        self.assertEqual(failure["code"], "source_unavailable")
+        self.assertEqual(failure["kind"], "no_extractable_evidence")
+        self.assertEqual(failure["status_code"], 200)
+        self.assertEqual(failure["url"], "https://example.org/empty-landing-page")
+        self.assertEqual(failure["attempt_count"], 1)
+        self.assertEqual(failure["retry_count"], 0)
 
     def test_openalex_records_remote_evidence_failure_without_source_outage(self):
         source = MultiSourceMetadataSource([OpenAlexMetadataSource(http_client=EvidenceTimeoutHTTPClient())])
@@ -569,6 +971,7 @@ class ScholarlySourceTests(unittest.TestCase):
             http_timeout=3,
             http_retries=2,
             http_retry_backoff=0.5,
+            http_min_interval=0.25,
             mailto="maintainer@example.org",
         )
 
@@ -579,12 +982,39 @@ class ScholarlySourceTests(unittest.TestCase):
         self.assertEqual(source.http_client.user_agent, f"CiteGuard/{__version__} (mailto:maintainer@example.org)")
         self.assertEqual(source.http_client.retries, 2)
         self.assertEqual(source.http_client.retry_backoff, 0.5)
+        self.assertEqual(source.http_client.min_interval, 0.25)
 
     def test_factory_default_user_agent_avoids_placeholder_contact_url(self):
         source = build_live_metadata_source(["openalex"], harvest_remote_evidence=False)
 
+        self.assertEqual(source.mailto, "")
         self.assertEqual(source.http_client.user_agent, f"CiteGuard/{__version__}")
-        self.assertNotIn("example.invalid", source.http_client.user_agent)
+        self.assertNotIn("research@example.com", source.http_client.user_agent)
+
+    def test_crossref_omits_unconfigured_mailto_and_includes_configured_mailto(self):
+        default_client = CapturingHTTPClient()
+        default_source = CrossrefMetadataSource(
+            mailto="research@example.com",
+            http_client=default_client,
+            harvest_evidence=False,
+        )
+
+        default_source.search("sparse crossref metadata", top_k=1)
+
+        self.assertEqual(default_source.mailto, "")
+        self.assertEqual(default_client.json_calls[0]["params"]["query.bibliographic"], "sparse crossref metadata")
+        self.assertNotIn("mailto", default_client.json_calls[0]["params"])
+
+        configured_client = CapturingHTTPClient()
+        configured_source = CrossrefMetadataSource(
+            mailto="maintainer@example.org",
+            http_client=configured_client,
+            harvest_evidence=False,
+        )
+
+        configured_source.search("sparse crossref metadata", top_k=1)
+
+        self.assertEqual(configured_client.json_calls[0]["params"]["mailto"], "maintainer@example.org")
 
     def test_openalex_handles_null_primary_location_and_source(self):
         # OpenAlex routinely returns primary_location or its nested source as JSON
@@ -594,6 +1024,16 @@ class ScholarlySourceTests(unittest.TestCase):
         self.assertEqual(len(results), 1)
         self.assertEqual(results[0].venue, "")
         self.assertEqual(results[0].url, "https://openalex.org/W999")
+        quality = results[0].metadata["metadata_quality"]
+        self.assertIn("venue", quality["missing_fields"])
+        self.assertIn("abstract", quality["missing_fields"])
+        self.assertIn("identifier", quality["missing_fields"])
+        self.assertFalse(quality["identifiers"]["doi"])
+        self.assertFalse(quality["identifiers"]["arxiv_id"])
+        self.assertEqual(
+            quality["confidence_effect"],
+            "missing_metadata_lowers_confidence_not_fabrication_evidence",
+        )
 
 
 if __name__ == "__main__":

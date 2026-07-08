@@ -137,8 +137,82 @@ class CacheTests(unittest.TestCase):
         self.assertEqual(before["schema_version"], CACHE_SCHEMA_VERSION)
         self.assertEqual(before["entries"], 1)
         self.assertEqual(before["entry_prefixes"]["search"], 1)
+        self.assertEqual(before["selected_entries"], 1)
+        self.assertEqual(before["selected_entry_prefixes"]["search"], 1)
+        self.assertEqual(before["inspect_filters"], {"operation": None, "source": None})
         self.assertEqual(cleared["cleared_entries"], 1)
+        self.assertEqual(cleared["remaining_entries"], 0)
+        self.assertEqual(cleared["clear_filters"], {"operation": None, "source": None})
+        self.assertEqual(cleared["selected_entry_prefixes"]["search"], 1)
         self.assertEqual(after["entries"], 0)
+
+    def test_clear_cache_can_filter_by_operation_and_preserve_other_rows(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = os.path.join(tmpdir, "cache.sqlite")
+            cached = CachingMetadataSource(self.inner, db_path=path)
+            cached.search("citation hallucination", top_k=5)
+            cached.lookup(CitationRecord(citation_id="candidate", title=self.record.title, year=2025))
+
+            cleared = clear_cache(path, operation="lookup")
+            after_lookup_clear = inspect_cache(path)
+            final_clear = clear_cache(path)
+
+        self.assertEqual(cleared["cleared_entries"], 1)
+        self.assertEqual(cleared["remaining_entries"], 1)
+        self.assertEqual(cleared["clear_filters"], {"operation": "lookup", "source": None})
+        self.assertEqual(cleared["selected_entry_prefixes"]["lookup"], 1)
+        self.assertEqual(cleared["selected_entry_prefixes"]["search"], 0)
+        self.assertEqual(after_lookup_clear["entries"], 1)
+        self.assertEqual(after_lookup_clear["entry_prefixes"]["search"], 1)
+        self.assertEqual(after_lookup_clear["entry_prefixes"]["lookup"], 0)
+        self.assertEqual(final_clear["cleared_entries"], 1)
+        self.assertEqual(final_clear["remaining_entries"], 0)
+
+    def test_clear_cache_can_filter_by_source_without_deleting_nonmatches(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = os.path.join(tmpdir, "cache.sqlite")
+            cached = CachingMetadataSource(self.inner, db_path=path)
+            cached.search("citation hallucination", top_k=5)
+
+            missing_source_clear = clear_cache(path, source="openalex")
+            after_missing_source_clear = inspect_cache(path)
+            matching_source_clear = clear_cache(path, source="metadata_source")
+            after_matching_source_clear = inspect_cache(path)
+
+        self.assertEqual(missing_source_clear["cleared_entries"], 0)
+        self.assertEqual(missing_source_clear["remaining_entries"], 1)
+        self.assertEqual(missing_source_clear["clear_filters"], {"operation": None, "source": "openalex"})
+        self.assertEqual(after_missing_source_clear["entries"], 1)
+        self.assertEqual(after_missing_source_clear["entry_prefixes"]["search"], 1)
+        self.assertEqual(matching_source_clear["cleared_entries"], 1)
+        self.assertEqual(matching_source_clear["remaining_entries"], 0)
+        self.assertEqual(matching_source_clear["clear_filters"], {"operation": None, "source": "metadata_source"})
+        self.assertEqual(matching_source_clear["selected_entry_prefixes"]["search"], 1)
+        self.assertEqual(after_matching_source_clear["entries"], 0)
+
+    def test_inspect_cache_can_filter_by_operation_and_source_without_raw_queries(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = os.path.join(tmpdir, "cache.sqlite")
+            cached = CachingMetadataSource(self.inner, db_path=path)
+            cached.search("citation hallucination", top_k=5)
+            cached.lookup(CitationRecord(citation_id="candidate", title=self.record.title, year=2025))
+
+            lookup_info = inspect_cache(path, operation="lookup")
+            source_info = inspect_cache(path, source="metadata_source")
+            missing_source_info = inspect_cache(path, source="openalex")
+
+        self.assertEqual(lookup_info["entries"], 2)
+        self.assertEqual(lookup_info["entry_prefixes"]["search"], 1)
+        self.assertEqual(lookup_info["entry_prefixes"]["lookup"], 1)
+        self.assertEqual(lookup_info["selected_entries"], 1)
+        self.assertEqual(lookup_info["selected_entry_prefixes"]["lookup"], 1)
+        self.assertEqual(lookup_info["selected_entry_prefixes"]["search"], 0)
+        self.assertEqual(lookup_info["inspect_filters"], {"operation": "lookup", "source": None})
+        self.assertNotIn("citation hallucination", json.dumps(lookup_info, sort_keys=True))
+        self.assertEqual(source_info["selected_entries"], 2)
+        self.assertEqual(source_info["inspect_filters"], {"operation": None, "source": "metadata_source"})
+        self.assertEqual(missing_source_info["selected_entries"], 0)
+        self.assertEqual(missing_source_info["selected_entry_prefixes"], {"search": 0, "lookup": 0, "other": 0})
 
     def test_export_cache_records_returns_offline_fixture_records(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -201,6 +275,43 @@ class CacheTests(unittest.TestCase):
         self.assertEqual(provenance["record_source"], "memory")
         self.assertEqual(provenance["query"], "title:citation hallucination in scientific writing")
         self.assertGreaterEqual(provenance["raw_match_score"], 0.25)
+
+    def test_export_cache_records_can_filter_by_operation(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = os.path.join(tmpdir, "cache.sqlite")
+            cached = CachingMetadataSource(self.inner, db_path=path)
+            cached.search("citation hallucination", top_k=5)
+            cached.lookup(CitationRecord(citation_id="candidate", title=self.record.title, year=2025))
+
+            exported = export_cache_records(path, deterministic=True, operation="lookup")
+
+        self.assertEqual(exported["cache_entry_count"], 2)
+        self.assertEqual(exported["cache_entry_prefixes"]["search"], 1)
+        self.assertEqual(exported["cache_entry_prefixes"]["lookup"], 1)
+        self.assertEqual(exported["selected_cache_entry_count"], 1)
+        self.assertEqual(exported["selected_cache_entry_prefixes"]["lookup"], 1)
+        self.assertEqual(exported["selected_cache_entry_prefixes"]["search"], 0)
+        self.assertEqual(exported["export_filters"]["operation"], "lookup")
+        self.assertIsNone(exported["export_filters"]["source"])
+        self.assertEqual(exported["record_count"], 1)
+        self.assertEqual(exported["records"][0]["metadata"]["cache_provenance"]["operation"], "lookup")
+
+    def test_export_cache_records_can_filter_by_source(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = os.path.join(tmpdir, "cache.sqlite")
+            cached = CachingMetadataSource(self.inner, db_path=path)
+            cached.search("citation hallucination", top_k=5)
+
+            matching = export_cache_records(path, deterministic=True, source="metadata_source")
+            missing = export_cache_records(path, deterministic=True, source="openalex")
+
+        self.assertEqual(matching["selected_cache_entry_count"], 1)
+        self.assertEqual(matching["record_count"], 1)
+        self.assertEqual(matching["export_filters"]["source"], "metadata_source")
+        self.assertEqual(missing["cache_entry_count"], 1)
+        self.assertEqual(missing["selected_cache_entry_count"], 0)
+        self.assertEqual(missing["record_count"], 0)
+        self.assertEqual(missing["records"], [])
 
     def test_cache_schema_upgrade_preserves_legacy_rows(self):
         with tempfile.TemporaryDirectory() as tmpdir:

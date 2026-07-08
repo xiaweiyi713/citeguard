@@ -12,6 +12,15 @@ from citeguard.graph import CitationRecord
 
 from .evidence import merge_evidence_chunks
 
+PLACEHOLDER_CONTACT_EMAIL = "research@example.com"
+
+
+def configured_contact_email(mailto: str = "") -> str:
+    """Return a real configured contact email, excluding placeholder defaults."""
+
+    contact = str(mailto or "").strip()
+    return "" if not contact or contact == PLACEHOLDER_CONTACT_EMAIL else contact
+
 
 def stable_record_id(prefix: str, value: str) -> str:
     """Build a deterministic record id when a source lacks a clean local identifier."""
@@ -35,10 +44,14 @@ def normalize_doi(doi: str) -> str:
 
     if not doi:
         return ""
-    value = doi.strip()
-    value = value.replace("https://doi.org/", "").replace("http://doi.org/", "")
-    value = value.replace("doi:", "")
-    return value.strip().lower()
+    value = str(doi).strip()
+    previous = None
+    while previous != value:
+        previous = value
+        value = re.sub(r"^\s*doi\s*:?\s*", "", value, flags=re.IGNORECASE)
+        value = re.sub(r"^\s*https?://(?:dx\.)?doi\.org/", "", value, flags=re.IGNORECASE)
+        value = re.sub(r"^\s*(?:dx\.)?doi\.org/", "", value, flags=re.IGNORECASE)
+    return value.strip().rstrip(".,;").lower()
 
 
 def normalize_arxiv_id(arxiv_id: str) -> str:
@@ -46,10 +59,26 @@ def normalize_arxiv_id(arxiv_id: str) -> str:
 
     if not arxiv_id:
         return ""
-    value = arxiv_id.strip()
-    value = value.replace("https://arxiv.org/abs/", "").replace("http://arxiv.org/abs/", "")
-    value = value.replace("arXiv:", "").replace("arxiv:", "")
-    return value.strip()
+    value = str(arxiv_id).strip().strip("<>()[]{}")
+    previous = None
+    while previous != value:
+        previous = value
+        value = re.sub(r"^\s*arxiv\s*:\s*", "", value, flags=re.IGNORECASE)
+        value = re.sub(
+            r"^\s*https?://arxiv\.org/(?:abs|pdf|html)/",
+            "",
+            value,
+            flags=re.IGNORECASE,
+        )
+        value = re.sub(
+            r"^\s*arxiv\.org/(?:abs|pdf|html)/",
+            "",
+            value,
+            flags=re.IGNORECASE,
+        )
+    value = re.split(r"[?#]", value, maxsplit=1)[0].strip().strip("/").rstrip(".,;")
+    value = re.sub(r"\.pdf$", "", value, flags=re.IGNORECASE)
+    return value.strip().strip("/").rstrip(".,;").lower()
 
 
 def openalex_abstract_to_text(abstract_index: Dict[str, List[int]]) -> str:
@@ -94,6 +123,45 @@ def record_completeness(record: CitationRecord) -> int:
     return sum(fields)
 
 
+def metadata_quality(
+    *,
+    title: str = "",
+    authors: Optional[List[str]] = None,
+    year: Optional[int] = None,
+    venue: str = "",
+    abstract: str = "",
+    doi: str = "",
+    arxiv_id: str = "",
+    url: str = "",
+) -> Dict[str, object]:
+    """Summarize source metadata completeness without turning gaps into errors."""
+
+    field_values = {
+        "title": bool(title),
+        "authors": bool(authors),
+        "year": year is not None,
+        "venue": bool(venue),
+        "abstract": bool(abstract),
+        "identifier": bool(doi or arxiv_id),
+        "url": bool(url),
+    }
+    present_fields = [field for field, present in field_values.items() if present]
+    missing_fields = [field for field, present in field_values.items() if not present]
+    return {
+        "schema_version": 1,
+        "present_fields": present_fields,
+        "missing_fields": missing_fields,
+        "identifiers": {
+            "doi": bool(doi),
+            "arxiv_id": bool(arxiv_id),
+        },
+        "completeness": round(len(present_fields) / len(field_values), 4),
+        "confidence_effect": "missing_metadata_lowers_confidence_not_fabrication_evidence"
+        if missing_fields
+        else "none",
+    }
+
+
 def merge_two_records(left: CitationRecord, right: CitationRecord) -> CitationRecord:
     """Merge two records, keeping the richer metadata and tracking provenance."""
 
@@ -128,16 +196,35 @@ def merge_two_records(left: CitationRecord, right: CitationRecord) -> CitationRe
         metadata["evidence_chunks"] = text_only_chunks
         metadata["evidence_spans"] = [chunk["text"] for chunk in text_only_chunks]
 
+    merged_title = preferred.title or other.title
+    merged_authors = preferred.authors or other.authors
+    merged_year = preferred.year or other.year
+    merged_venue = preferred.venue or other.venue
+    merged_abstract = preferred.abstract or other.abstract
+    merged_doi = normalize_doi(preferred.doi or other.doi)
+    merged_arxiv_id = normalize_arxiv_id(preferred.arxiv_id or other.arxiv_id)
+    merged_url = preferred.url or other.url
+    metadata["metadata_quality"] = metadata_quality(
+        title=merged_title,
+        authors=merged_authors,
+        year=merged_year,
+        venue=merged_venue,
+        abstract=merged_abstract,
+        doi=merged_doi,
+        arxiv_id=merged_arxiv_id,
+        url=merged_url,
+    )
+
     return CitationRecord(
         citation_id=preferred.citation_id,
-        title=preferred.title or other.title,
-        authors=preferred.authors or other.authors,
-        year=preferred.year or other.year,
-        venue=preferred.venue or other.venue,
-        abstract=preferred.abstract or other.abstract,
-        doi=normalize_doi(preferred.doi or other.doi),
-        arxiv_id=normalize_arxiv_id(preferred.arxiv_id or other.arxiv_id),
-        url=preferred.url or other.url,
+        title=merged_title,
+        authors=merged_authors,
+        year=merged_year,
+        venue=merged_venue,
+        abstract=merged_abstract,
+        doi=merged_doi,
+        arxiv_id=merged_arxiv_id,
+        url=merged_url,
         source=preferred.source,
         metadata=metadata,
     )

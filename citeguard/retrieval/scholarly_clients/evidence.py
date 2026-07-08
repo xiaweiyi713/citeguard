@@ -97,6 +97,7 @@ def build_text_evidence_chunks(
     text: str,
     source_field_prefix: str,
     source_url: str = "",
+    source_name: str = "",
     max_chunks: int = 4,
     max_words: int = 80,
 ) -> List[dict]:
@@ -138,13 +139,14 @@ def build_text_evidence_chunks(
 
     chunks = []
     for index, window in enumerate(windows[:max_chunks], start=1):
-        chunks.append(
-            {
-                "text": window,
-                "source_field": f"{source_field_prefix}_{index}",
-                "source_url": source_url,
-            }
-        )
+        chunk = {
+            "text": window,
+            "source_field": f"{source_field_prefix}_{index}",
+            "source_url": source_url,
+        }
+        if source_name:
+            chunk["source_name"] = source_name
+        chunks.append(chunk)
     return merge_evidence_chunks(chunks)
 
 
@@ -152,6 +154,7 @@ def extract_html_evidence_chunks(
     html_text: str,
     source_field_prefix: str,
     source_url: str = "",
+    source_name: str = "",
     max_chunks: int = 6,
 ) -> List[dict]:
     """Extract paragraph-level evidence chunks from a landing page HTML payload."""
@@ -169,6 +172,7 @@ def extract_html_evidence_chunks(
                 text,
                 source_field_prefix=f"{source_field_prefix}_meta_{index}",
                 source_url=source_url,
+                source_name=source_name,
                 max_chunks=1,
             )
         )
@@ -178,6 +182,7 @@ def extract_html_evidence_chunks(
                 text,
                 source_field_prefix=f"{source_field_prefix}_heading_{index}",
                 source_url=source_url,
+                source_name=source_name,
                 max_chunks=1,
                 max_words=24,
             )
@@ -190,6 +195,7 @@ def extract_html_evidence_chunks(
                 text,
                 source_field_prefix=f"{source_field_prefix}_paragraph_{index}",
                 source_url=source_url,
+                source_name=source_name,
                 max_chunks=1,
             )
         )
@@ -235,19 +241,25 @@ def harvest_remote_evidence_report(
         except Exception as exc:
             failures.append(_remote_evidence_exception_detail(source_name, url, exc))
             continue
-        if not payload or "<html" not in payload.lower():
+        if not payload:
             detail = _remote_evidence_http_detail(http_client, source_name, url)
-            if detail:
-                failures.append(detail)
+            failures.append(detail or _remote_evidence_content_detail(http_client, source_name, url, "empty_response"))
             continue
-        harvested.extend(
-            extract_html_evidence_chunks(
-                payload,
-                source_field_prefix=f"{source_name}_remote_{index}",
-                source_url=url,
-                max_chunks=max_chunks - len(harvested),
-            )
+        if "<html" not in payload.lower():
+            detail = _remote_evidence_http_detail(http_client, source_name, url)
+            failures.append(detail or _remote_evidence_content_detail(http_client, source_name, url, "non_html_response"))
+            continue
+        chunks = extract_html_evidence_chunks(
+            payload,
+            source_field_prefix=f"{source_name}_remote_{index}",
+            source_url=url,
+            source_name=source_name,
+            max_chunks=max_chunks - len(harvested),
         )
+        if not chunks:
+            failures.append(_remote_evidence_content_detail(http_client, source_name, url, "no_extractable_evidence"))
+            continue
+        harvested.extend(chunks)
     return {
         "chunks": merge_evidence_chunks(harvested)[:max_chunks],
         "failures": _dedupe_failure_details(failures),
@@ -286,6 +298,13 @@ def merge_evidence_chunks(*collections: Iterable[dict]) -> List[dict]:
                     "source_field": str(item.get("source_field", "metadata_span")),
                     "source_url": str(item.get("source_url", "")),
                 }
+                for key in ("source_name", "evidence_scope", "retrieved_at", "retrieval_source"):
+                    if item.get(key):
+                        candidate[key] = str(item.get(key, ""))
+                if not candidate.get("source_name"):
+                    inferred_source = _infer_chunk_source_name(candidate["source_field"])
+                    if inferred_source:
+                        candidate["source_name"] = inferred_source
             if not text:
                 continue
             key = text.lower()
@@ -293,6 +312,10 @@ def merge_evidence_chunks(*collections: Iterable[dict]) -> List[dict]:
                 existing = merged[text_to_index[key]]
                 if not existing.get("source_url") and candidate.get("source_url"):
                     merged[text_to_index[key]] = candidate
+                else:
+                    for metadata_key in ("source_name", "evidence_scope", "retrieved_at", "retrieval_source"):
+                        if not existing.get(metadata_key) and candidate.get(metadata_key):
+                            existing[metadata_key] = candidate[metadata_key]
                 continue
             text_to_index[key] = len(merged)
             merged.append(candidate)
@@ -303,6 +326,20 @@ def _clean_text(text: str) -> str:
     normalized = html.unescape(text or "")
     normalized = re.sub(r"\s+", " ", normalized)
     return normalized.strip()
+
+
+def _infer_chunk_source_name(source_field: str) -> str:
+    first_token = str(source_field or "").lower().split("_", 1)[0].replace("-", "")
+    aliases = {
+        "openalex": "openalex",
+        "crossref": "crossref",
+        "arxiv": "arxiv",
+        "semantic": "semantic_scholar",
+        "semanticscholar": "semantic_scholar",
+        "s2": "semantic_scholar",
+        "fixture": "fixture",
+    }
+    return aliases.get(first_token, "")
 
 
 def _unique_urls(urls: Sequence[str]) -> List[str]:
@@ -321,6 +358,7 @@ def _remote_evidence_http_detail(http_client: HTTPClient, source_name: str, url:
     code = str(getattr(http_client, "last_error_code", "") or "")
     if not code:
         return {}
+    retry_after_seconds = getattr(http_client, "last_retry_after_seconds", None)
     return {
         "source": source_name,
         "stage": "remote_evidence",
@@ -328,8 +366,33 @@ def _remote_evidence_http_detail(http_client: HTTPClient, source_name: str, url:
         "kind": str(getattr(http_client, "last_error_kind", "") or ""),
         "status_code": getattr(http_client, "last_status_code", None),
         "url": str(getattr(http_client, "last_url", "") or url),
+        "final_url": str(getattr(http_client, "last_final_url", "") or getattr(http_client, "last_url", "") or url),
+        "redirected": bool(getattr(http_client, "last_redirected", False)),
         "error": str(getattr(http_client, "last_error", "") or ""),
         "cache_hit": bool(getattr(http_client, "last_cache_hit", False)),
+        "attempt_count": int(getattr(http_client, "last_attempt_count", 0) or 0),
+        "retry_count": int(getattr(http_client, "last_retry_count", 0) or 0),
+        "retry_after_seconds": retry_after_seconds,
+        "retry_delay_seconds": getattr(http_client, "last_retry_delay_seconds", None),
+    }
+
+
+def _remote_evidence_content_detail(http_client: HTTPClient, source_name: str, url: str, kind: str) -> dict:
+    return {
+        "source": source_name,
+        "stage": "remote_evidence",
+        "code": "source_unavailable",
+        "kind": kind,
+        "status_code": getattr(http_client, "last_status_code", None),
+        "url": str(getattr(http_client, "last_url", "") or url),
+        "final_url": str(getattr(http_client, "last_final_url", "") or getattr(http_client, "last_url", "") or url),
+        "redirected": bool(getattr(http_client, "last_redirected", False)),
+        "error": "",
+        "cache_hit": bool(getattr(http_client, "last_cache_hit", False)),
+        "attempt_count": int(getattr(http_client, "last_attempt_count", 0) or 0),
+        "retry_count": int(getattr(http_client, "last_retry_count", 0) or 0),
+        "retry_after_seconds": getattr(http_client, "last_retry_after_seconds", None),
+        "retry_delay_seconds": getattr(http_client, "last_retry_delay_seconds", None),
     }
 
 

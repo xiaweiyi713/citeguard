@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass
 from itertools import product
-from typing import Dict, Iterable, List, Optional
+from typing import Dict, Iterable, List, Optional, Tuple
 
 from citeguard.verifiers import (
     DEFAULT_NLI_MODEL,
@@ -16,6 +16,7 @@ from citeguard.verifiers import (
     TransformersNLIBackend,
     combine_support_assessments,
 )
+from citeguard.verification.support_eval import SupportCase, load_support_eval
 
 
 @dataclass(frozen=True)
@@ -75,6 +76,22 @@ class SupportCalibrationMetrics:
     true_negative: int
     false_positive: int
     false_negative: int
+
+    def to_dict(self) -> Dict[str, object]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class SupportCalibrationDiagnostics:
+    """Case-level diagnostics for one calibration setting."""
+
+    true_positive_case_ids: List[str]
+    true_negative_case_ids: List[str]
+    false_positive_case_ids: List[str]
+    false_negative_case_ids: List[str]
+    false_support_examples: List[Dict[str, object]]
+    bucket_summaries: Dict[str, Dict[str, object]]
+    decision_path_counts: Dict[str, Dict[str, int]]
 
     def to_dict(self) -> Dict[str, object]:
         return asdict(self)
@@ -171,6 +188,48 @@ def default_support_calibration_examples() -> List[SupportCalibrationExample]:
     ]
 
 
+def support_eval_cases_to_calibration_examples(
+    cases: Iterable[SupportCase],
+    *,
+    positive_labels: Optional[Iterable[str]] = None,
+) -> List[SupportCalibrationExample]:
+    """Convert support-eval cases into binary strong-support calibration examples.
+
+    By default only `supported` is positive. `weakly_supported` remains negative
+    for calibration so threshold searches do not learn to upgrade tentative
+    abstract/title matches into strong support.
+    """
+
+    positives = set(positive_labels or ["supported"])
+    examples = []
+    for case in cases:
+        examples.append(
+            SupportCalibrationExample(
+                example_id=case.case_id,
+                claim_text=case.claim,
+                evidence_text=case.evidence,
+                supported=case.gold in positives,
+                note=(
+                    f"gold={case.gold}; split={case.split}; "
+                    f"case_type={case.case_type}; evidence_scope={case.evidence_scope}; lang={case.lang}"
+                ),
+            )
+        )
+    return examples
+
+
+def load_support_eval_calibration_examples(
+    path: str,
+    *,
+    split: str = "dev",
+    positive_labels: Optional[Iterable[str]] = None,
+) -> List[SupportCalibrationExample]:
+    """Load a support-eval split as binary strong-support calibration examples."""
+
+    cases = [case for case in load_support_eval(path) if case.split == split]
+    return support_eval_cases_to_calibration_examples(cases, positive_labels=positive_labels)
+
+
 def score_support_examples(
     examples: Iterable[SupportCalibrationExample],
     reranker_model_name: str = DEFAULT_RERANKER_MODEL,
@@ -218,7 +277,38 @@ def evaluate_support_config(
 ) -> SupportCalibrationMetrics:
     """Evaluate one configuration against the cached example scores."""
 
+    metrics, _diagnostics = _evaluate_support_config_with_diagnostics(scored_examples, config)
+    return metrics
+
+
+def evaluate_support_config_diagnostics(
+    scored_examples: Iterable[ScoredSupportExample],
+    config: SupportCalibrationConfig,
+) -> SupportCalibrationDiagnostics:
+    """Return case-level diagnostics for one calibration setting."""
+
+    _metrics, diagnostics = _evaluate_support_config_with_diagnostics(scored_examples, config)
+    return diagnostics
+
+
+def _evaluate_support_config_with_diagnostics(
+    scored_examples: Iterable[ScoredSupportExample],
+    config: SupportCalibrationConfig,
+) -> Tuple[SupportCalibrationMetrics, SupportCalibrationDiagnostics]:
+    """Evaluate one configuration and keep stable case ids for triage."""
+
     tp = tn = fp = fn = 0
+    true_positive_case_ids: List[str] = []
+    true_negative_case_ids: List[str] = []
+    false_positive_case_ids: List[str] = []
+    false_negative_case_ids: List[str] = []
+    false_support_examples: List[Dict[str, object]] = []
+    bucket_rows: Dict[str, List[Dict[str, object]]] = {
+        "true_positive": [],
+        "true_negative": [],
+        "false_positive": [],
+        "false_negative": [],
+    }
     for example in scored_examples:
         assessment = combine_support_assessments(
             _rebuild_component_assessments(example, config),
@@ -226,14 +316,25 @@ def evaluate_support_config(
         )
         predicted = assessment.passed
         gold = example.example.supported
+        case_id = example.example.example_id
         if predicted and gold:
             tp += 1
+            true_positive_case_ids.append(case_id)
+            bucket_rows["true_positive"].append(_diagnostic_score_row(example, assessment))
         elif predicted and not gold:
             fp += 1
+            false_positive_case_ids.append(case_id)
+            score_row = _diagnostic_score_row(example, assessment)
+            bucket_rows["false_positive"].append(score_row)
+            false_support_examples.append(_false_support_example_summary(example, assessment, score_row))
         elif not predicted and gold:
             fn += 1
+            false_negative_case_ids.append(case_id)
+            bucket_rows["false_negative"].append(_diagnostic_score_row(example, assessment))
         else:
             tn += 1
+            true_negative_case_ids.append(case_id)
+            bucket_rows["true_negative"].append(_diagnostic_score_row(example, assessment))
 
     total = max(tp + tn + fp + fn, 1)
     positives = max(tp + fn, 1)
@@ -244,7 +345,7 @@ def evaluate_support_config(
     false_support_rate = fp / negatives
     false_reject_rate = fn / positives
     f1 = 0.0 if precision + recall == 0 else 2 * precision * recall / (precision + recall)
-    return SupportCalibrationMetrics(
+    metrics = SupportCalibrationMetrics(
         accuracy=round(accuracy, 4),
         precision=round(precision, 4),
         recall=round(recall, 4),
@@ -256,6 +357,16 @@ def evaluate_support_config(
         false_positive=fp,
         false_negative=fn,
     )
+    diagnostics = SupportCalibrationDiagnostics(
+        true_positive_case_ids=true_positive_case_ids,
+        true_negative_case_ids=true_negative_case_ids,
+        false_positive_case_ids=false_positive_case_ids,
+        false_negative_case_ids=false_negative_case_ids,
+        false_support_examples=false_support_examples,
+        bucket_summaries=_bucket_summaries(bucket_rows),
+        decision_path_counts=_decision_path_counts(bucket_rows),
+    )
+    return metrics, diagnostics
 
 
 def grid_search_support_configs(
@@ -338,11 +449,12 @@ def grid_search_support_configs(
                         fallback_combined_threshold=fallback_combined_threshold,
                     ),
                 )
-                metrics = evaluate_support_config(scored_rows, config)
+                metrics, diagnostics = _evaluate_support_config_with_diagnostics(scored_rows, config)
                 results.append(
                     {
                         "config": config.to_dict(),
                         "metrics": metrics.to_dict(),
+                        "diagnostics": diagnostics.to_dict(),
                     }
                 )
 
@@ -358,6 +470,78 @@ def grid_search_support_configs(
         reverse=True,
     )
     return ranked[:top_k]
+
+
+def _false_support_example_summary(
+    scored_example: ScoredSupportExample,
+    assessment: SupportAssessment,
+    score_row: Optional[Dict[str, object]] = None,
+) -> Dict[str, object]:
+    row = score_row or _diagnostic_score_row(scored_example, assessment)
+    return {
+        "example_id": scored_example.example.example_id,
+        "note": scored_example.example.note,
+        "ensemble_score": row["ensemble_score"],
+        "decision_path": row["decision_path"],
+        "heuristic_score": row["heuristic_score"],
+        "reranker_score": row["reranker_score"],
+        "nli_entailment": row["nli_entailment"],
+        "nli_neutral": row["nli_neutral"],
+        "nli_contradiction": row["nli_contradiction"],
+    }
+
+
+def _diagnostic_score_row(
+    scored_example: ScoredSupportExample,
+    assessment: SupportAssessment,
+) -> Dict[str, object]:
+    probabilities = scored_example.nli_probabilities
+    return {
+        "example_id": scored_example.example.example_id,
+        "decision_path": str(assessment.details.get("decision_path") or ""),
+        "ensemble_score": round(float(assessment.score), 4),
+        "heuristic_score": round(float(scored_example.heuristic_score), 4),
+        "reranker_score": round(float(scored_example.reranker_score), 4),
+        "nli_entailment": round(float(probabilities.get("entailment", 0.0)), 4),
+        "nli_neutral": round(float(probabilities.get("neutral", 0.0)), 4),
+        "nli_contradiction": round(float(probabilities.get("contradiction", 0.0)), 4),
+    }
+
+
+def _bucket_summaries(rows_by_bucket: Dict[str, List[Dict[str, object]]]) -> Dict[str, Dict[str, object]]:
+    score_fields = [
+        "ensemble_score",
+        "heuristic_score",
+        "reranker_score",
+        "nli_entailment",
+        "nli_neutral",
+        "nli_contradiction",
+    ]
+    summaries: Dict[str, Dict[str, object]] = {}
+    for bucket, rows in rows_by_bucket.items():
+        summary: Dict[str, object] = {"count": len(rows)}
+        for field in score_fields:
+            summary[f"avg_{field}"] = _average(row[field] for row in rows)
+        summaries[bucket] = summary
+    return summaries
+
+
+def _decision_path_counts(rows_by_bucket: Dict[str, List[Dict[str, object]]]) -> Dict[str, Dict[str, int]]:
+    counts: Dict[str, Dict[str, int]] = {}
+    for bucket, rows in rows_by_bucket.items():
+        bucket_counts: Dict[str, int] = {}
+        for row in rows:
+            decision_path = str(row.get("decision_path") or "unknown")
+            bucket_counts[decision_path] = bucket_counts.get(decision_path, 0) + 1
+        counts[bucket] = dict(sorted(bucket_counts.items()))
+    return counts
+
+
+def _average(values: Iterable[object]) -> Optional[float]:
+    numbers = [float(value) for value in values]
+    if not numbers:
+        return None
+    return round(sum(numbers) / len(numbers), 4)
 
 
 def _rebuild_component_assessments(

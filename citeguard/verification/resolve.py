@@ -146,8 +146,14 @@ def _source_failure_details(source: MetadataSource) -> List[Dict[str, Any]]:
             "kind": getattr(http_client, "last_error_kind", ""),
             "status_code": getattr(http_client, "last_status_code", None),
             "url": getattr(http_client, "last_url", ""),
+            "final_url": getattr(http_client, "last_final_url", ""),
+            "redirected": bool(getattr(http_client, "last_redirected", False)),
             "error": getattr(http_client, "last_error", ""),
             "cache_hit": bool(getattr(http_client, "last_cache_hit", False)),
+            "attempt_count": int(getattr(http_client, "last_attempt_count", 0) or 0),
+            "retry_count": int(getattr(http_client, "last_retry_count", 0) or 0),
+            "retry_after_seconds": getattr(http_client, "last_retry_after_seconds", None),
+            "retry_delay_seconds": getattr(http_client, "last_retry_delay_seconds", None),
         }
     ]
 

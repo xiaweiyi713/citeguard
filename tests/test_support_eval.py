@@ -7,6 +7,7 @@ import sys
 import tempfile
 import unittest
 from collections import Counter
+from pathlib import Path
 
 from citeguard.verification.support_eval import (
     SupportCase,
@@ -14,14 +15,19 @@ from citeguard.verification.support_eval import (
     SupportLabelSidecarValidationError,
     build_support_label_sidecar_template,
     citation_record_for_support_case,
+    compute_abstention_analysis,
+    compute_release_blocker_summary,
     compute_support_confusion_matrix,
     compute_support_diagnostics,
     compute_support_error_bucket_counts,
     compute_support_error_buckets,
     compute_false_support_analysis,
+    compute_false_support_acceptance_guard,
+    compute_support_acceptance_slices,
     compute_support_label_sidecar_gate,
     compute_support_metrics,
     compute_support_quality_gate,
+    compute_support_release_summary,
     compute_support_report,
     compute_support_review_queue,
     compute_support_review_queue_summary,
@@ -39,6 +45,22 @@ from citeguard.verification.support_eval import (
     validate_support_eval_dataset,
 )
 from citeguard.verification.support import build_evidence_spans
+
+HIDDEN_PACKET_KEYS = {"gold", "predicted", "adjudicated_label", "annotator_labels", "label_notes"}
+
+
+def _hidden_packet_key_leaks(value):
+    if isinstance(value, dict):
+        leaks = sorted(key for key in value if key in HIDDEN_PACKET_KEYS)
+        for nested in value.values():
+            leaks.extend(_hidden_packet_key_leaks(nested))
+        return leaks
+    if isinstance(value, list):
+        leaks = []
+        for item in value:
+            leaks.extend(_hidden_packet_key_leaks(item))
+        return leaks
+    return []
 
 
 def _rewrite_recommended_packet_command(command, *, output_path, instructions_path):
@@ -64,7 +86,15 @@ class SupportEvalTests(unittest.TestCase):
         self.assertEqual(m["supported_precision"], 1.0)
         self.assertEqual(m["supported_recall"], 0.5)
         self.assertEqual(round(m["supported_f1"], 4), 0.6667)
+        self.assertEqual(m["macro_precision"], 0.625)
+        self.assertEqual(m["macro_recall"], 0.625)
+        self.assertEqual(m["macro_f1"], 0.5834)
+        self.assertEqual(m["weighted_precision"], 0.875)
+        self.assertEqual(m["weighted_recall"], 0.75)
+        self.assertEqual(m["weighted_f1"], 0.75)
         self.assertEqual(m["false_support_rate"], 0.0)
+        self.assertEqual(m["support_overcall_count"], 0)
+        self.assertEqual(m["support_overcall_rate"], 0.0)
         self.assertEqual(m["abstention_rate"], 0.25)
         self.assertEqual(m["misjudged_support_rate"], 0.5)
         self.assertEqual(m["per_label"]["supported"]["tp"], 1)
@@ -120,6 +150,7 @@ class SupportEvalTests(unittest.TestCase):
         self.assertIn("s42", case_ids)
         self.assertIn("s43", case_ids)
         self.assertIn("s44", case_ids)
+        self.assertIn("s47", case_ids)
         seeded_cases = {case.case_id: case for case in cases}
         self.assertEqual(seeded_cases["s31"].case_type, "hard_negative")
         self.assertEqual(seeded_cases["s31"].gold, "insufficient_evidence")
@@ -163,6 +194,19 @@ class SupportEvalTests(unittest.TestCase):
         self.assertEqual(seeded_cases["s44"].case_type, "contradiction")
         self.assertEqual(seeded_cases["s44"].gold, "contradicted")
         self.assertIn("Semantic Scholar", seeded_cases["s44"].claim)
+        self.assertEqual(seeded_cases["s45"].case_type, "hard_negative")
+        self.assertEqual(seeded_cases["s45"].gold, "insufficient_evidence")
+        self.assertIn("deployed writing agents", seeded_cases["s45"].claim)
+        self.assertEqual(seeded_cases["s46"].case_type, "hard_negative")
+        self.assertEqual(seeded_cases["s46"].gold, "insufficient_evidence")
+        self.assertIn("without human review", seeded_cases["s46"].claim)
+        self.assertEqual(seeded_cases["s47"].case_type, "hard_negative")
+        self.assertEqual(seeded_cases["s47"].gold, "insufficient_evidence")
+        self.assertIn("manuscript acceptance rates", seeded_cases["s47"].claim)
+        self.assertIn("s48", case_ids)
+        self.assertEqual(seeded_cases["s48"].case_type, "contradiction")
+        self.assertEqual(seeded_cases["s48"].gold, "contradicted")
+        self.assertIn("Counter-evidence search leads", seeded_cases["s48"].claim)
         self.assertTrue(any(case.case_type == "hard_negative" for case in cases))
         self.assertTrue(any(case.case_type == "contradiction" for case in cases))
         self.assertTrue(any(case.case_type == "weak_support" for case in cases))
@@ -170,9 +214,9 @@ class SupportEvalTests(unittest.TestCase):
         self.assertTrue(any(case.evidence_scope == "title" for case in cases))
         self.assertTrue(any(case.evidence_scope == "metadata_snippet" for case in cases))
         self.assertTrue(any(case.evidence_scope == "full_text" for case in cases))
-        self.assertEqual(Counter(case.lang for case in cases), {"en": 32, "zh": 12})
+        self.assertEqual(Counter(case.lang for case in cases), {"en": 36, "zh": 12})
         self.assertEqual({case.split for case in cases}, {"train", "dev", "test"})
-        self.assertEqual(Counter(case.split for case in cases), {"train": 14, "dev": 15, "test": 15})
+        self.assertEqual(Counter(case.split for case in cases), {"train": 14, "dev": 15, "test": 19})
         self.assertTrue(any(case.case_type == "weak_set_boundary" for case in set_cases))
         self.assertTrue(any(case.case_type == "contradiction_set" for case in set_cases))
         set_case_ids = {case.case_id for case in set_cases}
@@ -191,6 +235,15 @@ class SupportEvalTests(unittest.TestCase):
         self.assertEqual(len(sidecar), len(cases))
         self.assertEqual(summary["coverage"], 1.0)
         self.assertEqual(summary["human_reviewed"], 0)
+        self.assertEqual(summary["sidecar_case_provenance"]["complete_count"], len(cases))
+        self.assertEqual(summary["sidecar_case_provenance"]["complete_fraction"], 1.0)
+        self.assertEqual(summary["sidecar_case_provenance"]["field_present_counts"]["label_source"], len(cases))
+        self.assertEqual(summary["sidecar_case_provenance"]["field_present_counts"]["case_type"], len(cases))
+        self.assertEqual(summary["sidecar_case_provenance"]["field_present_counts"]["evidence_scope"], len(cases))
+        self.assertEqual(summary["sidecar_case_provenance"]["field_present_counts"]["split"], len(cases))
+        self.assertEqual(summary["sidecar_case_provenance"]["field_present_counts"]["lang"], len(cases))
+        self.assertEqual(summary["sidecar_case_provenance"]["missing_count"], 0)
+        self.assertEqual(summary["sidecar_case_provenance"]["missing_case_ids"], [])
         self.assertEqual(sidecar[0].adjudication_status, "not_human_reviewed")
         self.assertEqual(sidecar[0].annotator_labels, [])
         self.assertEqual(sidecar[0].adjudicated_label, cases[0].gold)
@@ -225,6 +278,8 @@ class SupportEvalTests(unittest.TestCase):
         self.assertEqual(summary["coverage"], 0.5)
         self.assertEqual(summary["human_reviewed"], 1)
         self.assertEqual(summary["adjudication_statuses"]["single_annotator"], 1)
+        self.assertEqual(summary["sidecar_case_provenance"]["missing_count"], 1)
+        self.assertEqual(summary["sidecar_case_provenance"]["missing_case_ids"], ["b"])
         self.assertEqual(summary["label_maturity"]["reviewed_count"], 1)
         self.assertEqual(summary["label_maturity"]["single_annotator_count"], 1)
         self.assertEqual(summary["label_maturity"]["reviewed_fraction"], 0.5)
@@ -305,6 +360,22 @@ class SupportEvalTests(unittest.TestCase):
                 lang="zh",
                 case_type="contradiction_set",
             ),
+            SupportCase(
+                "e",
+                "claim",
+                "citation_verdicts: weakly_supported, weakly_supported",
+                "insufficient_evidence",
+                lang="zh",
+                case_type="weak_set_boundary",
+            ),
+            SupportCase(
+                "f",
+                "claim",
+                "abstract evidence only",
+                "insufficient_evidence",
+                lang="en",
+                case_type="full_text_required",
+            ),
         ]
         sidecar = {
             "schema_version": 1,
@@ -333,25 +404,69 @@ class SupportEvalTests(unittest.TestCase):
                     "adjudicated_label": "supported",
                     "disagreement": "not_applicable",
                 },
+                {
+                    "case_id": "e",
+                    "adjudication_status": "not_human_reviewed",
+                    "annotator_count": 0,
+                    "annotator_labels": [],
+                    "adjudicated_label": "insufficient_evidence",
+                    "disagreement": "not_applicable",
+                },
             ],
         }
 
         summary = validate_support_label_sidecar(sidecar, cases)
 
-        self.assertEqual(summary["high_risk_review"]["case_count"], 3)
+        self.assertEqual(summary["high_risk_review"]["case_count"], 4)
         self.assertEqual(summary["high_risk_review"]["reviewed_count"], 1)
-        self.assertEqual(summary["high_risk_review"]["unreviewed_count"], 2)
-        self.assertEqual(summary["high_risk_review"]["case_count_by_language"], {"en": 1, "zh": 2})
+        self.assertEqual(summary["high_risk_review"]["unreviewed_count"], 3)
+        self.assertEqual(summary["high_risk_review"]["case_count_by_language"], {"en": 2, "zh": 2})
         self.assertEqual(summary["high_risk_review"]["reviewed_by_language"], {"en": 1})
-        self.assertEqual(summary["high_risk_review"]["unreviewed_by_language"], {"zh": 2})
+        self.assertEqual(summary["high_risk_review"]["unreviewed_by_language"], {"en": 1, "zh": 2})
         self.assertEqual(summary["high_risk_review"]["reviewed_case_ids"], ["a"])
-        self.assertEqual(summary["high_risk_review"]["unreviewed_case_ids"], ["b", "d"])
+        self.assertEqual(summary["high_risk_review"]["unreviewed_case_ids"], ["b", "d", "f"])
         self.assertEqual(summary["high_risk_review"]["reviewed_case_ids_by_language"], {"en": ["a"]})
-        self.assertEqual(summary["high_risk_review"]["unreviewed_case_ids_by_language"], {"zh": ["b", "d"]})
+        self.assertEqual(summary["high_risk_review"]["unreviewed_case_ids_by_language"], {"en": ["f"], "zh": ["b", "d"]})
+        self.assertEqual(
+            summary["high_risk_review"]["case_count_by_language_case_type"],
+            {
+                "en": {"contradiction": 1, "full_text_required": 1},
+                "zh": {"contradiction_set": 1, "hard_negative": 1},
+            },
+        )
+        self.assertEqual(
+            summary["high_risk_review"]["reviewed_by_language_case_type"],
+            {"en": {"contradiction": 1}},
+        )
+        self.assertEqual(
+            summary["high_risk_review"]["unreviewed_by_language_case_type"],
+            {
+                "en": {"full_text_required": 1},
+                "zh": {"contradiction_set": 1, "hard_negative": 1},
+            },
+        )
         self.assertEqual(
             summary["high_risk_review"]["unreviewed_by_case_type"],
-            {"contradiction_set": 1, "hard_negative": 1},
+            {"contradiction_set": 1, "full_text_required": 1, "hard_negative": 1},
         )
+        self.assertEqual(summary["full_text_required_review"]["case_count"], 1)
+        self.assertEqual(summary["full_text_required_review"]["reviewed_count"], 0)
+        self.assertEqual(summary["full_text_required_review"]["unreviewed_count"], 1)
+        self.assertEqual(summary["full_text_required_review"]["case_count_by_language"], {"en": 1})
+        self.assertEqual(summary["full_text_required_review"]["unreviewed_by_language"], {"en": 1})
+        self.assertEqual(summary["full_text_required_review"]["unreviewed_case_ids"], ["f"])
+        self.assertEqual(summary["policy_boundary_review"]["case_count"], 1)
+        self.assertEqual(summary["policy_boundary_review"]["reviewed_count"], 0)
+        self.assertEqual(summary["policy_boundary_review"]["unreviewed_count"], 1)
+        self.assertEqual(summary["policy_boundary_review"]["case_count_by_language"], {"zh": 1})
+        self.assertEqual(summary["policy_boundary_review"]["unreviewed_by_language"], {"zh": 1})
+        self.assertEqual(summary["policy_boundary_review"]["unreviewed_case_ids"], ["e"])
+        self.assertEqual(summary["label_provenance"]["label_source_counts"], {"synthetic": 6})
+        self.assertEqual(summary["label_provenance"]["status_by_label_source"]["synthetic"]["not_human_reviewed"], 3)
+        self.assertEqual(summary["label_provenance"]["status_by_label_source"]["synthetic"]["single_annotator"], 1)
+        self.assertEqual(summary["label_provenance"]["reviewed_by_label_source"], {"synthetic": 1})
+        self.assertEqual(summary["label_provenance"]["unreviewed_by_label_source"], {"synthetic": 3})
+        self.assertEqual(summary["label_provenance"]["reviewed_missing_source_locator_count"], 1)
 
     def test_support_label_sidecar_gate_checks_coverage_and_human_review(self):
         passing = compute_support_label_sidecar_gate(
@@ -366,11 +481,41 @@ class SupportEvalTests(unittest.TestCase):
                     "unreviewed_count": 1,
                     "case_count_by_language": {"zh": 1},
                     "reviewed_by_language": {"zh": 1},
+                    "unreviewed_by_language": {},
+                    "case_count_by_language_case_type": {"zh": {"hard_negative": 1}},
+                    "reviewed_by_language_case_type": {"zh": {"hard_negative": 1}},
+                    "unreviewed_by_language_case_type": {},
+                },
+                "full_text_required_review": {
+                    "case_count": 3,
+                    "reviewed_count": 1,
+                    "unreviewed_count": 2,
+                    "case_count_by_language": {"en": 2, "zh": 1},
+                    "reviewed_by_language": {"en": 1},
+                    "unreviewed_by_language": {"en": 1, "zh": 1},
+                    "unreviewed_case_ids": ["s30", "s43"],
+                },
+                "policy_boundary_review": {
+                    "case_count": 2,
+                    "reviewed_count": 1,
+                    "unreviewed_count": 1,
+                    "case_count_by_language": {"en": 1, "zh": 1},
+                    "reviewed_by_language": {"en": 1},
+                    "unreviewed_by_language": {"zh": 1},
+                    "unreviewed_case_ids": ["ss05"],
                 },
                 "label_maturity": {
                     "dual_annotated_count": 1,
                     "unresolved_disagreement_count": 0,
                     "raw_dual_agreement_rate": 1.0,
+                },
+                "label_provenance": {
+                    "label_source_counts": {"maintainer_synthetic": 4},
+                    "reviewed_by_label_source": {"maintainer_synthetic": 2},
+                    "unreviewed_by_label_source": {"maintainer_synthetic": 2},
+                    "reviewed_source_locator_count": 1,
+                    "reviewed_missing_source_locator_count": 1,
+                    "published_benchmark_source_locator_count": 0,
                 },
             },
             min_coverage=1.0,
@@ -407,6 +552,31 @@ class SupportEvalTests(unittest.TestCase):
         self.assertEqual(passing["thresholds"]["min_high_risk_reviewed_by_language"], {"zh": 1})
         self.assertEqual(passing["metrics"]["high_risk_case_count_by_language"], {"zh": 1})
         self.assertEqual(passing["metrics"]["high_risk_reviewed_by_language"], {"zh": 1})
+        self.assertEqual(passing["metrics"]["high_risk_unreviewed_by_language"], {})
+        self.assertEqual(
+            passing["metrics"]["high_risk_case_count_by_language_case_type"],
+            {"zh": {"hard_negative": 1}},
+        )
+        self.assertEqual(
+            passing["metrics"]["high_risk_reviewed_by_language_case_type"],
+            {"zh": {"hard_negative": 1}},
+        )
+        self.assertEqual(passing["metrics"]["high_risk_unreviewed_by_language_case_type"], {})
+        self.assertEqual(passing["metrics"]["full_text_required_case_count"], 3)
+        self.assertEqual(passing["metrics"]["full_text_required_reviewed"], 1)
+        self.assertEqual(passing["metrics"]["full_text_required_unreviewed"], 2)
+        self.assertEqual(passing["metrics"]["full_text_required_unreviewed_by_language"], {"en": 1, "zh": 1})
+        self.assertEqual(passing["metrics"]["full_text_required_unreviewed_case_ids"], ["s30", "s43"])
+        self.assertEqual(passing["metrics"]["policy_boundary_case_count"], 2)
+        self.assertEqual(passing["metrics"]["policy_boundary_reviewed"], 1)
+        self.assertEqual(passing["metrics"]["policy_boundary_unreviewed"], 1)
+        self.assertEqual(passing["metrics"]["policy_boundary_unreviewed_by_language"], {"zh": 1})
+        self.assertEqual(passing["metrics"]["policy_boundary_unreviewed_case_ids"], ["ss05"])
+        self.assertEqual(passing["metrics"]["label_source_counts"], {"maintainer_synthetic": 4})
+        self.assertEqual(passing["metrics"]["reviewed_by_label_source"], {"maintainer_synthetic": 2})
+        self.assertEqual(passing["metrics"]["unreviewed_by_label_source"], {"maintainer_synthetic": 2})
+        self.assertEqual(passing["metrics"]["reviewed_source_locator_count"], 1)
+        self.assertEqual(passing["metrics"]["reviewed_missing_source_locator_count"], 1)
         self.assertFalse(failing["ok"])
         self.assertEqual(
             {failure["code"] for failure in failing["failures"]},
@@ -520,13 +690,42 @@ class SupportEvalTests(unittest.TestCase):
         self.assertEqual(template["dataset"], "unit_support_eval.json")
         self.assertEqual(template["cases"][0]["adjudication_status"], "single_annotator")
         self.assertEqual(template["cases"][0]["source_locator"], "doi:10.123/example")
+        self.assertEqual(template["cases"][0]["label_source"], "synthetic")
+        self.assertEqual(template["cases"][0]["case_type"], "direct_support")
+        self.assertEqual(template["cases"][0]["evidence_scope"], "abstract")
+        self.assertEqual(template["cases"][0]["split"], "dev")
         self.assertEqual(template["cases"][1]["adjudication_status"], "not_human_reviewed")
         self.assertEqual(template["cases"][1]["annotator_count"], 0)
         self.assertEqual(template["cases"][1]["adjudicated_label"], "contradicted")
+        self.assertEqual(template["cases"][1]["case_type"], "contradiction")
+        self.assertEqual(template["cases"][1]["split"], "test")
         self.assertIn("Unreviewed seed label", template["cases"][1]["notes"])
         self.assertIn("evidence source", template["cases"][1]["notes"])
         self.assertEqual(template["cases"][1]["claim"], "claim b")
         self.assertEqual(template["cases"][1]["dataset_gold"], "contradicted")
+
+    def test_validate_support_label_sidecar_rejects_case_provenance_mismatch(self):
+        cases = [
+            SupportCase(
+                "a",
+                "claim",
+                "evidence",
+                "supported",
+                lang="en",
+                evidence_scope="abstract",
+                label_source="maintainer_synthetic",
+                case_type="direct_support",
+                split="test",
+            )
+        ]
+        sidecar = build_support_label_sidecar_template(cases)
+        sidecar["cases"][0]["case_type"] = "hard_negative"
+
+        with self.assertRaises(SupportLabelSidecarValidationError) as raised:
+            validate_support_label_sidecar(sidecar, cases)
+
+        self.assertIn("case_type", str(raised.exception))
+        self.assertIn("does not match dataset", str(raised.exception))
 
     def test_prepare_support_label_sidecar_script_writes_valid_template(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -588,14 +787,36 @@ class SupportEvalTests(unittest.TestCase):
         self.assertTrue(payload["audit_gate"]["ok"])
         self.assertFalse(payload["audit_gate"]["thresholds"]["fail_on_high_risk_unreviewed"])
         self.assertEqual(payload["audit_gate"]["thresholds"]["fail_on_high_risk_unreviewed_languages"], [])
+        self.assertFalse(payload["audit_gate"]["thresholds"]["fail_on_full_text_required_unreviewed"])
+        self.assertFalse(payload["audit_gate"]["thresholds"]["fail_on_policy_boundary_unreviewed"])
         self.assertEqual(payload["audit_gate"]["metrics"]["unreviewed_count"], len(cases))
         self.assertEqual(
             payload["audit_gate"]["metrics"]["high_risk_unreviewed_count"],
             payload["high_risk_unreviewed_count"],
         )
         self.assertEqual(
+            payload["audit_gate"]["metrics"]["full_text_required_unreviewed_count"],
+            payload["full_text_required_unreviewed_count"],
+        )
+        self.assertEqual(
+            payload["audit_gate"]["metrics"]["policy_boundary_unreviewed_count"],
+            payload["policy_boundary_unreviewed_count"],
+        )
+        self.assertEqual(
             payload["audit_gate"]["metrics"]["high_risk_unreviewed_by_language"],
             payload["high_risk_unreviewed_by_language"],
+        )
+        self.assertEqual(
+            payload["audit_gate"]["metrics"]["high_risk_unreviewed_by_language_case_type"],
+            payload["high_risk_unreviewed_by_language_case_type"],
+        )
+        self.assertEqual(
+            payload["audit_gate"]["metrics"]["full_text_required_unreviewed_by_language"],
+            payload["full_text_required_unreviewed_by_language"],
+        )
+        self.assertEqual(
+            payload["audit_gate"]["metrics"]["policy_boundary_unreviewed_by_language"],
+            payload["policy_boundary_unreviewed_by_language"],
         )
         self.assertEqual(payload["audit_gate"]["failures"], [])
         self.assertEqual(payload["unreviewed_count"], len(cases))
@@ -603,6 +824,23 @@ class SupportEvalTests(unittest.TestCase):
         self.assertLess(payload["high_risk_unreviewed_count"], payload["unreviewed_count"])
         self.assertEqual(len(payload["unreviewed"]), len(cases))
         self.assertEqual(len(payload["high_risk_unreviewed"]), payload["high_risk_unreviewed_count"])
+        self.assertEqual(
+            len(payload["full_text_required_unreviewed"]),
+            payload["full_text_required_unreviewed_count"],
+        )
+        self.assertEqual(payload["full_text_required_unreviewed_count"], 7)
+        self.assertEqual(payload["full_text_required_unreviewed_by_language"], {"en": 6, "zh": 1})
+        self.assertEqual(
+            [item["case_id"] for item in payload["full_text_required_unreviewed"]],
+            ["s17", "s30", "s43", "s13", "s38", "s20", "s33"],
+        )
+        self.assertEqual(len(payload["policy_boundary_unreviewed"]), payload["policy_boundary_unreviewed_count"])
+        self.assertEqual(payload["policy_boundary_unreviewed_count"], 2)
+        self.assertEqual(payload["policy_boundary_unreviewed_by_language"], {"en": 1, "zh": 1})
+        self.assertEqual(
+            [item["case_id"] for item in payload["policy_boundary_unreviewed"]],
+            ["ss02", "ss05"],
+        )
         self.assertEqual(payload["high_risk_unreviewed"][0]["priority"], "high")
         self.assertIn(
             payload["high_risk_unreviewed"][0]["case_type"],
@@ -611,12 +849,78 @@ class SupportEvalTests(unittest.TestCase):
         self.assertIn("test", payload["unreviewed_by_split"])
         self.assertIn("zh", payload["unreviewed_by_language"])
         self.assertIn("zh", payload["high_risk_unreviewed_by_language"])
+        self.assertEqual(
+            payload["high_risk_unreviewed_by_language_case_type"],
+            {
+                "en": {
+                    "contradiction": 9,
+                    "contradiction_set": 1,
+                    "full_text_required": 6,
+                    "hard_negative": 10,
+                },
+                "zh": {
+                    "contradiction": 6,
+                    "full_text_required": 1,
+                    "hard_negative": 2,
+                },
+            },
+        )
         self.assertTrue(any("high-priority" in action for action in payload["next_actions"]))
+        self.assertTrue(any("full-text-boundary review" in action for action in payload["next_actions"]))
+        self.assertTrue(any("policy-boundary review" in action for action in payload["next_actions"]))
         recommendations = {item["id"]: item for item in payload["recommended_packets"]}
         self.assertIn("high_risk_unreviewed_balanced", recommendations)
         self.assertIn("high_risk_unreviewed_zh", recommendations)
+        self.assertIn("high_risk_unreviewed_zh_contradiction", recommendations)
+        self.assertIn("full_text_required_unreviewed", recommendations)
+        self.assertIn("policy_boundary_unreviewed", recommendations)
+        review_plan = payload["review_plan"]
+        self.assertEqual(review_plan["schema_version"], 1)
+        self.assertEqual(review_plan["status"], "blocked")
+        self.assertEqual(review_plan["next_phase"], "first_review_high_risk")
+        self.assertEqual(review_plan["human_reviewed"], 0)
+        self.assertEqual(review_plan["high_risk_unreviewed"], payload["high_risk_unreviewed_count"])
+        self.assertEqual(
+            review_plan["high_risk_unreviewed_by_language_case_type"],
+            payload["high_risk_unreviewed_by_language_case_type"],
+        )
+        self.assertEqual(review_plan["full_text_required_unreviewed"], 7)
+        self.assertEqual(review_plan["policy_boundary_unreviewed"], 2)
+        review_phases = {item["id"]: item for item in review_plan["phases"]}
+        self.assertEqual(review_phases["first_review_high_risk"]["status"], "ready")
+        self.assertEqual(review_phases["first_review_high_risk"]["candidate_case_count"], 37)
+        self.assertEqual(
+            review_phases["first_review_high_risk"]["candidate_case_count_by_language_case_type"],
+            payload["high_risk_unreviewed_by_language_case_type"],
+        )
+        self.assertEqual(
+            review_phases["first_review_high_risk"]["candidate_case_ids"][-2:],
+            ["ss02", "ss05"],
+        )
+        self.assertEqual(
+            len(review_phases["first_review_high_risk"]["recommended_packet_ids"]),
+            len(set(review_phases["first_review_high_risk"]["recommended_packet_ids"])),
+        )
+        self.assertIn("high_risk_unreviewed_balanced", review_phases["first_review_high_risk"]["recommended_packet_ids"])
+        self.assertIn(
+            "high_risk_unreviewed_zh_contradiction",
+            review_phases["first_review_high_risk"]["recommended_packet_ids"],
+        )
+        self.assertIn("policy_boundary_unreviewed", review_phases["first_review_high_risk"]["recommended_packet_ids"])
+        self.assertEqual(review_phases["second_review"]["status"], "waiting_for_first_review")
+        self.assertEqual(review_phases["adjudication"]["status"], "waiting_for_dual_annotation")
+        self.assertIn("--apply-adjudications", review_phases["adjudication"]["command_template"])
+        self.assertEqual(review_phases["raise_release_gates"]["status"], "blocked")
+        self.assertEqual(
+            review_phases["raise_release_gates"]["suggested_thresholds"]["max_supported_disagreements"],
+            0,
+        )
+        self.assertIn("--max-supported-disagreements", review_phases["raise_release_gates"]["command_template"])
         balanced_command = recommendations["high_risk_unreviewed_balanced"]["command"]
         self.assertIn("--annotation-packet", balanced_command)
+        self.assertIn("--review-phase", balanced_command)
+        self.assertIn("first_review_high_risk", balanced_command)
+        self.assertIn("--packet-purpose", balanced_command)
         self.assertIn("--unreviewed-only", balanced_command)
         self.assertIn("--limit-per-language", balanced_command)
         self.assertIn("--limit-per-case-type", balanced_command)
@@ -629,6 +933,28 @@ class SupportEvalTests(unittest.TestCase):
         self.assertEqual(zh_recommendation["candidate_case_count"], payload["high_risk_unreviewed_by_language"]["zh"])
         self.assertIn("--lang", zh_recommendation["command"])
         self.assertIn("zh", zh_recommendation["command"])
+        zh_contradiction_recommendation = recommendations["high_risk_unreviewed_zh_contradiction"]
+        self.assertEqual(
+            zh_contradiction_recommendation["candidate_case_count"],
+            payload["high_risk_unreviewed_by_language_case_type"]["zh"]["contradiction"],
+        )
+        self.assertIn("--lang", zh_contradiction_recommendation["command"])
+        self.assertIn("zh", zh_contradiction_recommendation["command"])
+        self.assertIn("--case-type", zh_contradiction_recommendation["command"])
+        self.assertIn("contradiction", zh_contradiction_recommendation["command"])
+        full_text_recommendation = recommendations["full_text_required_unreviewed"]
+        self.assertEqual(full_text_recommendation["candidate_case_count"], 7)
+        self.assertEqual(
+            full_text_recommendation["candidate_case_ids"],
+            ["s17", "s30", "s43", "s13", "s38", "s20", "s33"],
+        )
+        self.assertIn("--case-type", full_text_recommendation["command"])
+        self.assertIn("full_text_required", full_text_recommendation["command"])
+        policy_recommendation = recommendations["policy_boundary_unreviewed"]
+        self.assertEqual(policy_recommendation["candidate_case_count"], 2)
+        self.assertEqual(policy_recommendation["candidate_case_ids"], ["ss02", "ss05"])
+        self.assertIn("--case-type", policy_recommendation["command"])
+        self.assertIn("weak_set_boundary", policy_recommendation["command"])
         with tempfile.TemporaryDirectory() as tmpdir:
             packet_path = os.path.join(tmpdir, "recommended-zh-packet.json")
             instructions_path = os.path.join(tmpdir, "recommended-zh-instructions.md")
@@ -650,10 +976,66 @@ class SupportEvalTests(unittest.TestCase):
                 instructions = handle.read()
 
         self.assertEqual(packet["packet_type"], "support_label_annotation_packet")
+        self.assertEqual(packet["review_phase"], "first_review_high_risk")
+        self.assertIn("high-risk `zh`", packet["packet_purpose"])
         self.assertEqual(packet["packet_summary"]["case_count_by_language"], {"zh": 9})
         self.assertEqual(packet["packet_summary"]["case_count_by_review_status"], {"not_human_reviewed": 9})
         self.assertTrue(all(item["lang"] == "zh" for item in packet["cases"]))
+        self.assertTrue(all(item["review_phase"] == "first_review_high_risk" for item in packet["cases"]))
         self.assertIn("Packet summary", instructions)
+        self.assertIn("Review phase", instructions)
+        self.assertIn("Packet purpose", instructions)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            packet_path = os.path.join(tmpdir, "recommended-full-text-packet.json")
+            instructions_path = os.path.join(tmpdir, "recommended-full-text-instructions.md")
+            command = _rewrite_recommended_packet_command(
+                full_text_recommendation["command"],
+                output_path=packet_path,
+                instructions_path=instructions_path,
+            )
+            subprocess.run(
+                command,
+                check=True,
+                cwd=os.getcwd(),
+                capture_output=True,
+                text=True,
+            )
+            with open(packet_path, encoding="utf-8") as handle:
+                packet = json.load(handle)
+
+        self.assertEqual(
+            packet["packet_summary"]["case_ids"],
+            ["s17", "s30", "s43", "s13", "s38", "s20", "s33"],
+        )
+        self.assertTrue(all(item["case_type"] == "full_text_required" for item in packet["cases"]))
+        self.assertTrue(
+            all("full-text" in item["review_focus"] or "full text" in item["review_focus"] for item in packet["cases"])
+        )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            packet_path = os.path.join(tmpdir, "recommended-policy-packet.json")
+            instructions_path = os.path.join(tmpdir, "recommended-policy-instructions.md")
+            command = _rewrite_recommended_packet_command(
+                policy_recommendation["command"],
+                output_path=packet_path,
+                instructions_path=instructions_path,
+            )
+            subprocess.run(
+                command,
+                check=True,
+                cwd=os.getcwd(),
+                capture_output=True,
+                text=True,
+            )
+            with open(packet_path, encoding="utf-8") as handle:
+                packet = json.load(handle)
+
+        self.assertEqual(packet["packet_summary"]["case_ids"], ["ss02", "ss05"])
+        self.assertTrue(all(item["case_type"] == "weak_set_boundary" for item in packet["cases"]))
+        self.assertTrue(
+            all("multiple weak citations remain tentative" in item["review_focus"] for item in packet["cases"])
+        )
 
     def test_prepare_support_label_sidecar_can_filter_annotation_packet(self):
         completed = subprocess.run(
@@ -686,6 +1068,14 @@ class SupportEvalTests(unittest.TestCase):
         self.assertEqual(payload["summary"]["dataset_cases"], payload["unreviewed_count"])
         self.assertEqual(payload["unreviewed_by_language"], {"zh": payload["unreviewed_count"]})
         self.assertEqual(payload["high_risk_unreviewed_by_language"], {"zh": payload["high_risk_unreviewed_count"]})
+        self.assertEqual(
+            set(payload["high_risk_unreviewed_by_language_case_type"]),
+            {"zh"},
+        )
+        self.assertEqual(
+            sum(payload["high_risk_unreviewed_by_language_case_type"]["zh"].values()),
+            payload["high_risk_unreviewed_count"],
+        )
         self.assertTrue(all(item["priority"] == "high" for item in payload["unreviewed"]))
         self.assertTrue(all(item["split"] == "test" for item in payload["unreviewed"]))
         self.assertTrue(all(item["lang"] == "zh" for item in payload["unreviewed"]))
@@ -716,12 +1106,13 @@ class SupportEvalTests(unittest.TestCase):
             text=True,
         )
         payload = json.loads(completed.stdout)
-        raw = completed.stdout
 
         self.assertTrue(payload["ok"])
         self.assertEqual(payload["packet_type"], "support_label_annotation_packet")
         self.assertTrue(payload["packet_id"].startswith("support-packet-"))
         self.assertEqual(len(payload["packet_id"]), len("support-packet-") + 16)
+        self.assertTrue(payload["packet_digest"].startswith("sha256:"))
+        self.assertEqual(len(payload["packet_digest"]), len("sha256:") + 64)
         self.assertEqual(payload["filters"], {"priority": ["high"], "split": ["test"], "lang": ["zh"], "limit": 2})
         self.assertEqual(payload["n"], 2)
         self.assertEqual(payload["packet_summary"]["case_ids"], [item["case_id"] for item in payload["cases"]])
@@ -730,21 +1121,36 @@ class SupportEvalTests(unittest.TestCase):
         self.assertEqual(payload["packet_summary"]["case_count_by_split"], {"test": 2})
         self.assertEqual(payload["packet_summary"]["case_count_by_priority"], {"high": 2})
         self.assertEqual(payload["packet_summary"]["case_count_by_review_status"], {"not_human_reviewed": 2})
+        self.assertEqual(payload["review_protocol"]["packet_role"], "first_review")
+        self.assertTrue(payload["review_protocol"]["independent_labeling_required"])
+        self.assertTrue(payload["review_protocol"]["reviewer_must_not_see_hidden_labels"])
+        self.assertEqual(payload["review_protocol"]["packet_target_annotator_count"], 1)
+        self.assertEqual(payload["review_protocol"]["benchmark_target_annotator_count"], 2)
+        self.assertEqual(payload["review_protocol"]["cases_already_single_annotated"], 0)
+        self.assertTrue(payload["review_protocol"]["second_review_required_after_first_review"])
+        self.assertTrue(payload["review_protocol"]["adjudication_required_on_disagreement"])
+        self.assertTrue(all(item["review_protocol"] == payload["review_protocol"] for item in payload["cases"]))
         self.assertTrue(all(item["packet_id"] == payload["packet_id"] for item in payload["cases"]))
+        self.assertTrue(all(item["packet_digest"] == payload["packet_digest"] for item in payload["cases"]))
         self.assertEqual([item["packet_case_index"] for item in payload["cases"]], [1, 2])
         self.assertEqual(payload["label_options"][0], "supported")
+        self.assertEqual(
+            payload["hidden_fields"],
+            ["gold", "predicted", "adjudicated_label", "annotator_labels", "label_notes"],
+        )
         self.assertTrue(all(item["priority"] == "high" for item in payload["cases"]))
         self.assertTrue(all(item["split"] == "test" for item in payload["cases"]))
         self.assertTrue(all(item["lang"] == "zh" for item in payload["cases"]))
         self.assertTrue(all(item["annotation"]["annotator_label"] == "" for item in payload["cases"]))
+        self.assertTrue(all(item["annotation"]["evidence_scope_assessed"] == "" for item in payload["cases"]))
+        self.assertTrue(all(item["annotation"]["full_text_needed"] == "" for item in payload["cases"]))
         self.assertIn("claim", payload["cases"][0])
         self.assertIn("evidence", payload["cases"][0])
         self.assertIn("review_focus", payload["cases"][0])
         self.assertIn("Check whether", payload["cases"][0]["review_focus"])
         self.assertIn("review_focus", payload["instructions"][-1])
-        self.assertNotIn('"gold"', raw)
-        self.assertNotIn("adjudicated_label", raw)
-        self.assertNotIn("label_notes", raw)
+        self.assertEqual(_hidden_packet_key_leaks(payload["cases"]), [])
+        self.assertEqual(_hidden_packet_key_leaks(payload["packet_summary"]), [])
 
     def test_prepare_support_label_sidecar_can_build_packet_from_review_queue(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -783,21 +1189,23 @@ class SupportEvalTests(unittest.TestCase):
         self.assertEqual(completed.stdout, "")
         self.assertEqual(
             payload["filters"]["review_queue_case_ids"],
-            ["s10", "s16", "s27", "s36", "s39", "s09", "s24"],
+            ["s10", "s16", "s27", "s36", "s39", "s48", "s09", "s24"],
         )
         self.assertEqual(payload["filters"]["from_review_queue"], True)
         self.assertEqual(payload["filters"]["review_backend"], "heuristic")
         self.assertEqual(payload["filters"]["split"], ["test"])
         self.assertEqual(payload["packet_summary"]["case_ids"], payload["filters"]["review_queue_case_ids"])
-        self.assertEqual([item["review_queue_rank"] for item in payload["cases"]], [1, 2, 3, 4, 5, 6, 7])
-        self.assertEqual(payload["packet_summary"]["case_count_by_split"], {"test": 7})
-        self.assertEqual(payload["packet_summary"]["case_count_by_review_status"], {"not_human_reviewed": 7})
+        self.assertEqual([item["review_queue_rank"] for item in payload["cases"]], [1, 2, 3, 4, 5, 6, 7, 8])
+        self.assertEqual(payload["packet_summary"]["case_count_by_split"], {"test": 8})
+        self.assertEqual(payload["packet_summary"]["case_count_by_review_status"], {"not_human_reviewed": 8})
         self.assertTrue(all(item["annotation"]["annotator_label"] == "" for item in payload["cases"]))
         self.assertIn("review_queue_rank", instructions)
         self.assertIn("do not treat it as a label hint", instructions)
-        self.assertNotIn('"gold"', raw)
-        self.assertNotIn('"predicted"', raw)
-        self.assertNotIn("adjudicated_label", raw)
+        self.assertEqual(
+            payload["hidden_fields"],
+            ["gold", "predicted", "adjudicated_label", "annotator_labels", "label_notes"],
+        )
+        self.assertEqual(_hidden_packet_key_leaks(payload["cases"]), [])
         self.assertNotIn("missed_contradiction", raw)
 
     def test_prepare_support_label_sidecar_can_limit_annotation_packet_per_language(self):
@@ -1015,15 +1423,41 @@ class SupportEvalTests(unittest.TestCase):
                 capture_output=True,
                 text=True,
             )
-        payload = json.loads(completed.stdout)
-        recommendations = {item["id"]: item for item in payload["recommended_packets"]}
+            payload = json.loads(completed.stdout)
+            recommendations = {item["id"]: item for item in payload["recommended_packets"]}
 
-        self.assertEqual(payload["label_maturity"]["single_annotator_count"], 1)
-        self.assertIn("single_annotator_second_reviewer", recommendations)
-        command = recommendations["single_annotator_second_reviewer"]["command"]
-        self.assertIn("--review-status", command)
-        self.assertIn("single_annotator", command)
-        self.assertEqual(recommendations["single_annotator_second_reviewer"]["candidate_case_count"], 1)
+            self.assertEqual(payload["label_maturity"]["single_annotator_count"], 1)
+            self.assertEqual(payload["review_plan"]["next_phase"], "first_review_high_risk")
+            review_phases = {item["id"]: item for item in payload["review_plan"]["phases"]}
+            self.assertEqual(review_phases["second_review"]["status"], "ready")
+            self.assertEqual(review_phases["second_review"]["candidate_case_count"], 1)
+            self.assertEqual(
+                review_phases["second_review"]["recommended_packet_ids"],
+                ["single_annotator_second_reviewer"],
+            )
+            self.assertIn("single_annotator_second_reviewer", recommendations)
+            command = recommendations["single_annotator_second_reviewer"]["command"]
+            self.assertIn("--review-status", command)
+            self.assertIn("single_annotator", command)
+            self.assertEqual(recommendations["single_annotator_second_reviewer"]["candidate_case_count"], 1)
+            packet_path = os.path.join(tmpdir, "second-review-packet.json")
+            command = _rewrite_recommended_packet_command(
+                command,
+                output_path=packet_path,
+                instructions_path=os.path.join(tmpdir, "second-review-instructions.md"),
+            )
+            subprocess.run(
+                command,
+                check=True,
+                cwd=os.getcwd(),
+                capture_output=True,
+                text=True,
+            )
+            packet = json.loads(Path(packet_path).read_text(encoding="utf-8"))
+        self.assertEqual(packet["review_protocol"]["packet_role"], "second_review")
+        self.assertEqual(packet["review_protocol"]["cases_already_single_annotated"], 1)
+        self.assertFalse(packet["review_protocol"]["second_review_required_after_first_review"])
+        self.assertTrue(packet["review_protocol"]["independent_labeling_required"])
 
     def test_prepare_support_label_sidecar_rejects_conflicting_review_status_filters(self):
         completed = subprocess.run(
@@ -1087,14 +1521,20 @@ class SupportEvalTests(unittest.TestCase):
         self.assertIn("Packet id", instructions)
         self.assertIn("packet_case_index", instructions)
         self.assertIn("Packet summary", instructions)
+        self.assertIn("Review protocol", instructions)
+        self.assertIn("independent annotation", instructions)
+        self.assertIn("review_protocol", instructions)
+        self.assertIn("Hidden fields", instructions)
         self.assertIn("case_count_by_language", instructions)
         self.assertIn("case_count_by_evidence_scope", instructions)
         self.assertIn("case_count_by_review_status", instructions)
         self.assertIn("label hint", instructions)
         self.assertIn("Do not edit `case_id`", instructions)
-        self.assertNotIn("adjudicated_label", instructions)
-        self.assertNotIn('"gold"', instructions)
-        self.assertNotIn("label_notes", instructions)
+        self.assertEqual(
+            packet["hidden_fields"],
+            ["gold", "predicted", "adjudicated_label", "annotator_labels", "label_notes"],
+        )
+        self.assertEqual(_hidden_packet_key_leaks(packet["cases"]), [])
 
     def test_prepare_support_label_sidecar_writes_jsonl_annotation_packet(self):
         completed = subprocess.run(
@@ -1120,9 +1560,14 @@ class SupportEvalTests(unittest.TestCase):
 
         self.assertEqual({row["case_id"] for row in rows}, {"s04", "s10"})
         self.assertEqual(len({row["packet_id"] for row in rows}), 1)
+        self.assertEqual(len({row["packet_digest"] for row in rows}), 1)
+        self.assertTrue(rows[0]["packet_digest"].startswith("sha256:"))
         self.assertEqual([row["packet_case_index"] for row in rows], [1, 2])
         self.assertTrue(all(row["annotation"]["rationale"] == "" for row in rows))
         self.assertTrue(all(row["review_focus"] for row in rows))
+        self.assertTrue(all(row["review_protocol"]["packet_role"] == "first_review" for row in rows))
+        self.assertTrue(all(row["review_protocol"]["independent_labeling_required"] for row in rows))
+        self.assertTrue(all(row["review_protocol"]["benchmark_target_annotator_count"] == 2 for row in rows))
         self.assertTrue(all("gold" not in row for row in rows))
         self.assertTrue(all("adjudicated_label" not in row for row in rows))
 
@@ -1132,6 +1577,9 @@ class SupportEvalTests(unittest.TestCase):
             packet = {
                 "packet_type": "support_label_annotation_packet",
                 "packet_id": "support-packet-test1234",
+                "packet_digest": "sha256:" + "a" * 64,
+                "review_phase": "first_review_high_risk",
+                "packet_purpose": "Assign a balanced first-review packet for unreviewed high-risk support cases.",
                 "cases": [
                     {
                         "packet_id": "support-packet-test1234",
@@ -1143,6 +1591,8 @@ class SupportEvalTests(unittest.TestCase):
                             "annotator_label": "contradicted",
                             "rationale": "Evidence directly says the method does not improve.",
                             "confidence": "high",
+                            "evidence_scope_assessed": "abstract",
+                            "full_text_needed": "no",
                         },
                     },
                     {
@@ -1192,9 +1642,25 @@ class SupportEvalTests(unittest.TestCase):
         self.assertTrue(payload["merge_report"]["ok"])
         self.assertEqual(payload["merge_report"]["applied_count"], 2)
         self.assertEqual(payload["merge_report"]["source_packet_ids"], ["support-packet-test1234"])
+        self.assertEqual(
+            payload["merge_report"]["source_packet_metadata"],
+            [
+                {
+                    "packet_id": "support-packet-test1234",
+                    "packet_digest": "sha256:" + "a" * 64,
+                    "review_phase": "first_review_high_risk",
+                    "packet_purpose": "Assign a balanced first-review packet for unreviewed high-risk support cases.",
+                }
+            ],
+        )
         self.assertEqual(cases["s04"]["adjudication_status"], "single_annotator")
         self.assertEqual(cases["s04"]["source_locator"], "doi:10.123/example")
         self.assertIn("reviewer-a", cases["s04"]["notes"])
+        self.assertIn("evidence_scope_assessed=abstract", cases["s04"]["notes"])
+        self.assertIn("full_text_needed=no", cases["s04"]["notes"])
+        self.assertIn("review_phase=first_review_high_risk", cases["s04"]["notes"])
+        self.assertIn("packet_purpose=Assign a balanced first-review packet", cases["s04"]["notes"])
+        self.assertIn("packet_digest=sha256:", cases["s04"]["notes"])
         self.assertEqual(cases["s10"]["adjudication_status"], "dual_annotator_agreed")
         self.assertEqual(cases["s10"]["annotator_count"], 2)
         self.assertEqual(cases["s10"]["annotator_labels"], ["contradicted", "contradicted"])
@@ -1205,8 +1671,11 @@ class SupportEvalTests(unittest.TestCase):
             rows = [
                 {
                     "packet_id": "support-packet-conflict",
+                    "packet_digest": "sha256:" + "b" * 64,
                     "packet_case_index": 1,
                     "case_id": "s04",
+                    "review_phase": "first_review_high_risk",
+                    "packet_purpose": "Assign a balanced first-review packet for unreviewed high-risk support cases.",
                     "annotation": {
                         "annotator_id": "reviewer-a",
                         "annotator_label": "supported",
@@ -1241,9 +1710,18 @@ class SupportEvalTests(unittest.TestCase):
         self.assertFalse(payload["merge_report"]["ok"])
         self.assertEqual(payload["merge_report"]["conflicts"][0]["code"], "label_mismatch")
         self.assertEqual(payload["merge_report"]["conflicts"][0]["annotation_examples"][0]["packet_id"], "support-packet-conflict")
+        self.assertEqual(payload["merge_report"]["conflicts"][0]["annotation_examples"][0]["packet_digest"], "sha256:" + "b" * 64)
         self.assertEqual(payload["merge_report"]["conflicts"][0]["annotation_examples"][0]["packet_case_index"], 1)
         self.assertEqual(payload["merge_report"]["conflicts"][0]["annotation_examples"][0]["annotator_id"], "reviewer-a")
         self.assertEqual(payload["merge_report"]["conflicts"][0]["annotation_examples"][0]["label"], "supported")
+        self.assertEqual(
+            payload["merge_report"]["conflicts"][0]["annotation_examples"][0]["review_phase"],
+            "first_review_high_risk",
+        )
+        self.assertIn(
+            "balanced first-review",
+            payload["merge_report"]["conflicts"][0]["annotation_examples"][0]["packet_purpose"],
+        )
         self.assertIn("Intentionally conflicts", payload["merge_report"]["conflicts"][0]["annotation_examples"][0]["rationale"])
         self.assertEqual(payload["merge_report"]["adjudication_queue"][0]["case_id"], "s04")
         self.assertEqual(payload["merge_report"]["adjudication_queue"][0]["conflict_code"], "label_mismatch")
@@ -1251,6 +1729,17 @@ class SupportEvalTests(unittest.TestCase):
         self.assertEqual(payload["merge_report"]["adjudication_queue"][0]["adjudication_template"]["annotator_labels"], ["supported"])
         self.assertEqual(payload["merge_report"]["adjudication_queue"][0]["adjudication_template"]["adjudicated_label"], "")
         self.assertEqual(payload["merge_report"]["adjudication_queue"][0]["adjudication_template"]["source_packet_ids"], ["support-packet-conflict"])
+        self.assertEqual(
+            payload["merge_report"]["adjudication_queue"][0]["adjudication_template"]["source_packet_metadata"],
+            [
+                {
+                    "packet_id": "support-packet-conflict",
+                    "packet_digest": "sha256:" + "b" * 64,
+                    "review_phase": "first_review_high_risk",
+                    "packet_purpose": "Assign a balanced first-review packet for unreviewed high-risk support cases.",
+                }
+            ],
+        )
         self.assertEqual(cases["s04"]["adjudication_status"], "not_human_reviewed")
         self.assertEqual(cases["s04"]["annotator_labels"], [])
 
@@ -1258,6 +1747,10 @@ class SupportEvalTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             packet_path = os.path.join(tmpdir, "disagreement_packet.json")
             packet = {
+                "packet_id": "support-packet-disagreement",
+                "packet_digest": "sha256:" + "c" * 64,
+                "review_phase": "first_review_high_risk",
+                "packet_purpose": "Assign a balanced first-review packet for unreviewed high-risk support cases.",
                 "cases": [
                     {
                         "packet_id": "support-packet-disagreement",
@@ -1312,12 +1805,24 @@ class SupportEvalTests(unittest.TestCase):
         self.assertEqual(conflict["code"], "annotator_disagreement")
         self.assertEqual(conflict["annotator_labels"], ["contradicted", "weakly_supported"])
         self.assertEqual([item["packet_id"] for item in conflict["annotation_examples"]], ["support-packet-disagreement", "support-packet-disagreement"])
+        self.assertEqual([item["packet_digest"] for item in conflict["annotation_examples"]], ["sha256:" + "c" * 64, "sha256:" + "c" * 64])
         self.assertEqual([item["packet_case_index"] for item in conflict["annotation_examples"]], [1, 2])
         self.assertEqual([item["annotator_id"] for item in conflict["annotation_examples"]], ["reviewer-a", "reviewer-b"])
         self.assertEqual([item["confidence"] for item in conflict["annotation_examples"]], ["high", "low"])
         self.assertEqual(queue_item["conflict_code"], "annotator_disagreement")
         self.assertEqual(queue_item["adjudication_template"]["annotator_labels"], ["contradicted", "weakly_supported"])
         self.assertEqual(queue_item["adjudication_template"]["source_packet_ids"], ["support-packet-disagreement"])
+        self.assertEqual(
+            queue_item["adjudication_template"]["source_packet_metadata"],
+            [
+                {
+                    "packet_id": "support-packet-disagreement",
+                    "packet_digest": "sha256:" + "c" * 64,
+                    "review_phase": "first_review_high_risk",
+                    "packet_purpose": "Assign a balanced first-review packet for unreviewed high-risk support cases.",
+                }
+            ],
+        )
         self.assertIn("--apply-adjudications", queue_item["recommended_action"])
         self.assertEqual(cases["s04"]["adjudication_status"], "not_human_reviewed")
         self.assertEqual(cases["s04"]["annotator_labels"], [])
@@ -1420,6 +1925,14 @@ class SupportEvalTests(unittest.TestCase):
                         "rationale": "The evidence explicitly rejects the improvement claim.",
                         "source_locator": "doi:10.123/adjudicated",
                         "source_packet_ids": ["support-packet-conflict"],
+                        "source_packet_metadata": [
+                            {
+                                "packet_id": "support-packet-conflict",
+                                "packet_digest": "sha256:" + "d" * 64,
+                                "review_phase": "first_review_high_risk",
+                                "packet_purpose": "Assign a balanced first-review packet for unreviewed high-risk support cases.",
+                            }
+                        ],
                     }
                 ]
             }
@@ -1448,12 +1961,26 @@ class SupportEvalTests(unittest.TestCase):
         self.assertTrue(output["adjudication_report"]["ok"])
         self.assertEqual(output["adjudication_report"]["applied_case_ids"], ["s04"])
         self.assertEqual(output["adjudication_report"]["source_packet_ids"], ["support-packet-conflict"])
+        self.assertEqual(
+            output["adjudication_report"]["source_packet_metadata"],
+            [
+                {
+                    "packet_id": "support-packet-conflict",
+                    "packet_digest": "sha256:" + "d" * 64,
+                    "review_phase": "first_review_high_risk",
+                    "packet_purpose": "Assign a balanced first-review packet for unreviewed high-risk support cases.",
+                }
+            ],
+        )
         self.assertEqual(cases["s04"]["adjudication_status"], "dual_annotator_adjudicated")
         self.assertEqual(cases["s04"]["disagreement"], "resolved")
         self.assertEqual(cases["s04"]["adjudicator"], "reviewer-c")
         self.assertEqual(cases["s04"]["source_locator"], "doi:10.123/adjudicated")
         self.assertIn("annotator_labels=supported, contradicted", cases["s04"]["notes"])
         self.assertIn("source_packet_ids=support-packet-conflict", cases["s04"]["notes"])
+        self.assertIn("review_phase=first_review_high_risk", cases["s04"]["notes"])
+        self.assertIn("packet_purpose=Assign a balanced first-review packet", cases["s04"]["notes"])
+        self.assertIn("packet_digest=sha256:", cases["s04"]["notes"])
 
     def test_prepare_support_label_sidecar_reports_adjudication_gold_conflict(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -1639,6 +2166,68 @@ class SupportEvalTests(unittest.TestCase):
         self.assertEqual(failure["actual"], payload["high_risk_unreviewed_by_language"]["zh"])
         self.assertIn("s34", failure["case_ids"])
 
+    def test_prepare_support_label_sidecar_audit_can_fail_on_full_text_boundary_cases(self):
+        completed = subprocess.run(
+            [
+                sys.executable,
+                "scripts/prepare_support_label_sidecar.py",
+                "--dataset",
+                os.path.join("data", "eval", "support_eval.json"),
+                "--existing-sidecar",
+                os.path.join("data", "eval", "support_eval_label_sidecar.json"),
+                "--audit",
+                "--fail-on-full-text-required-unreviewed",
+            ],
+            cwd=os.getcwd(),
+            capture_output=True,
+            text=True,
+        )
+        payload = json.loads(completed.stdout)
+
+        self.assertEqual(completed.returncode, 1)
+        self.assertTrue(payload["ok"])
+        self.assertFalse(payload["audit_gate"]["ok"])
+        self.assertTrue(payload["audit_gate"]["thresholds"]["fail_on_full_text_required_unreviewed"])
+        self.assertEqual(
+            payload["audit_gate"]["metrics"]["full_text_required_unreviewed_count"],
+            payload["full_text_required_unreviewed_count"],
+        )
+        failure = payload["audit_gate"]["failures"][0]
+        self.assertEqual(failure["code"], "full_text_required_unreviewed")
+        self.assertEqual(failure["actual"], payload["full_text_required_unreviewed_count"])
+        self.assertEqual(failure["case_ids"], ["s17", "s30", "s43", "s13", "s38", "s20", "s33"])
+
+    def test_prepare_support_label_sidecar_audit_can_fail_on_policy_boundary_cases(self):
+        completed = subprocess.run(
+            [
+                sys.executable,
+                "scripts/prepare_support_label_sidecar.py",
+                "--dataset",
+                os.path.join("data", "eval", "support_eval.json"),
+                "--existing-sidecar",
+                os.path.join("data", "eval", "support_eval_label_sidecar.json"),
+                "--audit",
+                "--fail-on-policy-boundary-unreviewed",
+            ],
+            cwd=os.getcwd(),
+            capture_output=True,
+            text=True,
+        )
+        payload = json.loads(completed.stdout)
+
+        self.assertEqual(completed.returncode, 1)
+        self.assertTrue(payload["ok"])
+        self.assertFalse(payload["audit_gate"]["ok"])
+        self.assertTrue(payload["audit_gate"]["thresholds"]["fail_on_policy_boundary_unreviewed"])
+        self.assertEqual(
+            payload["audit_gate"]["metrics"]["policy_boundary_unreviewed_count"],
+            payload["policy_boundary_unreviewed_count"],
+        )
+        failure = payload["audit_gate"]["failures"][0]
+        self.assertEqual(failure["code"], "policy_boundary_unreviewed")
+        self.assertEqual(failure["actual"], payload["policy_boundary_unreviewed_count"])
+        self.assertEqual(failure["case_ids"], ["ss02", "ss05"])
+
     def test_validate_support_label_sidecar_rejects_gold_mismatch(self):
         cases = [SupportCase("a", "claim", "evidence", "supported")]
         sidecar = {
@@ -1752,6 +2341,10 @@ class SupportEvalTests(unittest.TestCase):
         self.assertTrue(summary["ok"])
         self.assertEqual(summary["label_maturity"]["adjudicated_count"], 1)
         self.assertEqual(summary["label_maturity"]["published_benchmark_count"], 1)
+        self.assertEqual(summary["label_provenance"]["published_benchmark_count"], 1)
+        self.assertEqual(summary["label_provenance"]["published_benchmark_source_locator_count"], 1)
+        self.assertEqual(summary["label_provenance"]["reviewed_source_locator_count"], 2)
+        self.assertEqual(summary["label_provenance"]["reviewed_missing_source_locator_count"], 0)
 
     def test_validate_support_eval_dataset_reports_schema_and_coverage(self):
         dataset = {
@@ -1844,13 +2437,59 @@ class SupportEvalTests(unittest.TestCase):
                     "split": "test",
                 },
             ],
+            "set_cases": [
+                {
+                    "id": "set-a",
+                    "claim": "claim",
+                    "citation_verdicts": ["supported", "insufficient_evidence"],
+                    "gold": "supported",
+                    "lang": "en",
+                    "label_source": "maintainer_synthetic",
+                    "case_type": "set_aggregation",
+                    "split": "dev",
+                    "label_notes": "One strong citation can support the claim while an unresolved citation remains visible.",
+                },
+                {
+                    "id": "set-b",
+                    "claim": "claim",
+                    "citation_verdicts": ["weakly_supported", "weakly_supported"],
+                    "gold": "weakly_supported",
+                    "lang": "en",
+                    "label_source": "maintainer_synthetic",
+                    "case_type": "weak_set_boundary",
+                    "split": "test",
+                    "label_notes": "Multiple weak citations stay tentative rather than becoming full support.",
+                },
+                {
+                    "id": "set-c",
+                    "claim": "claim",
+                    "citation_verdicts": ["supported", "contradicted"],
+                    "gold": "contradicted",
+                    "lang": "en",
+                    "label_source": "maintainer_synthetic",
+                    "case_type": "contradiction_set",
+                    "split": "test",
+                    "label_notes": "Contradictory evidence should dominate the aggregate verdict.",
+                },
+                {
+                    "id": "set-d",
+                    "claim": "claim",
+                    "citation_verdicts": ["insufficient_evidence", "insufficient_evidence"],
+                    "gold": "insufficient_evidence",
+                    "lang": "en",
+                    "label_source": "maintainer_synthetic",
+                    "case_type": "set_aggregation",
+                    "split": "train",
+                    "label_notes": "A set of non-confirming citations should abstain.",
+                },
+            ],
         }
 
         summary = validate_support_eval_dataset(dataset)
 
         self.assertTrue(summary["ok"])
         self.assertEqual(summary["n"], 7)
-        self.assertEqual(summary["set_cases"]["n"], 0)
+        self.assertEqual(summary["set_cases"]["n"], 4)
         self.assertEqual(summary["case_types"]["hard_negative"], 1)
         self.assertEqual(summary["splits"]["test"], 5)
         self.assertEqual(summary["test_split"]["case_types"]["hard_negative"], 1)
@@ -1864,18 +2503,39 @@ class SupportEvalTests(unittest.TestCase):
             "hard_negative",
             "weak_support",
         ])
+        self.assertEqual(summary["set_cases"]["case_types"]["set_aggregation"], 2)
+        self.assertEqual(summary["set_cases"]["case_types"]["weak_set_boundary"], 1)
+        self.assertEqual(summary["set_cases"]["case_types"]["contradiction_set"], 1)
+        self.assertEqual(set(summary["set_cases"]["gold_labels"]), {
+            "contradicted",
+            "insufficient_evidence",
+            "supported",
+            "weakly_supported",
+        })
+        self.assertEqual(summary["set_cases"]["test_split"]["case_types"]["contradiction_set"], 1)
+        self.assertEqual(summary["set_cases"]["test_split"]["case_types"]["weak_set_boundary"], 1)
+        self.assertEqual(summary["set_cases"]["required_case_types"], [
+            "contradiction_set",
+            "set_aggregation",
+            "weak_set_boundary",
+        ])
+        self.assertEqual(summary["set_cases"]["required_test_case_types"], [
+            "contradiction_set",
+            "weak_set_boundary",
+        ])
         self.assertIn("maintainer_synthetic", summary["label_sources"])
+        self.assertEqual(summary["label_source_counts"], {"maintainer_synthetic": 11})
 
     def test_validate_support_eval_dataset_reports_test_split_high_risk_coverage(self):
         with open(os.path.join("data", "eval", "support_eval.json"), encoding="utf-8") as handle:
             summary = validate_support_eval_dataset(json.load(handle))
 
-        self.assertEqual(summary["test_split"]["case_types"]["hard_negative"], 3)
-        self.assertEqual(summary["test_split"]["case_types"]["contradiction"], 5)
+        self.assertEqual(summary["test_split"]["case_types"]["hard_negative"], 6)
+        self.assertEqual(summary["test_split"]["case_types"]["contradiction"], 6)
         self.assertEqual(summary["test_split"]["case_types"]["full_text_required"], 3)
         self.assertEqual(summary["test_split"]["case_types"]["weak_support"], 1)
-        self.assertEqual(summary["languages"], {"en": 32, "zh": 12})
-        self.assertEqual(summary["test_split"]["languages"], {"en": 9, "zh": 6})
+        self.assertEqual(summary["languages"], {"en": 36, "zh": 12})
+        self.assertEqual(summary["test_split"]["languages"], {"en": 13, "zh": 6})
         self.assertEqual(set(summary["test_split"]["gold_labels"]), {
             "contradicted",
             "insufficient_evidence",
@@ -1890,7 +2550,46 @@ class SupportEvalTests(unittest.TestCase):
         self.assertGreaterEqual(summary["set_cases"]["n"], 6)
         self.assertEqual(summary["set_cases"]["case_types"]["weak_set_boundary"], 2)
         self.assertEqual(summary["set_cases"]["case_types"]["set_aggregation"], 3)
+        self.assertEqual(summary["set_cases"]["case_types"]["contradiction_set"], 1)
+        self.assertEqual(set(summary["set_cases"]["gold_labels"]), {
+            "contradicted",
+            "insufficient_evidence",
+            "supported",
+            "weakly_supported",
+        })
+        self.assertEqual(summary["set_cases"]["test_split"]["case_types"]["weak_set_boundary"], 2)
+        self.assertEqual(summary["set_cases"]["test_split"]["case_types"]["contradiction_set"], 1)
+        self.assertEqual(summary["set_cases"]["required_case_types"], [
+            "contradiction_set",
+            "set_aggregation",
+            "weak_set_boundary",
+        ])
         self.assertIn("test", summary["set_cases"]["splits"])
+
+    def test_validate_support_eval_dataset_rejects_unknown_set_case_type(self):
+        with open(os.path.join("data", "eval", "support_eval.json"), encoding="utf-8") as handle:
+            dataset = json.load(handle)
+        dataset["set_cases"][0]["case_type"] = "unsupported_set_policy"
+
+        with self.assertRaises(SupportEvalValidationError) as raised:
+            validate_support_eval_dataset(dataset)
+
+        self.assertIn("unsupported case_type 'unsupported_set_policy'", str(raised.exception))
+
+    def test_validate_support_eval_dataset_rejects_missing_set_case_coverage(self):
+        with open(os.path.join("data", "eval", "support_eval.json"), encoding="utf-8") as handle:
+            dataset = json.load(handle)
+        dataset["set_cases"] = [
+            case for case in dataset["set_cases"] if case.get("case_type") != "weak_set_boundary"
+        ]
+
+        with self.assertRaises(SupportEvalValidationError) as raised:
+            validate_support_eval_dataset(dataset)
+
+        message = str(raised.exception)
+        self.assertIn("set_cases are missing required case_type coverage: weak_set_boundary", message)
+        self.assertIn("set_cases test split is missing required case_type coverage: weak_set_boundary", message)
+        self.assertIn("set_cases are missing required gold label coverage: weakly_supported", message)
 
     def test_validate_support_eval_dataset_rejects_missing_coverage(self):
         dataset = {
@@ -2085,6 +2784,8 @@ class SupportEvalTests(unittest.TestCase):
         self.assertEqual(report["dataset"]["splits"]["test"], 3)
         self.assertEqual(report["overall"]["n"], 3)
         self.assertEqual(report["overall"]["false_support_rate"], 0.5)
+        self.assertEqual(report["overall"]["support_overcall_count"], 1)
+        self.assertEqual(report["overall"]["support_overcall_rate"], 0.5)
         self.assertEqual(report["overall"]["per_label"]["supported"]["precision"], 0.5)
         self.assertEqual(report["overall"]["per_label"]["contradicted"]["recall"], 1.0)
         self.assertEqual(report["confusion_matrix"]["insufficient_evidence"]["supported"], 1)
@@ -2096,12 +2797,44 @@ class SupportEvalTests(unittest.TestCase):
         self.assertEqual(report["review_queue_summary"]["count"], 1)
         self.assertEqual(report["review_queue_summary"]["by_severity"], {"critical": 1})
         self.assertEqual(report["review_queue_summary"]["by_recommended_action"], {"rewrite_or_replace_evidence": 1})
+        self.assertTrue(report["release_blocker_summary"]["release_blocked"])
+        self.assertFalse(report["release_blocker_summary"]["benchmark_claim_safe"])
+        self.assertEqual(report["release_blocker_summary"]["blocking_case_ids"], ["b"])
+        self.assertEqual(
+            report["release_blocker_summary"]["next_action"],
+            "block_release_until_false_support_reviewed",
+        )
+        self.assertEqual(report["release_summary"]["schema_version"], 1)
+        self.assertEqual(report["release_summary"]["status"], "blocked")
+        self.assertEqual(report["release_summary"]["next_action"], "block_release_until_false_support_reviewed")
+        self.assertEqual(report["release_summary"]["metrics"]["case_count"], 3)
+        self.assertEqual(report["release_summary"]["metrics"]["supported_precision"], 0.5)
+        self.assertEqual(report["release_summary"]["metrics"]["false_support_rate"], 0.5)
+        self.assertEqual(report["release_summary"]["risk_counts"]["false_support"], 1)
+        self.assertEqual(report["release_summary"]["review_queue"]["blocking_case_ids"], ["b"])
+        self.assertEqual(report["release_summary"]["acceptance"]["block_acceptance_case_ids"], ["b"])
+        self.assertEqual(report["release_summary"]["acceptance"]["top_risk_slice_id"], "hard_negative_overcalled")
+        self.assertEqual(report["release_summary"]["label_maturity"]["human_reviewed"], 0)
         self.assertEqual(report["false_support_analysis"]["false_support_count"], 1)
         self.assertEqual(report["false_support_analysis"]["weak_false_support_count"], 0)
+        self.assertEqual(report["false_support_analysis"]["false_support_case_ids"], ["b"])
+        self.assertEqual(report["false_support_analysis"]["weak_false_support_case_ids"], [])
+        self.assertEqual(report["false_support_analysis"]["high_risk_overcall_case_ids"], ["b"])
+        self.assertFalse(report["acceptance_guard"]["ok_to_accept_supported"])
+        self.assertEqual(report["acceptance_guard"]["block_acceptance_case_ids"], ["b"])
+        self.assertEqual(report["acceptance_guard"]["review_before_accepting_case_ids"], [])
         self.assertEqual(report["false_support_analysis"]["by_case_type"]["hard_negative"]["case_ids"], ["b"])
         self.assertEqual(report["false_support_analysis"]["by_language"]["zh"]["case_ids"], ["b"])
         self.assertEqual(report["false_support_analysis"]["top_risk_slice"]["id"], "hard_negative_overcalled")
         self.assertEqual(report["false_support_analysis"]["top_risk_slice"]["case_ids"], ["b"])
+        acceptance_slices = {item["id"]: item for item in report["acceptance_slices"]}
+        self.assertEqual(acceptance_slices["hard_negative"]["status"], "blocked")
+        self.assertEqual(acceptance_slices["hard_negative"]["false_support_case_ids"], ["b"])
+        self.assertEqual(acceptance_slices["contradiction"]["status"], "clear")
+        self.assertEqual(acceptance_slices["full_text_boundary"]["status"], "clear")
+        self.assertEqual(acceptance_slices["non_english"]["status"], "blocked")
+        self.assertEqual(report["abstention_analysis"]["total_abstention_count"], 0)
+        self.assertEqual(report["abstention_analysis"]["incorrect_case_ids"], [])
         self.assertEqual(report["by_case_type"]["direct_support"]["accuracy"], 1.0)
         self.assertEqual(report["by_case_type"]["direct_support"]["per_label"]["supported"]["f1"], 1.0)
         self.assertEqual(report["by_case_type"]["hard_negative"]["false_support_rate"], 1.0)
@@ -2115,6 +2848,50 @@ class SupportEvalTests(unittest.TestCase):
         self.assertEqual(report["cases"][1]["lang"], "zh")
         self.assertEqual(report["cases"][1]["split"], "test")
         self.assertFalse(report["cases"][1]["correct"])
+
+    def test_acceptance_slices_keep_clear_high_risk_groups_visible(self):
+        cases = [
+            SupportCase(
+                "a",
+                "claim",
+                "evidence",
+                "contradicted",
+                case_type="contradiction",
+                evidence_scope="metadata_snippet",
+                split="test",
+            ),
+            SupportCase(
+                "b",
+                "claim",
+                "evidence",
+                "insufficient_evidence",
+                case_type="full_text_required",
+                evidence_scope="abstract",
+                split="dev",
+            ),
+            SupportCase(
+                "c",
+                "claim",
+                "evidence",
+                "supported",
+                case_type="direct_support",
+                evidence_scope="abstract",
+                lang="zh",
+                split="test",
+            ),
+        ]
+
+        slices = {item["id"]: item for item in compute_support_acceptance_slices(cases, ["weakly_supported", "supported", "supported"])}
+
+        self.assertEqual(slices["contradiction"]["status"], "review_required")
+        self.assertEqual(slices["contradiction"]["weak_false_support_case_ids"], ["a"])
+        self.assertEqual(slices["hard_negative"]["status"], "clear")
+        self.assertEqual(slices["hard_negative"]["case_count"], 0)
+        self.assertEqual(slices["full_text_boundary"]["status"], "blocked")
+        self.assertEqual(slices["full_text_boundary"]["false_support_case_ids"], ["b"])
+        self.assertEqual(slices["test_split"]["case_count"], 2)
+        self.assertEqual(slices["non_english"]["status"], "clear")
+        self.assertEqual(slices["non_english"]["case_ids"], ["c"])
 
     def test_fixture_eval_report_is_deterministic_and_model_free(self):
         cases = [
@@ -2168,8 +2945,13 @@ class SupportEvalTests(unittest.TestCase):
 
         report = compute_support_report(cases, ["supported", "supported", "contradicted"])
         gate = compute_support_quality_gate(report)
+        summary = compute_support_release_summary(report, gate)
 
         self.assertFalse(gate["ok"])
+        self.assertEqual(summary["quality_gate_ok"], False)
+        self.assertEqual(summary["status"], "blocked")
+        self.assertEqual(summary["risk_counts"]["false_support"], 1)
+        self.assertEqual(summary["review_queue"]["critical_case_ids"], ["b"])
         self.assertIn("false_support_count", {failure["code"] for failure in gate["failures"]})
         self.assertIn("supported_precision", {failure["code"] for failure in gate["failures"]})
         self.assertEqual(gate["failures"][0]["case_ids"], ["b"])
@@ -2178,6 +2960,11 @@ class SupportEvalTests(unittest.TestCase):
         self.assertEqual(gate["metrics"]["review_queue_count"], 1)
         self.assertEqual(gate["metrics"]["critical_review_count"], 1)
         self.assertEqual(gate["review_queue_summary"]["by_bucket"], {"false_support": 1})
+        self.assertTrue(gate["release_blocker_summary"]["release_blocked"])
+        self.assertEqual(
+            gate["release_blocker_summary"]["next_action"],
+            "block_release_until_false_support_reviewed",
+        )
 
     def test_quality_gate_fails_on_missed_contradiction(self):
         cases = [
@@ -2193,6 +2980,10 @@ class SupportEvalTests(unittest.TestCase):
         self.assertEqual(gate["metrics"]["contradiction_recall"], 0.0)
         self.assertEqual(gate["review_queue_case_ids"], ["b"])
         self.assertEqual(gate["critical_review_case_ids"], [])
+        self.assertEqual(
+            gate["release_blocker_summary"]["next_action"],
+            "block_release_until_high_risk_reviewed",
+        )
 
     def test_eval_support_cli_quality_gate_exits_nonzero_on_failure(self):
         completed = subprocess.run(
@@ -2216,6 +3007,9 @@ class SupportEvalTests(unittest.TestCase):
         self.assertEqual(completed.returncode, 1)
         payload = json.loads(completed.stdout)
         self.assertFalse(payload["quality_gate"]["ok"])
+        self.assertEqual(payload["release_summary"]["quality_gate_ok"], False)
+        self.assertEqual(payload["release_summary"]["status"], "blocked")
+        self.assertEqual(payload["release_summary"]["next_action"], "inspect_support_quality_gate_failures")
         self.assertEqual(payload["quality_gate"]["failures"][0]["code"], "supported_precision")
         self.assertIn("review_queue_case_ids", payload["quality_gate"])
         self.assertIn("support_set_policy", payload)
@@ -2233,6 +3027,8 @@ class SupportEvalTests(unittest.TestCase):
                 "--backend",
                 "heuristic",
                 "--quality-gate",
+                "--label-sidecar",
+                os.path.join("data", "eval", "support_eval_label_sidecar.json"),
                 "--review-queue-only",
             ],
             check=False,
@@ -2245,29 +3041,137 @@ class SupportEvalTests(unittest.TestCase):
         payload = json.loads(completed.stdout)
         self.assertEqual(payload["backend"], "heuristic")
         self.assertEqual(payload["split"], "test")
+        self.assertIn("macro_f1", payload["overall"])
+        self.assertIn("macro_precision", payload["overall"])
+        self.assertIn("macro_recall", payload["overall"])
+        self.assertIn("weighted_f1", payload["overall"])
+        self.assertIn("weighted_precision", payload["overall"])
+        self.assertIn("weighted_recall", payload["overall"])
         self.assertIn("review_queue", payload)
         self.assertNotIn("cases", payload)
         self.assertEqual(payload["quality_gate"]["ok"], False)
         self.assertIn("false_support_analysis", payload)
-        self.assertEqual(payload["false_support_analysis"]["total_overcall_count"], 1)
+        self.assertIn("acceptance_guard", payload)
+        self.assertTrue(payload["acceptance_guard"]["ok_to_accept_supported"])
+        self.assertEqual(payload["acceptance_guard"]["block_acceptance_case_ids"], [])
+        self.assertEqual(payload["acceptance_guard"]["review_before_accepting_case_ids"], ["s39", "s48"])
+        self.assertEqual(payload["acceptance_guard"]["next_action"], "review_before_accepting_weak_support")
+        self.assertEqual(
+            payload["acceptance_guard"]["policy"],
+            "supported_overcalls_block_acceptance; weak_overcalls_require_review",
+        )
+        acceptance_slices = {item["id"]: item for item in payload["acceptance_slices"]}
+        self.assertEqual(
+            sorted(acceptance_slices),
+            ["contradiction", "full_text_boundary", "hard_negative", "non_english", "test_split"],
+        )
+        self.assertEqual(acceptance_slices["contradiction"]["status"], "review_required")
+        self.assertEqual(acceptance_slices["contradiction"]["weak_false_support_case_ids"], ["s39", "s48"])
+        self.assertEqual(
+            payload["quality_gate"]["acceptance_slices"],
+            payload["acceptance_slices"],
+        )
+        self.assertEqual(payload["false_support_analysis"]["total_overcall_count"], 2)
+        self.assertEqual(payload["false_support_analysis"]["false_support_case_ids"], [])
+        self.assertEqual(payload["false_support_analysis"]["weak_false_support_case_ids"], ["s39", "s48"])
+        self.assertEqual(payload["false_support_analysis"]["high_risk_overcall_case_ids"], ["s39", "s48"])
+        self.assertEqual(
+            payload["false_support_analysis"]["acceptance_guard"]["review_before_accepting_case_ids"],
+            ["s39", "s48"],
+        )
         self.assertEqual(
             payload["false_support_analysis"]["top_risk_slice"]["id"],
             "contradicted_overcalled",
         )
-        self.assertEqual(payload["false_support_analysis"]["top_risk_slice"]["case_ids"], ["s39"])
+        self.assertEqual(payload["false_support_analysis"]["top_risk_slice"]["case_ids"], ["s39", "s48"])
         self.assertEqual(
             payload["false_support_analysis"]["risk_slices"][0]["recommended_action"],
             "inspect_contradiction_before_accepting_support",
         )
+        self.assertIn("abstention_analysis", payload)
+        self.assertGreater(payload["abstention_analysis"]["incorrect_abstention_count"], 0)
+        self.assertIn("review_case_ids", payload["abstention_analysis"])
+        self.assertIn("by_evidence_scope", payload["abstention_analysis"])
+        self.assertTrue(payload["label_sidecar_gate"]["ok"])
+        self.assertEqual(payload["label_maturity"]["coverage"], 1.0)
+        self.assertEqual(payload["label_maturity"]["human_reviewed"], 0)
+        self.assertEqual(payload["label_maturity"]["dual_annotated"], 0)
+        self.assertEqual(payload["label_maturity"]["high_risk_unreviewed"], 35)
+        self.assertEqual(payload["label_maturity"]["full_text_required_unreviewed"], 7)
+        self.assertEqual(payload["label_maturity"]["policy_boundary_unreviewed"], 2)
+        self.assertEqual(payload["label_maturity"]["dataset_cases"], 54)
+        self.assertEqual(payload["label_maturity"]["sidecar_cases"], 54)
+        self.assertEqual(payload["label_maturity"]["sidecar_provenance_complete_count"], 54)
+        self.assertEqual(payload["label_maturity"]["sidecar_provenance_complete_fraction"], 1.0)
+        self.assertEqual(payload["label_maturity"]["sidecar_provenance_missing_count"], 0)
+        self.assertEqual(payload["label_maturity"]["sidecar_provenance_missing_case_ids"], [])
+        self.assertEqual(payload["label_maturity"]["sidecar_provenance_missing_case_ids_by_field"], {})
+        self.assertEqual(
+            payload["label_maturity"]["sidecar_provenance_field_present_counts"]["case_type"],
+            54,
+        )
+        self.assertIsNone(payload["label_maturity"]["raw_dual_agreement_rate"])
+        self.assertEqual(payload["label_maturity"]["supported_disagreement_case_ids"], [])
+        self.assertEqual(
+            payload["label_sidecar_gate"]["metrics"],
+            payload["label_maturity"],
+        )
         self.assertEqual(payload["quality_gate"]["review_queue_case_ids"][:5], ["s10", "s16", "s27", "s36", "s39"])
-        self.assertEqual(payload["review_queue_summary"]["by_severity"]["high"], 5)
+        self.assertTrue(payload["release_blocker_summary"]["release_blocked"])
+        self.assertFalse(payload["release_blocker_summary"]["benchmark_claim_safe"])
+        self.assertEqual(
+            payload["release_blocker_summary"]["next_action"],
+            "block_release_until_high_risk_reviewed",
+        )
+        self.assertEqual(
+            payload["quality_gate"]["release_blocker_summary"]["next_action"],
+            payload["release_blocker_summary"]["next_action"],
+        )
+        self.assertEqual(payload["review_queue_summary"]["by_severity"]["high"], 6)
         self.assertEqual(
             payload["quality_gate"]["review_queue_summary"]["by_recommended_action"][
                 "run_nli_or_human_contradiction_review"
             ],
-            5,
+            6,
         )
         self.assertEqual(payload["review_queue"][0]["recommended_action"], "run_nli_or_human_contradiction_review")
+
+    def test_eval_support_cli_can_limit_review_queue_only_rows(self):
+        completed = subprocess.run(
+            [
+                sys.executable,
+                "scripts/eval_support.py",
+                "--dataset",
+                os.path.join("data", "eval", "support_eval.json"),
+                "--split",
+                "test",
+                "--backend",
+                "heuristic",
+                "--quality-gate",
+                "--review-queue-only",
+                "--review-queue-limit",
+                "2",
+            ],
+            check=False,
+            cwd=os.getcwd(),
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertEqual(completed.returncode, 1)
+        payload = json.loads(completed.stdout)
+        self.assertEqual(payload["review_queue_limit"], 2)
+        self.assertEqual(len(payload["review_queue"]), 2)
+        self.assertEqual(payload["review_queue_filtered"]["limit"], 2)
+        self.assertEqual(payload["review_queue_filtered"]["returned"], 2)
+        self.assertEqual(payload["review_queue_filtered"]["original_count"], payload["review_queue_summary"]["count"])
+        self.assertEqual(
+            payload["review_queue_filtered"]["returned_case_ids"],
+            payload["review_queue_summary"]["top_case_ids"][:2],
+        )
+        self.assertGreater(payload["review_queue_filtered"]["omitted"], 0)
+        self.assertIn("review_queue_summary_and_quality_gate_counts_remain_full_queue", payload["review_queue_filtered"]["policy"])
+        self.assertGreater(len(payload["quality_gate"]["review_queue_case_ids"]), len(payload["review_queue"]))
 
     def test_eval_support_cli_sidecar_gate_exits_nonzero_on_review_threshold(self):
         completed = subprocess.run(
@@ -2406,6 +3310,9 @@ class SupportEvalTests(unittest.TestCase):
         self.assertEqual(counts["correct_abstention"], 1)
         self.assertEqual(buckets["false_support"][0]["case_id"], "a")
         self.assertEqual(buckets["missed_contradiction"][0]["case_type"], "contradiction")
+        metrics = compute_support_metrics([(case.gold, pred) for case, pred in zip(cases, predictions)])
+        self.assertEqual(metrics["support_overcall_count"], 2)
+        self.assertEqual(metrics["support_overcall_rate"], 0.6667)
 
     def test_false_support_analysis_groups_overcalls_for_triage(self):
         cases = [
@@ -2416,11 +3323,57 @@ class SupportEvalTests(unittest.TestCase):
         buckets = compute_support_error_buckets(cases, ["supported", "weakly_supported", "supported"])
 
         analysis = compute_false_support_analysis(buckets)
+        guard = compute_false_support_acceptance_guard(buckets)
 
         self.assertEqual(analysis["false_support_count"], 2)
         self.assertEqual(analysis["weak_false_support_count"], 1)
         self.assertEqual(analysis["total_overcall_count"], 3)
         self.assertEqual(analysis["high_risk_case_ids"], ["a", "c"])
+        self.assertEqual(analysis["false_support_case_ids"], ["a", "c"])
+        self.assertEqual(analysis["weak_false_support_case_ids"], ["b"])
+        self.assertEqual(analysis["high_risk_overcall_case_ids"], ["a", "c", "b"])
+        self.assertFalse(analysis["acceptance_guard"]["ok_to_accept_supported"])
+        self.assertEqual(analysis["acceptance_guard"]["block_acceptance_case_ids"], ["a", "c"])
+        self.assertEqual(analysis["acceptance_guard"]["review_before_accepting_case_ids"], ["b"])
+        self.assertEqual(analysis["acceptance_guard"], guard)
+        self.assertEqual(guard["next_action"], "block_release_until_reviewed")
+        self.assertEqual(analysis["review_plan"]["schema_version"], 1)
+        self.assertEqual(analysis["review_plan"]["status"], "blocked")
+        self.assertEqual(analysis["review_plan"]["next_action"], "review_supported_overcalls_before_release")
+        self.assertEqual(analysis["review_plan"]["block_acceptance_case_ids"], ["a", "c"])
+        self.assertEqual(analysis["review_plan"]["review_before_accepting_case_ids"], ["b"])
+        self.assertEqual(analysis["review_plan"]["top_risk_slice_id"], "contradicted_overcalled")
+        review_phases = {phase["id"]: phase for phase in analysis["review_plan"]["phases"]}
+        self.assertEqual(review_phases["supported_overcall_blockers"]["status"], "blocked")
+        self.assertEqual(review_phases["supported_overcall_blockers"]["case_ids"], ["a", "c"])
+        self.assertEqual(review_phases["weak_support_overcall_review"]["status"], "review_required")
+        self.assertEqual(review_phases["weak_support_overcall_review"]["case_ids"], ["b"])
+        self.assertEqual(review_phases["highest_risk_slice_review"]["risk_slice_id"], "contradicted_overcalled")
+        self.assertEqual(review_phases["highest_risk_slice_review"]["case_ids"], ["b"])
+        blocker_packet = review_phases["supported_overcall_blockers"]["annotation_packet"]
+        self.assertEqual(blocker_packet["schema_version"], 1)
+        self.assertEqual(blocker_packet["packet_id"], "support-label-packet-supported-overcall-blockers")
+        self.assertEqual(blocker_packet["review_phase"], "supported_overcall_blockers")
+        self.assertEqual(blocker_packet["case_ids"], ["a", "c"])
+        self.assertEqual(blocker_packet["count"], 2)
+        self.assertIn("--annotation-packet", blocker_packet["command_template"])
+        self.assertIn("--instructions-output", blocker_packet["command_template"])
+        self.assertEqual(blocker_packet["command_template"].count("--case-id"), 2)
+        self.assertIn("experiments/support-label-packet-supported-overcall-blockers.json", blocker_packet["output"])
+        self.assertIn("create_blinded_annotation_packet", blocker_packet["policy"])
+        self.assertEqual(review_phases["supported_overcall_blockers"]["packet_id"], blocker_packet["packet_id"])
+        self.assertEqual(review_phases["supported_overcall_blockers"]["command_template"], blocker_packet["command_template"])
+        self.assertEqual(
+            [packet["packet_id"] for packet in analysis["review_plan"]["recommended_annotation_packets"]],
+            [
+                "support-label-packet-supported-overcall-blockers",
+                "support-label-packet-weak-support-overcall-review",
+                "support-label-packet-highest-risk-slice-review",
+            ],
+        )
+        self.assertEqual(analysis["review_plan"]["recommended_annotation_packet_count"], 3)
+        self.assertEqual(analysis["review_plan"]["recommended_annotation_case_ids"], ["a", "c", "b"])
+        self.assertIn("annotation_packets_are_review_assignments", analysis["review_plan"]["policy"])
         self.assertEqual(analysis["by_case_type"]["hard_negative"]["false_support"], 1)
         self.assertEqual(analysis["by_case_type"]["hard_negative"]["false_support_case_ids"], ["a"])
         self.assertEqual(analysis["by_case_type"]["hard_negative"]["weak_false_support_case_ids"], [])
@@ -2446,6 +3399,54 @@ class SupportEvalTests(unittest.TestCase):
         self.assertEqual(analysis["risk_slices"][2]["false_support_case_ids"], ["c"])
         self.assertEqual(analysis["risk_slices"][3]["case_ids"], ["a", "b"])
         self.assertIn("highest-risk", analysis["interpretation"])
+
+    def test_abstention_analysis_separates_correct_and_incorrect_refusals(self):
+        cases = [
+            SupportCase(
+                "a",
+                "claim",
+                "evidence",
+                "supported",
+                case_type="direct_support",
+                evidence_scope="abstract",
+                split="test",
+            ),
+            SupportCase(
+                "b",
+                "claim",
+                "evidence",
+                "insufficient_evidence",
+                case_type="hard_negative",
+                evidence_scope="abstract",
+                split="test",
+            ),
+            SupportCase(
+                "c",
+                "claim",
+                "evidence",
+                "contradicted",
+                case_type="contradiction",
+                evidence_scope="metadata_snippet",
+                split="dev",
+            ),
+        ]
+        buckets = compute_support_error_buckets(
+            cases,
+            ["insufficient_evidence", "insufficient_evidence", "insufficient_evidence"],
+        )
+
+        analysis = compute_abstention_analysis(buckets)
+
+        self.assertEqual(analysis["incorrect_abstention_count"], 2)
+        self.assertEqual(analysis["correct_abstention_count"], 1)
+        self.assertEqual(analysis["total_abstention_count"], 3)
+        self.assertEqual(analysis["incorrect_case_ids"], ["a", "c"])
+        self.assertEqual(analysis["correct_case_ids"], ["b"])
+        self.assertEqual(analysis["review_case_ids"], ["a", "c"])
+        self.assertEqual(analysis["by_case_type"]["direct_support"]["incorrect_case_ids"], ["a"])
+        self.assertEqual(analysis["by_case_type"]["hard_negative"]["correct_case_ids"], ["b"])
+        self.assertEqual(analysis["by_evidence_scope"]["abstract"]["total"], 2)
+        self.assertEqual(analysis["by_split"]["dev"]["incorrect_abstention"], 1)
 
     def test_support_review_queue_prioritizes_high_risk_support_failures(self):
         cases = [
@@ -2478,6 +3479,54 @@ class SupportEvalTests(unittest.TestCase):
         self.assertEqual(summary["by_bucket"]["missed_contradiction"], 2)
         self.assertEqual(summary["top_case_ids"], ["a", "c", "b", "d"])
         self.assertEqual(summary["critical_case_ids"], ["a"])
+
+        blocker_summary = compute_release_blocker_summary(queue)
+        self.assertTrue(blocker_summary["release_blocked"])
+        self.assertFalse(blocker_summary["benchmark_claim_safe"])
+        self.assertEqual(blocker_summary["blocking_case_ids"], ["a", "c", "b"])
+        self.assertEqual(blocker_summary["blocking_buckets"], {
+            "false_support": 1,
+            "incorrect_abstention": 1,
+            "missed_contradiction": 2,
+            "weak_false_support": 1,
+        })
+        self.assertEqual(
+            blocker_summary["blocking_recommended_actions"],
+            {
+                "downgrade_or_find_stronger_evidence": 1,
+                "inspect_contradiction_before_accepting_support": 1,
+                "run_nli_or_human_contradiction_review": 1,
+            },
+        )
+        self.assertEqual(
+            blocker_summary["next_action"],
+            "block_release_until_false_support_reviewed",
+        )
+        self.assertEqual(
+            blocker_summary["policy"],
+            "critical_or_high_support_eval_rows_block_release_claims",
+        )
+
+    def test_release_blocker_summary_distinguishes_medium_review_rows(self):
+        queue = [
+            {
+                "case_id": "recall-loss",
+                "severity": "medium",
+                "buckets": ["supported_rejected"],
+                "recommended_action": "inspect_recall_loss",
+            }
+        ]
+
+        blocker_summary = compute_release_blocker_summary(queue)
+
+        self.assertFalse(blocker_summary["release_blocked"])
+        self.assertFalse(blocker_summary["benchmark_claim_safe"])
+        self.assertEqual(blocker_summary["blocking_case_ids"], [])
+        self.assertEqual(blocker_summary["review_required_case_ids"], ["recall-loss"])
+        self.assertEqual(
+            blocker_summary["next_action"],
+            "review_medium_risk_before_benchmark_claims",
+        )
 
 
 if __name__ == "__main__":

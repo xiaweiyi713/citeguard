@@ -1,0 +1,1 @@
+Synthetic lawful excerpt for local demos: the Transformer relies entirely on attention mechanisms, dispensing with recurrence and convolutions.

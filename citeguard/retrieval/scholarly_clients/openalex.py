@@ -9,7 +9,14 @@ from citeguard.graph import CitationRecord
 from .base import MetadataSource
 from .evidence import attach_evidence_chunks, harvest_remote_evidence_report
 from .http import HTTPClient
-from .utils import find_local_match, normalize_doi, openalex_abstract_to_text, record_match_score
+from .utils import (
+    configured_contact_email,
+    find_local_match,
+    metadata_quality,
+    normalize_doi,
+    openalex_abstract_to_text,
+    record_match_score,
+)
 
 
 class OpenAlexMetadataSource(MetadataSource):
@@ -20,12 +27,12 @@ class OpenAlexMetadataSource(MetadataSource):
 
     def __init__(
         self,
-        mailto: str = "research@example.com",
+        mailto: str = "",
         http_client: Optional[HTTPClient] = None,
         harvest_evidence: bool = True,
         evidence_timeout: int = 4,
     ) -> None:
-        self.mailto = mailto
+        self.mailto = configured_contact_email(mailto)
         self.http_client = http_client or HTTPClient()
         self.harvest_evidence = harvest_evidence
         self.evidence_timeout = evidence_timeout
@@ -35,9 +42,12 @@ class OpenAlexMetadataSource(MetadataSource):
         return list(self._records)
 
     def search(self, query: str, top_k: int = 5) -> List[CitationRecord]:
+        params = {"search": query, "per-page": top_k}
+        if self.mailto:
+            params["mailto"] = self.mailto
         payload = self.http_client.get_json(
             self.BASE_URL,
-            params={"search": query, "per-page": top_k, "mailto": self.mailto},
+            params=params,
         )
         records = [self._to_record(item) for item in payload.get("results", [])[:top_k]]
         self._remember(records)
@@ -49,9 +59,12 @@ class OpenAlexMetadataSource(MetadataSource):
             return local_match
 
         if candidate.doi:
+            params = {"filter": f"doi:{normalize_doi(candidate.doi)}", "per-page": 1}
+            if self.mailto:
+                params["mailto"] = self.mailto
             payload = self.http_client.get_json(
                 self.BASE_URL,
-                params={"filter": f"doi:{normalize_doi(candidate.doi)}", "per-page": 1, "mailto": self.mailto},
+                params=params,
             )
             results = payload.get("results", [])
             if results:
@@ -94,22 +107,35 @@ class OpenAlexMetadataSource(MetadataSource):
             )
             evidence_chunks = evidence_report["chunks"]
             evidence_failures = evidence_report["failures"]
+        title = item.get("display_name", "") or item.get("title", "")
+        year = item.get("publication_year")
+        abstract = openalex_abstract_to_text(item.get("abstract_inverted_index", {}))
+        url = landing_page_url or item.get("id", "")
         metadata = {
             "openalex_id": item.get("id", ""),
             "source_score": float(item.get("relevance_score", 0.0)),
             "cited_by_count": item.get("cited_by_count", 0),
+            "metadata_quality": metadata_quality(
+                title=title,
+                authors=authors,
+                year=year,
+                venue=venue,
+                abstract=abstract,
+                doi=doi,
+                url=url,
+            ),
         }
         if evidence_failures:
             metadata["evidence_harvest_failures"] = evidence_failures
         record = CitationRecord(
             citation_id=item.get("id", "").replace("https://openalex.org/", "openalex:"),
-            title=item.get("display_name", "") or item.get("title", ""),
+            title=title,
             authors=authors,
-            year=item.get("publication_year"),
+            year=year,
             venue=venue,
-            abstract=openalex_abstract_to_text(item.get("abstract_inverted_index", {})),
+            abstract=abstract,
             doi=doi,
-            url=landing_page_url or item.get("id", ""),
+            url=url,
             source=self.name,
             metadata=attach_evidence_chunks(metadata, evidence_chunks),
         )

@@ -42,7 +42,9 @@ class PublicPackageTests(unittest.TestCase):
             ClaimSupportRequest,
             ClaimSupportSetResult,
             CounterEvidenceSearchReport,
+            ERROR_CODE_CATEGORY,
             ERROR_CODE_NEXT_ACTION,
+            ERROR_CODE_RETRYABLE,
             ERROR_SCHEMA_VERSION,
             REVIEW_ACTION_QUEUE_BY_NEXT_ACTION,
             REVIEW_ACTION_QUEUE_KEYS,
@@ -52,6 +54,7 @@ class PublicPackageTests(unittest.TestCase):
             audit_claim_support,
             available_sources,
             check_claim_support_set,
+            error_code_registry,
             error_payload,
             filter_high_risk_payload,
             infer_evidence_scope,
@@ -85,20 +88,30 @@ class PublicPackageTests(unittest.TestCase):
         self.assertTrue(callable(search_counterevidence_candidates))
         self.assertEqual(infer_evidence_scope("abstract_sentence_1"), "abstract")
         self.assertEqual(error_payload("x", "message")["error"]["code"], "x")
+        self.assertEqual(error_code_registry()["schema_version"], ERROR_SCHEMA_VERSION)
+        self.assertIn("missing_citation_input", error_code_registry()["codes"])
         self.assertEqual(error_payload("timeout", "Timed out")["error"]["recovery"], "Retry, raise the timeout, or continue with reduced confidence.")
         self.assertEqual(error_payload("timeout", "Timed out")["error"]["next_action"], "retry_or_check_source_health")
+        self.assertTrue(error_payload("timeout", "Timed out")["error"]["retryable"])
+        self.assertEqual(error_payload("timeout", "Timed out")["error"]["category"], "source_limited")
         self.assertEqual(ERROR_CODE_NEXT_ACTION["missing_citation_input"], "provide_missing_input")
+        self.assertEqual(ERROR_CODE_RETRYABLE["source_unavailable"], True)
+        self.assertEqual(ERROR_CODE_CATEGORY["model_unavailable"], "dependency_limited")
         self.assertTrue(callable(filter_high_risk_payload))
         self.assertTrue(callable(verify_citation))
 
     def test_public_errors_module_exports_error_payload(self):
         from citeguard.errors import (
+            ERROR_CODE_CATEGORY,
             ERROR_CODE_NEXT_ACTION,
             ERROR_CODE_RECOVERY,
+            ERROR_CODE_RETRYABLE,
             ERROR_SCHEMA_VERSION,
             STABLE_ERROR_CODES,
+            error_code_registry,
             error_payload,
             is_stable_error_code,
+            runtime_config_error_details,
         )
 
         self.assertFalse(error_payload("bad", "Bad input")["ok"])
@@ -106,13 +119,47 @@ class PublicPackageTests(unittest.TestCase):
         self.assertEqual(error_payload("bad", "Bad input")["schema_version"], ERROR_SCHEMA_VERSION)
         self.assertEqual(error_payload("bad", "Bad input")["error"]["recovery"], "")
         self.assertEqual(error_payload("bad", "Bad input")["error"]["next_action"], "")
+        self.assertEqual(error_payload("bad", "Bad input")["error"]["retryable"], False)
+        self.assertEqual(error_payload("bad", "Bad input")["error"]["category"], "")
         self.assertIn("DOI", error_payload("missing_citation_input", "Missing citation")["error"]["recovery"])
         self.assertEqual(error_payload("missing_citation_input", "Missing citation")["error"]["next_action"], "provide_missing_input")
+        self.assertEqual(error_payload("missing_citation_input", "Missing citation")["error"]["category"], "missing_input")
         self.assertIn("missing_citation_input", STABLE_ERROR_CODES)
         self.assertIn("Ask for", ERROR_CODE_RECOVERY["missing_citation_input"])
         self.assertEqual(set(ERROR_CODE_NEXT_ACTION), STABLE_ERROR_CODES)
+        self.assertEqual(set(ERROR_CODE_RETRYABLE), STABLE_ERROR_CODES)
+        self.assertEqual(set(ERROR_CODE_CATEGORY), STABLE_ERROR_CODES)
+        registry = error_code_registry()
+        self.assertEqual(registry["schema_version"], ERROR_SCHEMA_VERSION)
+        self.assertEqual(set(registry["codes"]), STABLE_ERROR_CODES)
+        self.assertEqual(
+            registry["codes"]["missing_citation_input"]["next_action"],
+            "provide_missing_input",
+        )
+        self.assertIn("DOI", registry["codes"]["missing_citation_input"]["recovery"])
+        self.assertFalse(registry["codes"]["missing_citation_input"]["retryable"])
+        self.assertEqual(registry["codes"]["missing_citation_input"]["category"], "missing_input")
+        self.assertTrue(registry["codes"]["source_unavailable"]["retryable"])
+        self.assertEqual(registry["codes"]["source_unavailable"]["category"], "source_limited")
         self.assertTrue(is_stable_error_code("timeout"))
         self.assertFalse(is_stable_error_code("private_experimental_code"))
+        details = runtime_config_error_details(
+            "Unknown CITEGUARD_SOURCES value(s): bad. Valid values: arxiv, openalex.",
+            base={"tool": "verify_citation_tool"},
+        )
+        self.assertEqual(details["tool"], "verify_citation_tool")
+        self.assertEqual(details["field"], "CITEGUARD_SOURCES")
+        self.assertEqual(details["source"], "environment")
+        self.assertEqual(details["invalid_values"], ["bad"])
+        self.assertEqual(details["valid_values"], ["arxiv", "openalex"])
+        numeric_details = runtime_config_error_details(
+            "CITEGUARD_HTTP_TIMEOUT must be a positive integer.",
+            env={"CITEGUARD_HTTP_TIMEOUT": "0"},
+        )
+        self.assertEqual(numeric_details["field"], "CITEGUARD_HTTP_TIMEOUT")
+        self.assertEqual(numeric_details["source"], "environment")
+        self.assertEqual(numeric_details["expected"], "positive integer")
+        self.assertEqual(numeric_details["received"], "0")
 
     def test_legacy_error_module_is_public_shim(self):
         from citeguard import errors as public_errors
@@ -122,6 +169,7 @@ class PublicPackageTests(unittest.TestCase):
         self.assertEqual(legacy_errors.ERROR_SCHEMA_VERSION, public_errors.ERROR_SCHEMA_VERSION)
         self.assertIs(legacy_errors.STABLE_ERROR_CODES, public_errors.STABLE_ERROR_CODES)
         self.assertIs(legacy_errors.ERROR_CODE_NEXT_ACTION, public_errors.ERROR_CODE_NEXT_ACTION)
+        self.assertIs(legacy_errors.runtime_config_error_details, public_errors.runtime_config_error_details)
 
     def test_legacy_graph_modules_are_public_shims(self):
         from citeguard import graph as public_graph
@@ -397,6 +445,7 @@ class PublicPackageTests(unittest.TestCase):
         self.assertIs(build_live_metadata_source, public_factory.build_live_metadata_source)
 
     def test_public_verification_submodule_facades_are_importable(self):
+        from citeguard.verification import compute_support_release_summary
         from citeguard.verification.cache import export_cache_records, inspect_cache
         from citeguard.verification.eval import load_eval
         from citeguard.verification.extract import extract_citation_candidates
@@ -407,6 +456,7 @@ class PublicPackageTests(unittest.TestCase):
         self.assertTrue(callable(export_cache_records))
         self.assertTrue(callable(load_eval))
         self.assertTrue(callable(extract_citation_candidates))
+        self.assertEqual(compute_support_release_summary({"overall": {"n": 0}})["schema_version"], 1)
         self.assertEqual(parse_citation(title="A Paper").title, "A Paper")
         self.assertEqual(compute_support_metrics([])["n"], 0)
 
@@ -473,6 +523,10 @@ class PublicPackageTests(unittest.TestCase):
         self.assertIs(legacy_support_eval.SupportCase, public_support_eval.SupportCase)
         self.assertIs(legacy_support_eval.load_support_eval, public_support_eval.load_support_eval)
         self.assertIs(legacy_support_eval.compute_support_report, public_support_eval.compute_support_report)
+        self.assertIs(
+            legacy_support_eval.compute_support_release_summary,
+            public_support_eval.compute_support_release_summary,
+        )
 
     def test_legacy_verification_support_module_is_public_shim(self):
         from citeguard.verification import support as public_support

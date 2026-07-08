@@ -57,6 +57,12 @@ ALLOWED_CASE_TYPES = {
     "standard",
 }
 
+ALLOWED_SET_CASE_TYPES = {
+    "set_aggregation",
+    "weak_set_boundary",
+    "contradiction_set",
+}
+
 ALLOWED_SPLITS = {
     "train",
     "dev",
@@ -87,6 +93,15 @@ REQUIRED_TEST_CASE_TYPES = {
 }
 
 REQUIRED_TEST_GOLD_LABELS = set(ALLOWED_SUPPORT_LABELS)
+
+REQUIRED_SET_CASE_TYPES = set(ALLOWED_SET_CASE_TYPES)
+
+REQUIRED_SET_TEST_CASE_TYPES = {
+    "weak_set_boundary",
+    "contradiction_set",
+}
+
+REQUIRED_SET_GOLD_LABELS = set(ALLOWED_SUPPORT_LABELS)
 
 HIGH_RISK_SUPPORT_CASE_TYPES = {
     "contradiction",
@@ -332,6 +347,9 @@ def validate_support_eval_dataset(data: Dict[str, Any]) -> Dict[str, Any]:
     raw_set_cases = data.get("set_cases", [])
     set_case_splits = set()
     set_case_types = set()
+    set_gold_labels = set()
+    set_test_case_types = set()
+    set_test_gold_labels = set()
     if raw_set_cases is None:
         raw_set_cases = []
     if not isinstance(raw_set_cases, list):
@@ -369,14 +387,36 @@ def validate_support_eval_dataset(data: Dict[str, Any]) -> Dict[str, Any]:
             errors.append(f"set_case {case_id or index} has unsupported gold label {gold!r}")
         if split and split not in ALLOWED_SPLITS:
             errors.append(f"set_case {case_id or index} has unsupported split {split!r}")
+        if case_type and case_type not in ALLOWED_SET_CASE_TYPES:
+            errors.append(f"set_case {case_id or index} has unsupported case_type {case_type!r}")
         if case_type:
             set_case_types.add(case_type)
         if split:
             set_case_splits.add(split)
+        if gold:
+            set_gold_labels.add(gold)
+        if split == "test":
+            if case_type:
+                set_test_case_types.add(case_type)
+            if gold:
+                set_test_gold_labels.add(gold)
         if label_source:
             label_sources.add(label_source)
         if case_type == "weak_set_boundary" and not notes:
             warnings.append(f"set_case {case_id or index} should explain weak aggregation boundary in label_notes")
+
+    missing_set_case_types = sorted(REQUIRED_SET_CASE_TYPES - set_case_types)
+    missing_set_test_case_types = sorted(REQUIRED_SET_TEST_CASE_TYPES - set_test_case_types)
+    missing_set_gold_labels = sorted(REQUIRED_SET_GOLD_LABELS - set_gold_labels)
+    if missing_set_case_types:
+        errors.append(f"set_cases are missing required case_type coverage: {', '.join(missing_set_case_types)}")
+    if missing_set_test_case_types:
+        errors.append(
+            "set_cases test split is missing required case_type coverage: "
+            + ", ".join(missing_set_test_case_types)
+        )
+    if missing_set_gold_labels:
+        errors.append(f"set_cases are missing required gold label coverage: {', '.join(missing_set_gold_labels)}")
 
     summary = {
         "ok": not errors,
@@ -443,8 +483,45 @@ def validate_support_eval_dataset(data: Dict[str, Any]) -> Dict[str, Any]:
                 split: sum(1 for case in raw_set_cases if isinstance(case, dict) and case.get("split") == split)
                 for split in sorted(set_case_splits)
             },
+            "gold_labels": {
+                label: sum(1 for case in raw_set_cases if isinstance(case, dict) and case.get("gold") == label)
+                for label in sorted(set_gold_labels)
+            },
+            "test_split": {
+                "case_types": {
+                    case_type: sum(
+                        1
+                        for case in raw_set_cases
+                        if isinstance(case, dict)
+                        and case.get("split") == "test"
+                        and case.get("case_type") == case_type
+                    )
+                    for case_type in sorted(set_test_case_types)
+                },
+                "gold_labels": {
+                    label: sum(
+                        1
+                        for case in raw_set_cases
+                        if isinstance(case, dict)
+                        and case.get("split") == "test"
+                        and case.get("gold") == label
+                    )
+                    for label in sorted(set_test_gold_labels)
+                },
+            },
+            "required_case_types": sorted(REQUIRED_SET_CASE_TYPES),
+            "required_test_case_types": sorted(REQUIRED_SET_TEST_CASE_TYPES),
+            "required_gold_labels": sorted(REQUIRED_SET_GOLD_LABELS),
         },
         "label_sources": sorted(label_sources),
+        "label_source_counts": {
+            source: sum(
+                1
+                for case in [*raw_cases, *raw_set_cases]
+                if isinstance(case, dict) and case.get("label_source") == source
+            )
+            for source in sorted(label_sources)
+        },
         "warnings": warnings,
     }
     if errors:
@@ -498,6 +575,7 @@ def build_support_label_sidecar_template(
     template_cases = []
     for case in cases:
         item = dict(existing_by_id.get(case.case_id, _sidecar_placeholder_for_case(case)))
+        item.update(_sidecar_case_provenance_fields(case))
         if include_context:
             item.update(
                 {
@@ -523,7 +601,7 @@ def build_support_label_sidecar_template(
 
 
 def _sidecar_placeholder_for_case(case: SupportCase) -> Dict[str, Any]:
-    return {
+    item = {
         "case_id": case.case_id,
         "adjudication_status": "not_human_reviewed",
         "annotator_count": 0,
@@ -536,6 +614,18 @@ def _sidecar_placeholder_for_case(case: SupportCase) -> Dict[str, Any]:
             "Unreviewed seed label. When reviewed, record evidence source, "
             "annotator rationale, disagreement resolution, and adjudication notes."
         ),
+    }
+    item.update(_sidecar_case_provenance_fields(case))
+    return item
+
+
+def _sidecar_case_provenance_fields(case: SupportCase) -> Dict[str, Any]:
+    return {
+        "label_source": case.label_source,
+        "case_type": case.case_type,
+        "evidence_scope": case.evidence_scope,
+        "split": case.split,
+        "lang": case.lang,
     }
 
 
@@ -550,6 +640,7 @@ def validate_support_label_sidecar(data: Dict[str, Any], cases: List[SupportCase
         errors.append("schema_version must be 1")
 
     case_ids = {case.case_id for case in cases}
+    case_by_id = {case.case_id: case for case in cases}
     gold_by_case = {case.case_id: case.gold for case in cases}
     raw_items = data.get("cases")
     if not isinstance(raw_items, list):
@@ -577,6 +668,14 @@ def validate_support_label_sidecar(data: Dict[str, Any], cases: List[SupportCase
         elif case_id not in case_ids:
             errors.append(f"sidecar case_id {case_id!r} does not exist in dataset")
         seen_ids.add(case_id)
+
+        if case_id in case_by_id:
+            expected_provenance = _sidecar_case_provenance_fields(case_by_id[case_id])
+            for field, expected in expected_provenance.items():
+                if field in item and str(item.get(field, "")).strip() != str(expected).strip():
+                    errors.append(
+                        f"sidecar case {case_id or index} {field} {item.get(field)!r} does not match dataset {expected!r}"
+                    )
 
         if status not in ALLOWED_ADJUDICATION_STATUSES:
             errors.append(f"sidecar case {case_id or index} has unsupported adjudication_status {status!r}")
@@ -626,6 +725,10 @@ def validate_support_label_sidecar(data: Dict[str, Any], cases: List[SupportCase
     coverage = round(len(seen_ids & case_ids) / len(case_ids), 4) if case_ids else 0.0
     label_maturity = summarize_support_label_maturity(raw_items, dataset_case_count=len(case_ids))
     high_risk_review = summarize_support_high_risk_review(raw_items, cases)
+    full_text_required_review = summarize_support_full_text_required_review(raw_items, cases)
+    policy_boundary_review = summarize_support_policy_boundary_review(raw_items, cases)
+    label_provenance = summarize_support_label_provenance(raw_items, cases)
+    sidecar_case_provenance = summarize_support_sidecar_case_provenance(raw_items, cases)
     summary = {
         "ok": not errors,
         "schema_version": data.get("schema_version"),
@@ -639,6 +742,10 @@ def validate_support_label_sidecar(data: Dict[str, Any], cases: List[SupportCase
         },
         "label_maturity": label_maturity,
         "high_risk_review": high_risk_review,
+        "full_text_required_review": full_text_required_review,
+        "policy_boundary_review": policy_boundary_review,
+        "label_provenance": label_provenance,
+        "sidecar_case_provenance": sidecar_case_provenance,
         "warnings": warnings,
     }
     if errors:
@@ -662,20 +769,27 @@ def summarize_support_high_risk_review(raw_items: List[Any], cases: List[Support
     reviewed_case_ids_by_language: Dict[str, List[str]] = {}
     unreviewed_case_ids_by_language: Dict[str, List[str]] = {}
     unreviewed_by_case_type: Dict[str, int] = {}
+    case_count_by_language_case_type: Dict[str, Dict[str, int]] = {}
+    reviewed_by_language_case_type: Dict[str, Dict[str, int]] = {}
+    unreviewed_by_language_case_type: Dict[str, Dict[str, int]] = {}
     high_risk_cases = [case for case in cases if case.case_type in HIGH_RISK_SUPPORT_CASE_TYPES]
     for case in high_risk_cases:
         language = case.lang.strip() or "unknown"
+        case_type = case.case_type.strip() or "unknown"
         case_count_by_language[language] = case_count_by_language.get(language, 0) + 1
+        _increment_nested_count(case_count_by_language_case_type, language, case_type)
         item = sidecar_by_id.get(case.case_id, {})
         if item.get("adjudication_status") != "not_human_reviewed" and item:
             reviewed_case_ids.append(case.case_id)
             reviewed_by_language[language] = reviewed_by_language.get(language, 0) + 1
+            _increment_nested_count(reviewed_by_language_case_type, language, case_type)
             reviewed_case_ids_by_language.setdefault(language, []).append(case.case_id)
             continue
         unreviewed_case_ids.append(case.case_id)
         unreviewed_by_language[language] = unreviewed_by_language.get(language, 0) + 1
+        _increment_nested_count(unreviewed_by_language_case_type, language, case_type)
         unreviewed_case_ids_by_language.setdefault(language, []).append(case.case_id)
-        unreviewed_by_case_type[case.case_type] = unreviewed_by_case_type.get(case.case_type, 0) + 1
+        unreviewed_by_case_type[case_type] = unreviewed_by_case_type.get(case_type, 0) + 1
 
     return {
         "case_types": sorted(HIGH_RISK_SUPPORT_CASE_TYPES),
@@ -690,6 +804,207 @@ def summarize_support_high_risk_review(raw_items: List[Any], cases: List[Support
         "reviewed_case_ids_by_language": dict(sorted(reviewed_case_ids_by_language.items())),
         "unreviewed_case_ids_by_language": dict(sorted(unreviewed_case_ids_by_language.items())),
         "unreviewed_by_case_type": dict(sorted(unreviewed_by_case_type.items())),
+        "case_count_by_language_case_type": _sorted_nested_counts(case_count_by_language_case_type),
+        "reviewed_by_language_case_type": _sorted_nested_counts(reviewed_by_language_case_type),
+        "unreviewed_by_language_case_type": _sorted_nested_counts(unreviewed_by_language_case_type),
+    }
+
+
+def summarize_support_full_text_required_review(raw_items: List[Any], cases: List[SupportCase]) -> Dict[str, Any]:
+    """Summarize human-review coverage for abstract/full-text boundary cases."""
+
+    sidecar_by_id = {
+        str(item.get("case_id", "")).strip(): item
+        for item in raw_items
+        if isinstance(item, dict) and str(item.get("case_id", "")).strip()
+    }
+    reviewed_case_ids: List[str] = []
+    unreviewed_case_ids: List[str] = []
+    case_count_by_language: Dict[str, int] = {}
+    reviewed_by_language: Dict[str, int] = {}
+    unreviewed_by_language: Dict[str, int] = {}
+    reviewed_case_ids_by_language: Dict[str, List[str]] = {}
+    unreviewed_case_ids_by_language: Dict[str, List[str]] = {}
+    boundary_cases = [case for case in cases if case.case_type == "full_text_required"]
+    for case in boundary_cases:
+        language = case.lang.strip() or "unknown"
+        case_count_by_language[language] = case_count_by_language.get(language, 0) + 1
+        item = sidecar_by_id.get(case.case_id, {})
+        if item.get("adjudication_status") != "not_human_reviewed" and item:
+            reviewed_case_ids.append(case.case_id)
+            reviewed_by_language[language] = reviewed_by_language.get(language, 0) + 1
+            reviewed_case_ids_by_language.setdefault(language, []).append(case.case_id)
+            continue
+        unreviewed_case_ids.append(case.case_id)
+        unreviewed_by_language[language] = unreviewed_by_language.get(language, 0) + 1
+        unreviewed_case_ids_by_language.setdefault(language, []).append(case.case_id)
+
+    return {
+        "case_types": ["full_text_required"],
+        "case_count": len(boundary_cases),
+        "reviewed_count": len(reviewed_case_ids),
+        "unreviewed_count": len(unreviewed_case_ids),
+        "case_count_by_language": dict(sorted(case_count_by_language.items())),
+        "reviewed_by_language": dict(sorted(reviewed_by_language.items())),
+        "unreviewed_by_language": dict(sorted(unreviewed_by_language.items())),
+        "reviewed_case_ids": reviewed_case_ids,
+        "unreviewed_case_ids": unreviewed_case_ids,
+        "reviewed_case_ids_by_language": dict(sorted(reviewed_case_ids_by_language.items())),
+        "unreviewed_case_ids_by_language": dict(sorted(unreviewed_case_ids_by_language.items())),
+    }
+
+
+def summarize_support_policy_boundary_review(raw_items: List[Any], cases: List[SupportCase]) -> Dict[str, Any]:
+    """Summarize human-review coverage for weak citation-set aggregation cases."""
+
+    sidecar_by_id = {
+        str(item.get("case_id", "")).strip(): item
+        for item in raw_items
+        if isinstance(item, dict) and str(item.get("case_id", "")).strip()
+    }
+    reviewed_case_ids: List[str] = []
+    unreviewed_case_ids: List[str] = []
+    case_count_by_language: Dict[str, int] = {}
+    reviewed_by_language: Dict[str, int] = {}
+    unreviewed_by_language: Dict[str, int] = {}
+    reviewed_case_ids_by_language: Dict[str, List[str]] = {}
+    unreviewed_case_ids_by_language: Dict[str, List[str]] = {}
+    boundary_cases = [case for case in cases if case.case_type == "weak_set_boundary"]
+    for case in boundary_cases:
+        language = case.lang.strip() or "unknown"
+        case_count_by_language[language] = case_count_by_language.get(language, 0) + 1
+        item = sidecar_by_id.get(case.case_id, {})
+        if item.get("adjudication_status") != "not_human_reviewed" and item:
+            reviewed_case_ids.append(case.case_id)
+            reviewed_by_language[language] = reviewed_by_language.get(language, 0) + 1
+            reviewed_case_ids_by_language.setdefault(language, []).append(case.case_id)
+            continue
+        unreviewed_case_ids.append(case.case_id)
+        unreviewed_by_language[language] = unreviewed_by_language.get(language, 0) + 1
+        unreviewed_case_ids_by_language.setdefault(language, []).append(case.case_id)
+
+    return {
+        "case_types": ["weak_set_boundary"],
+        "case_count": len(boundary_cases),
+        "reviewed_count": len(reviewed_case_ids),
+        "unreviewed_count": len(unreviewed_case_ids),
+        "case_count_by_language": dict(sorted(case_count_by_language.items())),
+        "reviewed_by_language": dict(sorted(reviewed_by_language.items())),
+        "unreviewed_by_language": dict(sorted(unreviewed_by_language.items())),
+        "reviewed_case_ids": reviewed_case_ids,
+        "unreviewed_case_ids": unreviewed_case_ids,
+        "reviewed_case_ids_by_language": dict(sorted(reviewed_case_ids_by_language.items())),
+        "unreviewed_case_ids_by_language": dict(sorted(unreviewed_case_ids_by_language.items())),
+    }
+
+
+def summarize_support_label_provenance(raw_items: List[Any], cases: List[SupportCase]) -> Dict[str, Any]:
+    """Summarize label-source and review-provenance coverage for benchmark claims."""
+
+    case_by_id = {case.case_id: case for case in cases}
+    label_source_counts: Dict[str, int] = {}
+    status_by_label_source: Dict[str, Dict[str, int]] = {}
+    reviewed_by_label_source: Dict[str, int] = {}
+    unreviewed_by_label_source: Dict[str, int] = {}
+    unreviewed_case_ids_by_label_source: Dict[str, List[str]] = {}
+    reviewed_source_locator_count = 0
+    reviewed_missing_source_locator_case_ids: List[str] = []
+    published_benchmark_count = 0
+    published_benchmark_source_locator_count = 0
+    published_benchmark_case_ids: List[str] = []
+
+    for case in cases:
+        label_source = case.label_source.strip() or "unknown"
+        label_source_counts[label_source] = label_source_counts.get(label_source, 0) + 1
+
+    for item in raw_items:
+        if not isinstance(item, dict):
+            continue
+        case_id = str(item.get("case_id", "")).strip()
+        case = case_by_id.get(case_id)
+        label_source = (case.label_source.strip() if case else "") or "unknown"
+        status = str(item.get("adjudication_status", "")).strip() or "unknown"
+        source_locator = str(item.get("source_locator", "")).strip()
+        status_counts = status_by_label_source.setdefault(label_source, {})
+        status_counts[status] = status_counts.get(status, 0) + 1
+        if status == "not_human_reviewed":
+            unreviewed_by_label_source[label_source] = unreviewed_by_label_source.get(label_source, 0) + 1
+            if case_id:
+                unreviewed_case_ids_by_label_source.setdefault(label_source, []).append(case_id)
+            continue
+
+        reviewed_by_label_source[label_source] = reviewed_by_label_source.get(label_source, 0) + 1
+        if source_locator:
+            reviewed_source_locator_count += 1
+        elif case_id:
+            reviewed_missing_source_locator_case_ids.append(case_id)
+
+        if status == "published_benchmark":
+            published_benchmark_count += 1
+            if case_id:
+                published_benchmark_case_ids.append(case_id)
+            if source_locator:
+                published_benchmark_source_locator_count += 1
+
+    return {
+        "label_source_counts": dict(sorted(label_source_counts.items())),
+        "status_by_label_source": {
+            label_source: dict(sorted(status_counts.items()))
+            for label_source, status_counts in sorted(status_by_label_source.items())
+        },
+        "reviewed_by_label_source": dict(sorted(reviewed_by_label_source.items())),
+        "unreviewed_by_label_source": dict(sorted(unreviewed_by_label_source.items())),
+        "unreviewed_case_ids_by_label_source": dict(sorted(unreviewed_case_ids_by_label_source.items())),
+        "reviewed_source_locator_count": reviewed_source_locator_count,
+        "reviewed_missing_source_locator_count": len(reviewed_missing_source_locator_case_ids),
+        "reviewed_missing_source_locator_case_ids": reviewed_missing_source_locator_case_ids,
+        "published_benchmark_count": published_benchmark_count,
+        "published_benchmark_source_locator_count": published_benchmark_source_locator_count,
+        "published_benchmark_case_ids": published_benchmark_case_ids,
+    }
+
+
+def summarize_support_sidecar_case_provenance(raw_items: List[Any], cases: List[SupportCase]) -> Dict[str, Any]:
+    """Summarize dataset-context fields copied into the sidecar for review packets."""
+
+    case_by_id = {case.case_id: case for case in cases}
+    fields = ["label_source", "case_type", "evidence_scope", "split", "lang"]
+    present_counts = {field: 0 for field in fields}
+    complete_case_ids: List[str] = []
+    missing_case_ids_by_field: Dict[str, List[str]] = {field: [] for field in fields}
+    sidecar_case_ids = set()
+
+    for item in raw_items:
+        if not isinstance(item, dict):
+            continue
+        case_id = str(item.get("case_id", "")).strip()
+        if case_id not in case_by_id:
+            continue
+        sidecar_case_ids.add(case_id)
+        complete = True
+        for field in fields:
+            if field in item:
+                present_counts[field] += 1
+                continue
+            complete = False
+            missing_case_ids_by_field[field].append(case_id)
+        if complete:
+            complete_case_ids.append(case_id)
+
+    total = len(case_by_id)
+    complete_count = len(complete_case_ids)
+    missing_case_ids = [case.case_id for case in cases if case.case_id not in sidecar_case_ids]
+    return {
+        "fields": fields,
+        "field_present_counts": present_counts,
+        "complete_count": complete_count,
+        "complete_fraction": round(complete_count / total, 4) if total else 0.0,
+        "complete_case_ids": complete_case_ids,
+        "missing_count": len(missing_case_ids),
+        "missing_case_ids": missing_case_ids,
+        "missing_case_ids_by_field": {
+            field: case_ids for field, case_ids in missing_case_ids_by_field.items() if case_ids
+        },
     }
 
 
@@ -868,6 +1183,18 @@ def compute_support_label_sidecar_gate(
     high_risk_review = summary.get("high_risk_review", {})
     if not isinstance(high_risk_review, dict):
         high_risk_review = {}
+    full_text_required_review = summary.get("full_text_required_review", {})
+    if not isinstance(full_text_required_review, dict):
+        full_text_required_review = {}
+    policy_boundary_review = summary.get("policy_boundary_review", {})
+    if not isinstance(policy_boundary_review, dict):
+        policy_boundary_review = {}
+    label_provenance = summary.get("label_provenance", {})
+    if not isinstance(label_provenance, dict):
+        label_provenance = {}
+    sidecar_case_provenance = summary.get("sidecar_case_provenance", {})
+    if not isinstance(sidecar_case_provenance, dict):
+        sidecar_case_provenance = {}
     high_risk_reviewed = _safe_int(high_risk_review.get("reviewed_count", 0))
     high_risk_unreviewed = _safe_int(high_risk_review.get("unreviewed_count", 0))
     high_risk_case_count = _safe_int(high_risk_review.get("case_count", 0))
@@ -992,10 +1319,81 @@ def compute_support_label_sidecar_gate(
             "high_risk_case_count_by_language": case_count_by_language,
             "high_risk_reviewed_by_language": reviewed_by_language,
             "high_risk_unreviewed_by_language": unreviewed_by_language,
+            "high_risk_case_count_by_language_case_type": _nested_int_mapping(
+                high_risk_review.get("case_count_by_language_case_type", {})
+            ),
+            "high_risk_reviewed_by_language_case_type": _nested_int_mapping(
+                high_risk_review.get("reviewed_by_language_case_type", {})
+            ),
+            "high_risk_unreviewed_by_language_case_type": _nested_int_mapping(
+                high_risk_review.get("unreviewed_by_language_case_type", {})
+            ),
+            "full_text_required_case_count": _safe_int(full_text_required_review.get("case_count", 0)),
+            "full_text_required_reviewed": _safe_int(full_text_required_review.get("reviewed_count", 0)),
+            "full_text_required_unreviewed": _safe_int(full_text_required_review.get("unreviewed_count", 0)),
+            "full_text_required_case_count_by_language": _int_mapping(
+                full_text_required_review.get("case_count_by_language", {})
+            ),
+            "full_text_required_reviewed_by_language": _int_mapping(
+                full_text_required_review.get("reviewed_by_language", {})
+            ),
+            "full_text_required_unreviewed_by_language": _int_mapping(
+                full_text_required_review.get("unreviewed_by_language", {})
+            ),
+            "full_text_required_unreviewed_case_ids": list(
+                full_text_required_review.get("unreviewed_case_ids", [])
+            ),
+            "policy_boundary_case_count": _safe_int(policy_boundary_review.get("case_count", 0)),
+            "policy_boundary_reviewed": _safe_int(policy_boundary_review.get("reviewed_count", 0)),
+            "policy_boundary_unreviewed": _safe_int(policy_boundary_review.get("unreviewed_count", 0)),
+            "policy_boundary_case_count_by_language": _int_mapping(
+                policy_boundary_review.get("case_count_by_language", {})
+            ),
+            "policy_boundary_reviewed_by_language": _int_mapping(
+                policy_boundary_review.get("reviewed_by_language", {})
+            ),
+            "policy_boundary_unreviewed_by_language": _int_mapping(
+                policy_boundary_review.get("unreviewed_by_language", {})
+            ),
+            "policy_boundary_unreviewed_case_ids": list(policy_boundary_review.get("unreviewed_case_ids", [])),
             "dual_annotated": dual_annotated,
             "unresolved_disagreements": unresolved_disagreements,
             "supported_disagreements": supported_disagreements,
             "raw_dual_agreement_rate": raw_dual_agreement_rate,
+            "unresolved_disagreement_case_ids": list(maturity.get("unresolved_disagreement_case_ids", [])),
+            "supported_disagreement_case_ids": list(maturity.get("supported_disagreement_case_ids", [])),
+            "label_source_counts": _int_mapping(label_provenance.get("label_source_counts", {})),
+            "reviewed_by_label_source": _int_mapping(label_provenance.get("reviewed_by_label_source", {})),
+            "unreviewed_by_label_source": _int_mapping(label_provenance.get("unreviewed_by_label_source", {})),
+            "reviewed_source_locator_count": _safe_int(label_provenance.get("reviewed_source_locator_count", 0)),
+            "reviewed_missing_source_locator_count": _safe_int(
+                label_provenance.get("reviewed_missing_source_locator_count", 0)
+            ),
+            "published_benchmark_source_locator_count": _safe_int(
+                label_provenance.get("published_benchmark_source_locator_count", 0)
+            ),
+            "sidecar_provenance_complete_count": _safe_int(
+                sidecar_case_provenance.get("complete_count", 0)
+            ),
+            "sidecar_provenance_complete_fraction": _safe_float(
+                sidecar_case_provenance.get("complete_fraction", 0.0)
+            ),
+            "sidecar_provenance_missing_count": _safe_int(sidecar_case_provenance.get("missing_count", 0)),
+            "sidecar_provenance_missing_case_ids": list(
+                sidecar_case_provenance.get("missing_case_ids", [])
+            ),
+            "sidecar_provenance_missing_case_ids_by_field": {
+                str(field): list(case_ids or [])
+                for field, case_ids in (
+                    sidecar_case_provenance.get("missing_case_ids_by_field", {}) or {}
+                ).items()
+                if isinstance(case_ids, list)
+            }
+            if isinstance(sidecar_case_provenance.get("missing_case_ids_by_field"), dict)
+            else {},
+            "sidecar_provenance_field_present_counts": _int_mapping(
+                sidecar_case_provenance.get("field_present_counts", {})
+            ),
             "dataset_cases": int(summary.get("dataset_cases", 0)),
             "sidecar_cases": int(summary.get("n", 0)),
         },
@@ -1021,6 +1419,28 @@ def _int_mapping(value: Any) -> Dict[str, int]:
     if not isinstance(value, dict):
         return {}
     return {str(key): _safe_int(raw_value) for key, raw_value in sorted(value.items(), key=lambda item: str(item[0]))}
+
+
+def _nested_int_mapping(value: Any) -> Dict[str, Dict[str, int]]:
+    if not isinstance(value, dict):
+        return {}
+    return {
+        str(key): _int_mapping(raw_value)
+        for key, raw_value in sorted(value.items(), key=lambda item: str(item[0]))
+        if isinstance(raw_value, dict)
+    }
+
+
+def _increment_nested_count(counts: Dict[str, Dict[str, int]], outer_key: str, inner_key: str) -> None:
+    inner_counts = counts.setdefault(outer_key, {})
+    inner_counts[inner_key] = inner_counts.get(inner_key, 0) + 1
+
+
+def _sorted_nested_counts(counts: Dict[str, Dict[str, int]]) -> Dict[str, Dict[str, int]]:
+    return {
+        outer_key: dict(sorted(inner_counts.items()))
+        for outer_key, inner_counts in sorted(counts.items())
+    }
 
 
 def _run_support_predictions(cases: List[SupportCase], backend: SupportBackend) -> List[str]:
@@ -1178,6 +1598,18 @@ def _count_by_attr(items: List[Any], attr: str) -> Dict[str, int]:
     return {value: sum(1 for item in items if str(getattr(item, attr)) == value) for value in values}
 
 
+def _unique_strings(values: Any) -> List[str]:
+    seen = set()
+    result: List[str] = []
+    for value in values or []:
+        text = str(value).strip()
+        if not text or text in seen:
+            continue
+        seen.add(text)
+        result.append(text)
+    return result
+
+
 def compute_support_quality_gate(
     report: Dict[str, Any],
     max_false_support_rate: float = 0.0,
@@ -1241,6 +1673,8 @@ def compute_support_quality_gate(
     false_support_count = int(counts.get("false_support", 0))
     weak_false_support_count = int(counts.get("weak_false_support", 0))
     false_support_rate = float(metrics.get("false_support_rate", 0.0))
+    support_overcall_count = int(metrics.get("support_overcall_count", false_support_count + weak_false_support_count))
+    support_overcall_rate = float(metrics.get("support_overcall_rate", 0.0))
     supported_precision = float(metrics.get("supported_precision", 0.0))
     contradiction_recall = float(metrics.get("contradiction_recall", 0.0))
 
@@ -1295,6 +1729,8 @@ def compute_support_quality_gate(
             "false_support_rate": false_support_rate,
             "false_support_count": false_support_count,
             "weak_false_support_count": weak_false_support_count,
+            "support_overcall_count": support_overcall_count,
+            "support_overcall_rate": support_overcall_rate,
             "supported_precision": supported_precision,
             "contradiction_recall": contradiction_recall,
             "review_queue_count": len(review_queue),
@@ -1312,9 +1748,151 @@ def compute_support_quality_gate(
             for item in review_queue
             if isinstance(item, dict) and item.get("severity") == "critical" and item.get("case_id")
         ],
+        "release_blocker_summary": compute_release_blocker_summary(review_queue),
         "review_queue_summary": review_queue_summary,
+        "acceptance_slices": report.get("acceptance_slices", []) if isinstance(report, dict) else [],
         "failures": failures,
         "warnings": warnings,
+    }
+
+
+def compute_support_release_summary(
+    report: Dict[str, Any],
+    quality_gate: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """Return a compact release/agent-facing support-eval summary."""
+
+    metrics = report.get("overall", {}) if isinstance(report, dict) else {}
+    dataset = report.get("dataset", {}) if isinstance(report, dict) else {}
+    error_counts = report.get("error_bucket_counts", {}) if isinstance(report, dict) else {}
+    review_queue_summary = report.get("review_queue_summary", {}) if isinstance(report, dict) else {}
+    release_blockers = report.get("release_blocker_summary", {}) if isinstance(report, dict) else {}
+    false_support = report.get("false_support_analysis", {}) if isinstance(report, dict) else {}
+    acceptance_guard = report.get("acceptance_guard", {}) if isinstance(report, dict) else {}
+    abstention = report.get("abstention_analysis", {}) if isinstance(report, dict) else {}
+    quality = quality_gate if isinstance(quality_gate, dict) else report.get("quality_gate", {})
+    label_gate = report.get("label_sidecar_gate", {}) if isinstance(report, dict) else {}
+    label_sidecar = report.get("label_sidecar", {}) if isinstance(report, dict) else {}
+
+    quality_ok = quality.get("ok") if isinstance(quality, dict) else None
+    label_gate_ok = label_gate.get("ok") if isinstance(label_gate, dict) else None
+    review_required_count = int(release_blockers.get("review_required_count", 0) or 0)
+    release_blocked = bool(release_blockers.get("release_blocked"))
+    supported_acceptance_ok = bool(acceptance_guard.get("ok_to_accept_supported", True))
+    supported_acceptance_review = int(acceptance_guard.get("review_before_accepting_count", 0) or 0)
+
+    if quality_ok is False or label_gate_ok is False or release_blocked:
+        status = "blocked"
+    elif not supported_acceptance_ok or supported_acceptance_review or review_required_count:
+        status = "review_required"
+    else:
+        status = "clear"
+
+    next_action = str(release_blockers.get("next_action") or "")
+    if status == "blocked" and next_action in {"", "continue"}:
+        if label_gate_ok is False:
+            next_action = "complete_label_provenance_review"
+        elif quality_ok is False:
+            next_action = "inspect_support_quality_gate_failures"
+        else:
+            next_action = "block_release_until_support_eval_reviewed"
+    elif status == "review_required" and next_action in {"", "continue"}:
+        next_action = "review_support_eval_before_benchmark_claims"
+    elif not next_action:
+        next_action = "continue"
+
+    top_risk_slice = false_support.get("top_risk_slice") if isinstance(false_support, dict) else None
+    if not top_risk_slice:
+        top_risk_slice = _first_non_clear_acceptance_slice(report.get("acceptance_slices", []))
+
+    return {
+        "schema_version": 1,
+        "status": status,
+        "next_action": next_action,
+        "quality_gate_ok": quality_ok,
+        "label_sidecar_gate_ok": label_gate_ok,
+        "benchmark_claim_safe": bool(release_blockers.get("benchmark_claim_safe", False)),
+        "ok_to_accept_supported": supported_acceptance_ok,
+        "policy": (
+            "treat_supported_as_release_ready_only_when_status_clear; "
+            "false_support_blocks_release; weak_support_overcalls_require_review; "
+            "label_sidecar_maturity_controls_benchmark_claims"
+        ),
+        "metrics": {
+            "case_count": int(metrics.get("n", dataset.get("n", 0)) or 0),
+            "supported_precision": float(metrics.get("supported_precision", 0.0) or 0.0),
+            "supported_recall": float(metrics.get("supported_recall", 0.0) or 0.0),
+            "supported_f1": float(metrics.get("supported_f1", 0.0) or 0.0),
+            "macro_f1": float(metrics.get("macro_f1", 0.0) or 0.0),
+            "weighted_f1": float(metrics.get("weighted_f1", 0.0) or 0.0),
+            "false_support_rate": float(metrics.get("false_support_rate", 0.0) or 0.0),
+            "support_overcall_count": int(metrics.get("support_overcall_count", 0) or 0),
+            "support_overcall_rate": float(metrics.get("support_overcall_rate", 0.0) or 0.0),
+            "abstention_rate": float(metrics.get("abstention_rate", 0.0) or 0.0),
+            "contradiction_recall": float(metrics.get("contradiction_recall", 0.0) or 0.0),
+        },
+        "risk_counts": {
+            "false_support": int(error_counts.get("false_support", 0) or 0),
+            "weak_false_support": int(error_counts.get("weak_false_support", 0) or 0),
+            "missed_contradiction": int(error_counts.get("missed_contradiction", 0) or 0),
+            "incorrect_abstention": int(error_counts.get("incorrect_abstention", 0) or 0),
+            "correct_abstention": int(error_counts.get("correct_abstention", 0) or 0),
+        },
+        "review_queue": {
+            "count": int(review_queue_summary.get("count", review_required_count) or 0),
+            "critical_case_ids": list(review_queue_summary.get("critical_case_ids", []) or []),
+            "top_case_ids": list(review_queue_summary.get("top_case_ids", []) or []),
+            "blocking_case_ids": list(release_blockers.get("blocking_case_ids", []) or []),
+            "review_required_case_ids": list(release_blockers.get("review_required_case_ids", []) or []),
+        },
+        "acceptance": {
+            "block_acceptance_case_ids": list(acceptance_guard.get("block_acceptance_case_ids", []) or []),
+            "review_before_accepting_case_ids": list(
+                acceptance_guard.get("review_before_accepting_case_ids", []) or []
+            ),
+            "top_risk_slice_id": top_risk_slice.get("id") if isinstance(top_risk_slice, dict) else None,
+            "top_risk_slice_case_ids": (
+                list(top_risk_slice.get("case_ids", []) or []) if isinstance(top_risk_slice, dict) else []
+            ),
+        },
+        "abstention": {
+            "total_count": int(abstention.get("total_abstention_count", 0) or 0),
+            "correct_count": int(abstention.get("correct_abstention_count", 0) or 0),
+            "incorrect_count": int(abstention.get("incorrect_abstention_count", 0) or 0),
+            "review_case_ids": list(abstention.get("review_case_ids", []) or []),
+        },
+        "label_maturity": _support_release_label_maturity_summary(label_sidecar, label_gate),
+    }
+
+
+def _first_non_clear_acceptance_slice(rows: Any) -> Optional[Dict[str, Any]]:
+    if not isinstance(rows, list):
+        return None
+    for row in rows:
+        if isinstance(row, dict) and row.get("status") != "clear":
+            return row
+    return None
+
+
+def _support_release_label_maturity_summary(
+    label_sidecar: Dict[str, Any],
+    label_gate: Dict[str, Any],
+) -> Dict[str, Any]:
+    metrics = label_gate.get("metrics", {}) if isinstance(label_gate, dict) else {}
+    maturity = label_sidecar.get("label_maturity", {}) if isinstance(label_sidecar, dict) else {}
+    return {
+        "human_reviewed": int(label_sidecar.get("human_reviewed", metrics.get("human_reviewed", 0)) or 0)
+        if isinstance(label_sidecar, dict)
+        else 0,
+        "dual_annotated": int(metrics.get("dual_annotated", maturity.get("dual_annotated_count", 0)) or 0),
+        "published_benchmark": int(maturity.get("published_benchmark_count", 0) or 0)
+        if isinstance(maturity, dict)
+        else 0,
+        "high_risk_reviewed": int(metrics.get("high_risk_reviewed", 0) or 0),
+        "high_risk_unreviewed": int(metrics.get("high_risk_unreviewed", 0) or 0),
+        "sidecar_provenance_complete_fraction": float(
+            metrics.get("sidecar_provenance_complete_fraction", 0.0) or 0.0
+        ),
     }
 
 
@@ -1328,7 +1906,9 @@ def compute_support_report(
     error_buckets = compute_support_error_buckets(cases, predictions)
     error_bucket_counts = {key: len(items) for key, items in error_buckets.items()}
     review_queue = compute_support_review_queue(error_buckets)
-    return {
+    false_support_analysis = compute_false_support_analysis(error_buckets)
+    acceptance_slices = compute_support_acceptance_slices(cases, predictions)
+    report = {
         "dataset": summarize_support_cases(cases),
         "overall": compute_support_metrics(overall_preds),
         "confusion_matrix": compute_support_confusion_matrix(overall_preds),
@@ -1340,7 +1920,11 @@ def compute_support_report(
         "error_buckets": error_buckets,
         "review_queue": review_queue,
         "review_queue_summary": compute_support_review_queue_summary(review_queue),
-        "false_support_analysis": compute_false_support_analysis(error_buckets),
+        "release_blocker_summary": compute_release_blocker_summary(review_queue),
+        "false_support_analysis": false_support_analysis,
+        "acceptance_guard": false_support_analysis["acceptance_guard"],
+        "acceptance_slices": acceptance_slices,
+        "abstention_analysis": compute_abstention_analysis(error_buckets),
         "diagnostics": compute_support_diagnostics(cases, predictions, backend_name=backend_name),
         "cases": [
             {
@@ -1357,6 +1941,8 @@ def compute_support_report(
             for case, pred in zip(cases, predictions)
         ],
     }
+    report["release_summary"] = compute_support_release_summary(report)
+    return report
 
 
 def compute_support_review_queue_summary(review_queue: List[Dict[str, Any]]) -> Dict[str, Any]:
@@ -1394,6 +1980,81 @@ def compute_support_review_queue_summary(review_queue: List[Dict[str, Any]]) -> 
         "top_case_ids": top_case_ids,
         "critical_case_ids": critical_case_ids,
     }
+
+
+def compute_release_blocker_summary(review_queue: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """Summarize support-eval review rows as release/readiness blockers."""
+
+    valid_items = [item for item in review_queue if isinstance(item, dict)]
+    blocking_severities = {"critical", "high"}
+    blocking_items = [
+        item
+        for item in valid_items
+        if str(item.get("severity", "")) in blocking_severities
+    ]
+    review_required_items = [
+        item
+        for item in valid_items
+        if str(item.get("severity", "")) in {"critical", "high", "medium"}
+    ]
+    blocking_case_ids = _queue_case_ids(blocking_items)
+    review_required_case_ids = _queue_case_ids(review_required_items)
+    blocking_buckets = _queue_bucket_counts(blocking_items)
+    blocking_actions = _queue_action_counts(blocking_items)
+
+    if any(str(item.get("severity", "")) == "critical" for item in blocking_items):
+        next_action = "block_release_until_false_support_reviewed"
+    elif blocking_items:
+        next_action = "block_release_until_high_risk_reviewed"
+    elif review_required_items:
+        next_action = "review_medium_risk_before_benchmark_claims"
+    else:
+        next_action = "continue"
+
+    return {
+        "release_blocked": bool(blocking_items),
+        "benchmark_claim_safe": not review_required_items,
+        "blocking_count": len(blocking_items),
+        "blocking_case_ids": blocking_case_ids,
+        "blocking_buckets": blocking_buckets,
+        "blocking_recommended_actions": blocking_actions,
+        "review_required_count": len(review_required_items),
+        "review_required_case_ids": review_required_case_ids,
+        "next_action": next_action,
+        "policy": "critical_or_high_support_eval_rows_block_release_claims",
+        "interpretation": (
+            "Critical/high support-eval rows block release-readiness claims. "
+            "Medium rows still require review before making unqualified benchmark claims."
+        ),
+    }
+
+
+def _queue_case_ids(items: List[Dict[str, Any]]) -> List[str]:
+    return [
+        str(item.get("case_id", ""))
+        for item in items
+        if isinstance(item, dict) and item.get("case_id")
+    ]
+
+
+def _queue_bucket_counts(items: List[Dict[str, Any]]) -> Dict[str, int]:
+    counts: Dict[str, int] = {}
+    for item in items:
+        buckets = item.get("buckets", []) if isinstance(item, dict) else []
+        if not isinstance(buckets, list):
+            continue
+        for bucket in buckets:
+            name = str(bucket)
+            counts[name] = counts.get(name, 0) + 1
+    return dict(sorted(counts.items()))
+
+
+def _queue_action_counts(items: List[Dict[str, Any]]) -> Dict[str, int]:
+    counts: Dict[str, int] = {}
+    for item in items:
+        action = str(item.get("recommended_action", "") or "inspect_case")
+        counts[action] = counts.get(action, 0) + 1
+    return dict(sorted(counts.items()))
 
 
 def compute_support_review_queue(error_buckets: Dict[str, List[Dict[str, str]]]) -> List[Dict[str, Any]]:
@@ -1528,12 +2189,28 @@ def compute_false_support_analysis(error_buckets: Dict[str, List[Dict[str, str]]
     items = [dict(item, bucket="false_support") for item in false_items]
     items.extend(dict(item, bucket="weak_false_support") for item in weak_items)
     risk_slices = _false_support_risk_slices(items)
+    acceptance_guard = compute_false_support_acceptance_guard(error_buckets)
+    false_case_ids = [item["case_id"] for item in false_items]
+    weak_case_ids = [item["case_id"] for item in weak_items]
+    high_risk_overcall_case_ids = [
+        item["case_id"]
+        for item in items
+        if item.get("case_type") in HIGH_RISK_SUPPORT_CASE_TYPES
+        or item.get("gold") == "contradicted"
+        or item.get("split") == "test"
+        or item.get("lang") not in {"", "en", None}
+    ]
     return {
         "false_support_count": len(false_items),
         "weak_false_support_count": len(weak_items),
         "total_overcall_count": len(items),
         "case_ids": [item["case_id"] for item in items],
-        "high_risk_case_ids": [item["case_id"] for item in false_items],
+        "false_support_case_ids": false_case_ids,
+        "weak_false_support_case_ids": weak_case_ids,
+        "high_risk_overcall_case_ids": high_risk_overcall_case_ids,
+        "high_risk_case_ids": false_case_ids,
+        "acceptance_guard": acceptance_guard,
+        "review_plan": compute_false_support_review_plan(acceptance_guard, risk_slices),
         "risk_slices": risk_slices,
         "top_risk_slice": risk_slices[0] if risk_slices else None,
         "by_case_type": _false_support_group_summary(items, "case_type"),
@@ -1543,6 +2220,278 @@ def compute_false_support_analysis(error_buckets: Dict[str, List[Dict[str, str]]
         "interpretation": (
             "False-support overcalls are the highest-risk support failures. "
             "Review these cases before relaxing support thresholds or shipping a support backend."
+        ),
+    }
+
+
+def compute_support_acceptance_slices(cases: List[SupportCase], predictions: List[str]) -> List[Dict[str, Any]]:
+    """Return fixed support-risk slices that should stay visible even when clear."""
+
+    if len(cases) != len(predictions):
+        raise ValueError("cases and predictions must have the same length")
+
+    slice_specs = [
+        {
+            "id": "contradiction",
+            "severity": "critical",
+            "predicate": lambda case: case.gold == "contradicted",
+            "policy": "contradicted_cases_must_not_be_called_supported",
+            "recommended_action": "inspect_contradiction_before_accepting_support",
+        },
+        {
+            "id": "hard_negative",
+            "severity": "critical",
+            "predicate": lambda case: case.case_type == "hard_negative",
+            "policy": "real_or_related_papers_without_claim_support_must_not_be_called_supported",
+            "recommended_action": "rewrite_or_replace_evidence",
+        },
+        {
+            "id": "full_text_boundary",
+            "severity": "high",
+            "predicate": lambda case: case.case_type == "full_text_required"
+            or case.evidence_scope in {"full_text", "mixed_with_full_text"},
+            "policy": "abstract_or_metadata_evidence_must_not_be_upgraded_to_full_text_support",
+            "recommended_action": "inspect_full_text_or_find_stronger_citation",
+        },
+        {
+            "id": "test_split",
+            "severity": "high",
+            "predicate": lambda case: case.split == "test",
+            "policy": "heldout_test_overcalls_require_release_review",
+            "recommended_action": "block_release_until_reviewed",
+        },
+        {
+            "id": "non_english",
+            "severity": "high",
+            "predicate": lambda case: case.lang not in {"", "en"},
+            "policy": "non_english_overcalls_require_language_specific_review",
+            "recommended_action": "review_language_specific_failure",
+        },
+    ]
+
+    rows = []
+    for spec in slice_specs:
+        pairs = [
+            (case, prediction)
+            for case, prediction in zip(cases, predictions)
+            if spec["predicate"](case)
+        ]
+        false_case_ids = [
+            case.case_id
+            for case, prediction in pairs
+            if prediction == "supported" and case.gold != "supported"
+        ]
+        weak_case_ids = [
+            case.case_id
+            for case, prediction in pairs
+            if prediction == "weakly_supported" and case.gold not in {"supported", "weakly_supported"}
+        ]
+        status = "blocked" if false_case_ids else "review_required" if weak_case_ids else "clear"
+        rows.append(
+            {
+                "id": spec["id"],
+                "severity": spec["severity"],
+                "status": status,
+                "case_count": len(pairs),
+                "case_ids": [case.case_id for case, _prediction in pairs],
+                "false_support_count": len(false_case_ids),
+                "false_support_case_ids": false_case_ids,
+                "weak_false_support_count": len(weak_case_ids),
+                "weak_false_support_case_ids": weak_case_ids,
+                "recommended_action": spec["recommended_action"] if status != "clear" else "continue",
+                "policy": spec["policy"],
+            }
+        )
+    return rows
+
+
+def compute_false_support_review_plan(
+    acceptance_guard: Dict[str, Any],
+    risk_slices: List[Dict[str, Any]],
+) -> Dict[str, Any]:
+    """Return an action-first review plan for support overcalls."""
+
+    block_case_ids = list(acceptance_guard.get("block_acceptance_case_ids", []) or [])
+    review_case_ids = list(acceptance_guard.get("review_before_accepting_case_ids", []) or [])
+    top_slice = risk_slices[0] if risk_slices else {}
+    if block_case_ids:
+        status = "blocked"
+        next_action = "review_supported_overcalls_before_release"
+    elif review_case_ids:
+        status = "review_required"
+        next_action = "review_weak_support_overcalls_before_acceptance"
+    else:
+        status = "clear"
+        next_action = "continue"
+
+    phases = [
+        {
+            "id": "supported_overcall_blockers",
+            "priority": 1,
+            "status": "blocked" if block_case_ids else "clear",
+            "recommended_action": "rewrite_or_replace_evidence",
+            "case_ids": block_case_ids,
+            "count": len(block_case_ids),
+        },
+        {
+            "id": "weak_support_overcall_review",
+            "priority": 2,
+            "status": "review_required" if review_case_ids else "clear",
+            "recommended_action": "downgrade_or_find_stronger_evidence",
+            "case_ids": review_case_ids,
+            "count": len(review_case_ids),
+        },
+        {
+            "id": "highest_risk_slice_review",
+            "priority": 3,
+            "status": "review_required" if top_slice else "clear",
+            "recommended_action": top_slice.get("recommended_action", "continue") if top_slice else "continue",
+            "risk_slice_id": top_slice.get("id") if top_slice else None,
+            "case_ids": list(top_slice.get("case_ids", []) or []) if top_slice else [],
+            "count": int(top_slice.get("count", 0) or 0) if top_slice else 0,
+        },
+    ]
+    for phase in phases:
+        phase["annotation_packet"] = _false_support_annotation_packet_for_phase(phase)
+        phase["command_template"] = list(phase["annotation_packet"].get("command_template", []))
+        phase["packet_id"] = phase["annotation_packet"].get("packet_id")
+        phase["output"] = phase["annotation_packet"].get("output")
+        phase["instructions_output"] = phase["annotation_packet"].get("instructions_output")
+    recommended_packets = [
+        phase["annotation_packet"]
+        for phase in phases
+        if phase.get("status") != "clear" and phase.get("annotation_packet", {}).get("case_ids")
+    ]
+    return {
+        "schema_version": 1,
+        "status": status,
+        "next_action": next_action,
+        "block_acceptance_case_ids": block_case_ids,
+        "review_before_accepting_case_ids": review_case_ids,
+        "top_risk_slice_id": top_slice.get("id") if top_slice else None,
+        "top_risk_slice_case_ids": list(top_slice.get("case_ids", []) or []) if top_slice else [],
+        "phases": phases,
+        "recommended_annotation_packets": recommended_packets,
+        "recommended_annotation_packet_count": len(recommended_packets),
+        "recommended_annotation_case_ids": _unique_strings(
+            case_id
+            for packet in recommended_packets
+            for case_id in packet.get("case_ids", [])
+            if isinstance(packet, dict)
+        ),
+        "policy": (
+            "supported_overcalls_block_release; weak_overcalls_require_review; "
+            "top_risk_slice_sets_triage_order; annotation_packets_are_review_assignments_not_label_changes"
+        ),
+    }
+
+
+def _false_support_annotation_packet_for_phase(phase: Dict[str, Any]) -> Dict[str, Any]:
+    phase_id = str(phase.get("id") or "false_support_review")
+    case_ids = _unique_strings(str(case_id) for case_id in phase.get("case_ids", []) or [] if case_id)
+    packet_id = f"support-label-packet-{phase_id.replace('_', '-')}"
+    purpose = _false_support_phase_packet_purpose(phase)
+    command = [
+        "python",
+        "scripts/prepare_support_label_sidecar.py",
+        "--dataset",
+        "data/eval/support_eval.json",
+        "--existing-sidecar",
+        "data/eval/support_eval_label_sidecar.json",
+        "--annotation-packet",
+        "--review-phase",
+        phase_id,
+        "--packet-purpose",
+        purpose,
+    ]
+    for case_id in case_ids:
+        command.extend(["--case-id", case_id])
+    command.extend(
+        [
+            "--output",
+            f"experiments/{packet_id}.json",
+            "--instructions-output",
+            f"experiments/{packet_id}-instructions.md",
+        ]
+    )
+    return {
+        "schema_version": 1,
+        "packet_id": packet_id,
+        "review_phase": phase_id,
+        "packet_purpose": purpose,
+        "status": phase.get("status", "clear"),
+        "priority": phase.get("priority"),
+        "case_ids": case_ids,
+        "count": len(case_ids),
+        "command_template": command,
+        "output": f"experiments/{packet_id}.json",
+        "instructions_output": f"experiments/{packet_id}-instructions.md",
+        "policy": "create_blinded_annotation_packet_before_changing_labels_or_accepting_support_overcalls",
+    }
+
+
+def _false_support_phase_packet_purpose(phase: Dict[str, Any]) -> str:
+    phase_id = str(phase.get("id") or "")
+    if phase_id == "supported_overcall_blockers":
+        return "Review false supported overcalls that block release acceptance."
+    if phase_id == "weak_support_overcall_review":
+        return "Review weak-support overcalls before accepting weak support behavior."
+    if phase_id == "highest_risk_slice_review":
+        risk_slice_id = str(phase.get("risk_slice_id") or "highest_risk_slice")
+        return f"Review the highest-risk false-support slice: {risk_slice_id}."
+    return "Review support-eval overcalls before changing labels or thresholds."
+
+
+def compute_false_support_acceptance_guard(error_buckets: Dict[str, List[Dict[str, str]]]) -> Dict[str, Any]:
+    """Return a compact policy decision for accepting support overcalls."""
+
+    false_items = list(error_buckets.get("false_support", []))
+    weak_items = list(error_buckets.get("weak_false_support", []))
+    block_case_ids = [str(item["case_id"]) for item in false_items if item.get("case_id")]
+    review_case_ids = [str(item["case_id"]) for item in weak_items if item.get("case_id")]
+    if block_case_ids:
+        next_action = "block_release_until_reviewed"
+    elif review_case_ids:
+        next_action = "review_before_accepting_weak_support"
+    else:
+        next_action = "accept_supported_predictions"
+    return {
+        "ok_to_accept_supported": not block_case_ids,
+        "block_acceptance_count": len(block_case_ids),
+        "block_acceptance_case_ids": block_case_ids,
+        "review_before_accepting_count": len(review_case_ids),
+        "review_before_accepting_case_ids": review_case_ids,
+        "next_action": next_action,
+        "policy": "supported_overcalls_block_acceptance; weak_overcalls_require_review",
+        "interpretation": (
+            "A supported prediction for a non-supporting gold case blocks acceptance. "
+            "A weakly_supported prediction for a non-supporting gold case must be reviewed before it is treated as support."
+        ),
+    }
+
+
+def compute_abstention_analysis(error_buckets: Dict[str, List[Dict[str, str]]]) -> Dict[str, Any]:
+    """Summarize abstentions so agents can separate conservative refusals from recall loss."""
+
+    incorrect_items = list(error_buckets.get("incorrect_abstention", []))
+    correct_items = list(error_buckets.get("correct_abstention", []))
+    items = [dict(item, bucket="incorrect_abstention") for item in incorrect_items]
+    items.extend(dict(item, bucket="correct_abstention") for item in correct_items)
+    return {
+        "incorrect_abstention_count": len(incorrect_items),
+        "correct_abstention_count": len(correct_items),
+        "total_abstention_count": len(items),
+        "case_ids": [item["case_id"] for item in items],
+        "incorrect_case_ids": [item["case_id"] for item in incorrect_items],
+        "correct_case_ids": [item["case_id"] for item in correct_items],
+        "review_case_ids": [item["case_id"] for item in incorrect_items],
+        "by_case_type": _abstention_group_summary(items, "case_type"),
+        "by_evidence_scope": _abstention_group_summary(items, "evidence_scope"),
+        "by_language": _abstention_group_summary(items, "lang"),
+        "by_split": _abstention_group_summary(items, "split"),
+        "interpretation": (
+            "Correct abstentions are conservative behavior on insufficient-evidence cases; "
+            "incorrect abstentions are recall-loss cases to inspect before tightening abstention thresholds."
         ),
     }
 
@@ -1637,6 +2586,32 @@ def _false_support_group_summary(items: List[Dict[str, str]], field_name: str) -
             ],
             "weak_false_support_case_ids": [
                 item["case_id"] for item in grouped[key] if item.get("bucket") == "weak_false_support"
+            ],
+        }
+        for key in sorted(grouped)
+    }
+
+
+def _abstention_group_summary(items: List[Dict[str, str]], field_name: str) -> Dict[str, Dict[str, Any]]:
+    grouped: Dict[str, List[Dict[str, str]]] = {}
+    for item in items:
+        key = str(item.get(field_name, "unknown") or "unknown")
+        grouped.setdefault(key, []).append(item)
+    return {
+        key: {
+            "incorrect_abstention": sum(
+                1 for item in grouped[key] if item.get("bucket") == "incorrect_abstention"
+            ),
+            "correct_abstention": sum(
+                1 for item in grouped[key] if item.get("bucket") == "correct_abstention"
+            ),
+            "total": len(grouped[key]),
+            "case_ids": [item["case_id"] for item in grouped[key]],
+            "incorrect_case_ids": [
+                item["case_id"] for item in grouped[key] if item.get("bucket") == "incorrect_abstention"
+            ],
+            "correct_case_ids": [
+                item["case_id"] for item in grouped[key] if item.get("bucket") == "correct_abstention"
             ],
         }
         for key in sorted(grouped)
@@ -1784,6 +2759,7 @@ def compute_support_metrics(preds: List[Tuple[str, str]]) -> Dict[str, Any]:
     n = len(preds)
     correct = sum(1 for gold, pred in preds if gold == pred)
     per_label = _compute_per_label_metrics(preds)
+    aggregate_metrics = _compute_aggregate_label_metrics(per_label)
     supported_tp = sum(1 for gold, pred in preds if gold == "supported" and pred == "supported")
     supported_pred = sum(1 for _, pred in preds if pred == "supported")
     supported_total = sum(1 for gold, _ in preds if gold == "supported")
@@ -1798,7 +2774,11 @@ def compute_support_metrics(preds: List[Tuple[str, str]]) -> Dict[str, Any]:
         1 for gold, pred in preds if gold == "supported" and pred in ("contradicted", "insufficient_evidence")
     )
     false_support = sum(1 for gold, pred in preds if pred == "supported" and gold != "supported")
+    support_overcall = sum(
+        1 for gold, pred in preds if pred in ("supported", "weakly_supported") and gold not in ("supported", "weakly_supported")
+    )
     non_supported_total = sum(1 for gold, _ in preds if gold != "supported")
+    non_supporting_total = sum(1 for gold, _ in preds if gold not in ("supported", "weakly_supported"))
     abstentions = sum(1 for _, pred in preds if pred == "insufficient_evidence")
     contra_total = sum(1 for gold, _ in preds if gold == "contradicted")
     contra_hit = sum(1 for gold, pred in preds if gold == "contradicted" and pred == "contradicted")
@@ -1809,9 +2789,17 @@ def compute_support_metrics(preds: List[Tuple[str, str]]) -> Dict[str, Any]:
         "supported_recall": round(supported_recall, 4),
         "supported_f1": round(supported_f1, 4),
         "false_support_rate": round(false_support / non_supported_total, 4) if non_supported_total else 0.0,
+        "support_overcall_count": support_overcall,
+        "support_overcall_rate": round(support_overcall / non_supporting_total, 4) if non_supporting_total else 0.0,
         "abstention_rate": round(abstentions / n, 4) if n else 0.0,
         "misjudged_support_rate": round(misjudged_support / supported_total, 4) if supported_total else 0.0,
         "contradiction_recall": round(contra_hit / contra_total, 4) if contra_total else 0.0,
+        "macro_precision": aggregate_metrics["macro_precision"],
+        "macro_recall": aggregate_metrics["macro_recall"],
+        "macro_f1": aggregate_metrics["macro_f1"],
+        "weighted_precision": aggregate_metrics["weighted_precision"],
+        "weighted_recall": aggregate_metrics["weighted_recall"],
+        "weighted_f1": aggregate_metrics["weighted_f1"],
         "per_label": per_label,
     }
 
@@ -1834,3 +2822,36 @@ def _compute_per_label_metrics(preds: List[Tuple[str, str]]) -> Dict[str, Dict[s
             "f1": round(f1, 4),
         }
     return metrics
+
+
+def _compute_aggregate_label_metrics(per_label: Dict[str, Dict[str, float]]) -> Dict[str, float]:
+    labels = [label for label in SUPPORT_LABEL_ORDER if label in per_label]
+    if not labels:
+        return {
+            "macro_precision": 0.0,
+            "macro_recall": 0.0,
+            "macro_f1": 0.0,
+            "weighted_precision": 0.0,
+            "weighted_recall": 0.0,
+            "weighted_f1": 0.0,
+        }
+
+    total_gold = sum(int(per_label[label].get("gold", 0)) for label in labels)
+
+    def average(field: str) -> float:
+        return round(sum(float(per_label[label].get(field, 0.0)) for label in labels) / len(labels), 4)
+
+    def weighted_average(field: str) -> float:
+        if not total_gold:
+            return 0.0
+        value = sum(float(per_label[label].get(field, 0.0)) * int(per_label[label].get("gold", 0)) for label in labels)
+        return round(value / total_gold, 4)
+
+    return {
+        "macro_precision": average("precision"),
+        "macro_recall": average("recall"),
+        "macro_f1": average("f1"),
+        "weighted_precision": weighted_average("precision"),
+        "weighted_recall": weighted_average("recall"),
+        "weighted_f1": weighted_average("f1"),
+    }

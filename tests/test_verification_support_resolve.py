@@ -139,6 +139,10 @@ class _HTTPDiagnostics:
         self.last_status_code = None
         self.last_url = ""
         self.last_cache_hit = False
+        self.last_attempt_count = 0
+        self.last_retry_count = 0
+        self.last_retry_after_seconds = None
+        self.last_retry_delay_seconds = None
 
     def fail_rate_limited(self):
         self.last_error_code = "source_unavailable"
@@ -147,6 +151,10 @@ class _HTTPDiagnostics:
         self.last_status_code = 429
         self.last_url = "https://api.example.test/support"
         self.last_cache_hit = False
+        self.last_attempt_count = 2
+        self.last_retry_count = 1
+        self.last_retry_after_seconds = 2.0
+        self.last_retry_delay_seconds = 1.5
 
     def clear(self):
         self.last_error_code = ""
@@ -155,6 +163,10 @@ class _HTTPDiagnostics:
         self.last_status_code = 200
         self.last_url = "https://api.example.test/support"
         self.last_cache_hit = False
+        self.last_attempt_count = 0
+        self.last_retry_count = 0
+        self.last_retry_after_seconds = None
+        self.last_retry_delay_seconds = None
 
 
 class _FailingMetadataSource(InMemoryMetadataSource):
@@ -238,6 +250,10 @@ class CheckClaimSupportTests(unittest.TestCase):
         self.assertEqual(result.resolution["sources_failed"], ["diagnostic_source"])
         self.assertEqual(result.resolution["source_failure_details"][0]["code"], "source_unavailable")
         self.assertEqual(result.resolution["source_failure_details"][0]["kind"], "rate_limited")
+        self.assertEqual(result.resolution["source_failure_details"][0]["attempt_count"], 2)
+        self.assertEqual(result.resolution["source_failure_details"][0]["retry_count"], 1)
+        self.assertEqual(result.resolution["source_failure_details"][0]["retry_after_seconds"], 2.0)
+        self.assertEqual(result.resolution["source_failure_details"][0]["retry_delay_seconds"], 1.5)
         self.assertIn("Confidence is reduced", result.explanation)
 
     def test_unresolved_paper_is_insufficient_not_unsupported(self):
@@ -323,10 +339,12 @@ class CheckClaimSupportTests(unittest.TestCase):
         self.assertEqual(report.risk_ranking[0]["resolution_verdict"], "not_found")
         self.assertEqual(report.risk_ranking[0]["resolved_title"], "")
         self.assertEqual(report.risk_ranking[0]["evidence_source_field"], "none")
+        self.assertEqual(report.risk_ranking[0]["evidence_source_name"], "none")
         self.assertEqual(report.risk_ranking[1]["support_engine"], "ensemble")
         self.assertEqual(report.risk_ranking[1]["resolution_verdict"], "matched")
         self.assertEqual(report.risk_ranking[1]["resolved_title"], "Method M for Task T")
         self.assertEqual(report.risk_ranking[1]["evidence_source_field"], "abstract_sentence_1")
+        self.assertEqual(report.risk_ranking[1]["evidence_source_name"], "memory")
         self.assertTrue(report.risk_ranking[0]["counterevidence_review"])
         self.assertEqual(report.risk_ranking[0]["counterevidence_reason"], "unresolved_citation")
         self.assertTrue(report.results[1].to_dict()["counterevidence_review"])
@@ -342,6 +360,23 @@ class CheckClaimSupportTests(unittest.TestCase):
         self.assertEqual(review_summary["action_queues"]["identity_resolution_indexes"], [1])
         self.assertEqual(review_summary["action_queues"]["safe_to_keep_indexes"], [0])
         self.assertEqual(review_summary["action_queues"]["evidence_review_indexes"], [])
+        self.assertEqual(review_summary["recommended_next_steps"]["first_queue"], "identity_resolution_indexes")
+        self.assertEqual(review_summary["recommended_next_steps"]["first_action"], "resolve_identity")
+        self.assertEqual(review_summary["triage_plan"]["next_action"], "resolve_citation_identity")
+        self.assertEqual(review_summary["triage_plan"]["first_queue"], "identity_resolution_indexes")
+        self.assertEqual(
+            review_summary["recommended_next_steps"]["steps"],
+            [
+                {
+                    "priority": 3,
+                    "action": "resolve_identity",
+                    "queue": "identity_resolution_indexes",
+                    "count": 1,
+                    "indexes": [1],
+                }
+            ],
+        )
+        self.assertEqual(review_summary["recommended_next_steps"]["safe_to_keep_indexes"], [0])
 
     def test_audit_claim_support_flags_contradicted_for_counterevidence_review(self):
         contradictory = CitationRecord(
@@ -391,6 +426,27 @@ class CheckClaimSupportTests(unittest.TestCase):
         self.assertEqual(len(payload["query_results"]), len(payload["queries"]))
         self.assertIn("improvement_negation", payload["candidates"][0]["matched_query_roles"])
         self.assertTrue(payload["candidates"][0]["matched_queries"])
+        self.assertEqual(payload["review_summary"]["candidate_count"], payload["candidate_count"])
+        self.assertEqual(payload["review_summary"]["signal_counts"]["explicit_contradiction_cue"], 1)
+        self.assertGreaterEqual(payload["review_summary"]["matched_query_role_counts"]["improvement_negation"], 1)
+        self.assertEqual(payload["review_summary"]["top_candidate"]["title"], "Method M Does Not Improve Task T")
+        self.assertEqual(
+            payload["review_summary"]["recommended_next_steps"]["first_action"],
+            "review_explicit_contradiction_leads",
+        )
+        self.assertEqual(
+            payload["review_summary"]["recommended_next_steps"]["explicit_contradiction_candidate_indexes"],
+            [0],
+        )
+        self.assertEqual(
+            payload["review_summary"]["recommended_next_steps"]["queue_order"][0],
+            "explicit_contradiction_candidate_indexes",
+        )
+        self.assertIn(
+            "related_candidate_indexes",
+            payload["review_summary"]["recommended_next_steps"]["queue_order"],
+        )
+        self.assertEqual(payload["review_summary"]["policy"], "review_leads_not_contradiction_verdicts")
         self.assertIn("review leads", payload["interpretation"])
         self.assertEqual(payload["source_failure_mode"], "none")
         self.assertEqual(payload["sources_available"], ["metadata_source"])
@@ -422,6 +478,16 @@ class CheckClaimSupportTests(unittest.TestCase):
         self.assertEqual(payload["candidates"][0]["signal"], "source_outage_safety_cue")
         self.assertIn("source_outage_safety", {item["role"] for item in payload["query_plan"]})
         self.assertIn("source_outage_safety", payload["candidates"][0]["matched_query_roles"])
+        self.assertEqual(payload["review_summary"]["signal_counts"]["source_outage_safety_cue"], 1)
+        self.assertEqual(payload["review_summary"]["top_candidate"]["signal"], "source_outage_safety_cue")
+        self.assertEqual(
+            payload["review_summary"]["recommended_next_steps"]["first_action"],
+            "review_source_outage_safety_leads",
+        )
+        self.assertEqual(
+            payload["review_summary"]["recommended_next_steps"]["source_outage_safety_candidate_indexes"],
+            [0],
+        )
         self.assertIn("not_found results lower confidence", payload["candidates"][0]["abstract_snippet"])
         self.assertEqual(payload["next_action"], "review_counterevidence_leads")
 
@@ -466,6 +532,15 @@ class CheckClaimSupportTests(unittest.TestCase):
         self.assertEqual(payload["source_failure_details"][0]["code"], "timeout")
         self.assertEqual(payload["recovery_code"], "timeout")
         self.assertEqual(payload["next_action"], "retry_or_check_source_health")
+        self.assertEqual(payload["review_summary"]["recommended_next_steps"]["status"], "source_retry")
+        self.assertEqual(
+            payload["review_summary"]["recommended_next_steps"]["first_action"],
+            "retry_or_check_source_health",
+        )
+        self.assertEqual(
+            payload["review_summary"]["recommended_next_steps"]["source_retry_sources"],
+            ["timeout_source"],
+        )
         self.assertEqual(len(payload["query_results"]), len(payload["queries"]))
         self.assertTrue(all(item["source_failure_mode"] == "all_sources_failed" for item in payload["query_results"]))
 
@@ -479,6 +554,8 @@ class CheckClaimSupportTests(unittest.TestCase):
         self.assertEqual(payload["source_failure_mode"], "none")
         self.assertFalse(payload["outage_limited"])
         self.assertEqual(payload["next_action"], "continue")
+        self.assertEqual(payload["review_summary"]["recommended_next_steps"]["status"], "clear")
+        self.assertEqual(payload["review_summary"]["recommended_next_steps"]["first_action"], "continue")
 
     def test_counterevidence_reports_single_source_http_failure_diagnostics(self):
         report = search_counterevidence_candidates(
@@ -493,6 +570,8 @@ class CheckClaimSupportTests(unittest.TestCase):
         self.assertEqual(payload["source_failure_details"][0]["code"], "source_unavailable")
         self.assertEqual(payload["source_failure_details"][0]["kind"], "rate_limited")
         self.assertEqual(payload["source_failure_details"][0]["status_code"], 429)
+        self.assertEqual(payload["source_failure_details"][0]["retry_after_seconds"], 2.0)
+        self.assertEqual(payload["source_failure_details"][0]["retry_delay_seconds"], 1.5)
         self.assertTrue(all(item["sources_failed"] == ["diagnostic_source"] for item in payload["query_results"]))
 
     def test_enrich_support_payload_adds_counterevidence_only_for_review_items(self):
@@ -558,6 +637,9 @@ class CheckClaimSupportTests(unittest.TestCase):
         self.assertTrue(result.evidence)
         self.assertEqual(result.to_dict()["evidence"][0]["evidence_scope"], "abstract")
         self.assertEqual(result.to_dict()["evidence"][0]["index"], 1)
+        self.assertEqual(result.to_dict()["evidence_scopes"], ["none", "abstract"])
+        self.assertEqual(result.to_dict()["evidence_source_names"], ["none", "memory"])
+        self.assertEqual(result.to_dict()["evidence_source_fields"], ["none", "abstract_sentence_1"])
 
     def test_claim_support_set_keeps_multiple_weak_support_tentative(self):
         source = InMemoryMetadataSource(
@@ -647,9 +729,15 @@ class CheckClaimSupportTests(unittest.TestCase):
         self.assertEqual(payload["summary"]["insufficient_evidence"], 1)
         self.assertEqual(payload["results"][0]["input_mode"], "citation_set")
         self.assertEqual(payload["results"][0]["support_mode"], "single_strong_support")
+        self.assertEqual(payload["results"][0]["evidence_scopes"], ["abstract", "none"])
+        self.assertEqual(payload["results"][0]["evidence_source_names"], ["memory", "none"])
+        self.assertEqual(payload["results"][0]["evidence_source_fields"], ["abstract_sentence_1", "none"])
         self.assertEqual(payload["results"][1]["input_mode"], "citation")
         self.assertEqual(payload["risk_ranking"][0]["input_mode"], "citation")
         self.assertEqual(payload["risk_ranking"][1]["input_mode"], "citation_set")
+        self.assertEqual(payload["risk_ranking"][1]["evidence_scopes"], ["abstract", "none"])
+        self.assertEqual(payload["risk_ranking"][1]["evidence_source_names"], ["memory", "none"])
+        self.assertEqual(payload["risk_ranking"][1]["evidence_source_fields"], ["abstract_sentence_1", "none"])
         self.assertEqual(payload["review_summary"]["total"], 2)
         self.assertEqual(payload["review_summary"]["high_risk_count"], 1)
         self.assertEqual(payload["review_summary"]["low_risk_count"], 1)

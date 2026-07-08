@@ -7,6 +7,7 @@ import socket
 from dataclasses import dataclass, field, replace
 from enum import Enum
 from typing import Any, Dict, List, Optional, Union
+from urllib.parse import urlparse
 
 from citeguard.citation import normalize_text, tokenize_text
 from citeguard.graph import CitationRecord
@@ -16,9 +17,13 @@ from citeguard.verifiers.support_backends import split_evidence_text
 
 from .models import (
     available_sources,
+    canonical_metadata_quality,
     classify_source_failure_mode,
+    input_source_provenance,
     review_summary_from_risk_ranking,
     source_failure_recovery_code,
+    source_metadata_confidence_effect,
+    source_metadata_missing_fields,
     stable_next_action,
 )
 from .resolve import STRONG_MATCH, resolve_citation, source_names
@@ -91,15 +96,23 @@ class SupportResult:
     model_failure_details: List[Dict[str, Any]] = field(default_factory=list)
 
     def to_dict(self) -> Dict[str, Any]:
+        evidence = dict(self.evidence)
+        evidence.setdefault(
+            "source_name",
+            infer_evidence_source_name(evidence.get("source_field", ""), evidence.get("source_url", "")),
+        )
         data = {
             "verdict": self.verdict.value,
             "confidence": round(self.confidence, 4),
             "claim": self.claim,
-            "evidence": dict(self.evidence),
+            "evidence": evidence,
             "evidence_scope": self.evidence_scope,
             "nli_scores": dict(self.nli_scores) if self.nli_scores else None,
             "engine": self.engine,
             "resolution": dict(self.resolution),
+            "canonical_metadata_quality": _resolution_metadata_quality(self.resolution),
+            "source_metadata_missing_fields": _resolution_metadata_missing_fields(self.resolution),
+            "source_metadata_confidence_effect": _resolution_metadata_confidence_effect(self.resolution),
             "explanation": self.explanation,
             "lang": self.lang,
             "model_failure_details": [dict(item) for item in self.model_failure_details],
@@ -172,6 +185,11 @@ class CounterEvidenceSearchReport:
     query_results: List[Dict[str, Any]] = field(default_factory=list)
 
     def to_dict(self) -> Dict[str, Any]:
+        next_action = _counterevidence_next_action(
+            candidate_count=len(self.candidates),
+            source_failure_mode=self.source_failure_mode,
+            sources_failed=self.sources_failed,
+        )
         return {
             "claim": self.claim,
             "queries": list(self.queries),
@@ -179,6 +197,12 @@ class CounterEvidenceSearchReport:
             "query_results": [dict(item) for item in self.query_results],
             "candidate_count": len(self.candidates),
             "candidates": [dict(item) for item in self.candidates],
+            "review_summary": _counterevidence_review_summary(
+                self.candidates,
+                source_failure_mode=self.source_failure_mode,
+                sources_failed=self.sources_failed,
+                next_action=next_action,
+            ),
             "sources_checked": list(self.sources_checked),
             "sources_responded": list(self.sources_responded),
             "sources_available": available_sources(self.sources_checked, self.sources_failed),
@@ -187,11 +211,7 @@ class CounterEvidenceSearchReport:
             "source_failure_mode": self.source_failure_mode,
             "outage_limited": self.source_failure_mode == "all_sources_failed",
             "recovery_code": source_failure_recovery_code(self.source_failure_details),
-            "next_action": _counterevidence_next_action(
-                candidate_count=len(self.candidates),
-                source_failure_mode=self.source_failure_mode,
-                sources_failed=self.sources_failed,
-            ),
+            "next_action": next_action,
             "interpretation": (
                 "Retrieved candidates are review leads, not a contradiction verdict. "
                 "Run support checks before rewriting or removing citations."
@@ -219,6 +239,8 @@ class ClaimSupportSetResult:
     evidence_scope: str = "abstract"
 
     def to_dict(self) -> Dict[str, Any]:
+        evidence_provenance = _support_set_evidence_provenance(self)
+        input_provenance = _support_set_input_source_provenance(self)
         data = {
             "verdict": self.verdict.value,
             "confidence": round(self.confidence, 4),
@@ -234,6 +256,20 @@ class ClaimSupportSetResult:
             "contradicting_citation_count": self.contradicting_citation_count,
             "lang": self.lang,
             "evidence_scope": self.evidence_scope,
+            "evidence_scopes": evidence_provenance["evidence_scopes"],
+            "evidence_source_names": evidence_provenance["evidence_source_names"],
+            "evidence_source_fields": evidence_provenance["evidence_source_fields"],
+            "source_metadata_missing_fields": _support_set_metadata_missing_fields(self),
+            "source_metadata_confidence_effects": _support_set_metadata_confidence_effects(self),
+            "support_mode_details": _support_set_mode_details(self),
+            "input_source_paths": input_provenance["input_source_paths"],
+            "input_source_formats": input_provenance["input_source_formats"],
+            "input_source_types": input_provenance["input_source_types"],
+            "input_source_ids": input_provenance["input_source_ids"],
+            "input_source_indexes": input_provenance["input_source_indexes"],
+            "input_source_locators": input_provenance["input_source_locators"],
+            "input_source_line_starts": input_provenance["input_source_line_starts"],
+            "input_source_line_ends": input_provenance["input_source_line_ends"],
             "next_action": _support_set_next_action(self.verdict),
         }
         data.update(_counterevidence_review_for_set(self.verdict, self.summary))
@@ -246,26 +282,40 @@ def build_evidence_spans(citation: CitationRecord) -> List[Dict[str, str]]:
     spans: List[Dict[str, str]] = []
     seen = set()
 
-    def add(text: str, source_field: str, source_url: str = "", evidence_scope: str = "") -> None:
+    def add(
+        text: str,
+        source_field: str,
+        source_url: str = "",
+        evidence_scope: str = "",
+        source_name: str = "",
+    ) -> None:
         cleaned = " ".join(str(text).split())
         if not cleaned or cleaned in seen:
             return
         seen.add(cleaned)
         scope = evidence_scope or infer_evidence_scope(source_field, source_url)
+        source = source_name or infer_evidence_source_name(source_field, source_url)
         spans.append(
             {
                 "text": cleaned,
                 "source_field": source_field,
                 "source_url": source_url,
                 "evidence_scope": scope,
+                "source_name": source,
             }
         )
 
+    citation_source_name = _citation_record_source_name(citation.source)
     if citation.title:
-        add(citation.title, "title", evidence_scope="title")
+        add(citation.title, "title", evidence_scope="title", source_name=citation_source_name)
     if citation.abstract:
         for index, sentence in enumerate(split_evidence_text(citation.abstract), start=1):
-            add(sentence, f"abstract_sentence_{index}", evidence_scope="abstract")
+            add(
+                sentence,
+                f"abstract_sentence_{index}",
+                evidence_scope="abstract",
+                source_name=citation_source_name,
+            )
     for index, chunk in enumerate(citation.metadata.get("evidence_chunks", []), start=1):
         if isinstance(chunk, dict):
             add(
@@ -273,10 +323,18 @@ def build_evidence_spans(citation: CitationRecord) -> List[Dict[str, str]]:
                 str(chunk.get("source_field", f"metadata_chunk_{index}")),
                 str(chunk.get("source_url", "")),
                 str(chunk.get("evidence_scope", "")),
+                str(chunk.get("source_name", "")),
             )
         else:
             add(str(chunk), f"metadata_chunk_{index}")
     return spans
+
+
+def _citation_record_source_name(source: str) -> str:
+    source_name = str(source or "").strip()
+    if not source_name or source_name == "unknown":
+        return "citation_metadata"
+    return source_name
 
 
 def infer_evidence_scope(source_field: str, source_url: str = "") -> str:
@@ -294,6 +352,45 @@ def infer_evidence_scope(source_field: str, source_url: str = "") -> str:
     if source_url:
         return "metadata_snippet"
     if field.startswith("metadata") or "chunk" in field:
+        return "metadata"
+    return "unknown"
+
+
+def infer_evidence_source_name(source_field: str, source_url: str = "") -> str:
+    """Return a stable source label for an evidence span without parsing prose."""
+
+    field = str(source_field or "").strip()
+    lowered = field.lower()
+    if not field or lowered == "none":
+        return "none"
+    if lowered == "title" or lowered.startswith("abstract"):
+        return "citation_metadata"
+    if "user_full_text" in lowered or lowered.startswith("user_provided"):
+        return "user_provided"
+    if lowered.startswith("eval_"):
+        return "eval_fixture"
+
+    aliases = {
+        "openalex": "openalex",
+        "crossref": "crossref",
+        "arxiv": "arxiv",
+        "semantic": "semantic_scholar",
+        "semanticscholar": "semantic_scholar",
+        "s2": "semantic_scholar",
+        "fixture": "fixture",
+    }
+    first_token = lowered.split("_", 1)[0].replace("-", "")
+    if first_token in aliases:
+        return aliases[first_token]
+
+    parsed = urlparse(str(source_url or ""))
+    hostname = (parsed.hostname or "").lower()
+    for token, canonical in aliases.items():
+        if token and token in hostname.replace("-", ""):
+            return canonical
+    if source_url:
+        return "remote_metadata"
+    if lowered.startswith("metadata") or "chunk" in lowered:
         return "metadata"
     return "unknown"
 
@@ -555,7 +652,13 @@ def assess_support(
             verdict=SupportVerdict.INSUFFICIENT_EVIDENCE,
             confidence=0.0,
             claim=claim,
-            evidence={"text": "", "source_field": "none", "source_url": "", "evidence_scope": "none"},
+            evidence={
+                "text": "",
+                "source_field": "none",
+                "source_url": "",
+                "evidence_scope": "none",
+                "source_name": "none",
+            },
             nli_scores=None,
             engine="heuristic",
             resolution=resolution,
@@ -727,6 +830,7 @@ def assess_support(
 
 def _result(verdict, confidence, claim, span, nli, engine, resolution, explanation, lang) -> SupportResult:
     evidence_scope = span.get("evidence_scope") or infer_evidence_scope(span["source_field"], span.get("source_url", ""))
+    source_name = span.get("source_name") or infer_evidence_source_name(span["source_field"], span.get("source_url", ""))
     adjusted_confidence = _support_confidence_with_source_failures(float(confidence), resolution)
     adjusted_explanation = explanation + _support_source_failure_note(resolution)
     return SupportResult(
@@ -738,6 +842,7 @@ def _result(verdict, confidence, claim, span, nli, engine, resolution, explanati
             "source_field": span["source_field"],
             "source_url": span.get("source_url", ""),
             "evidence_scope": evidence_scope,
+            "source_name": source_name,
         },
         nli_scores=nli,
         engine=engine,
@@ -841,10 +946,16 @@ def check_claim_support(
             verdict=SupportVerdict.INSUFFICIENT_EVIDENCE,
             confidence=0.0,
             claim=claim,
-            evidence={"text": "", "source_field": "none", "source_url": "", "evidence_scope": "none"},
+            evidence={
+                "text": "",
+                "source_field": "none",
+                "source_url": "",
+                "evidence_scope": "none",
+                "source_name": "none",
+            },
             nli_scores=None,
             engine="none",
-            resolution={"verdict": "not_found", **failure_status},
+            resolution={"verdict": "not_found", **failure_status, **input_source_provenance(candidate)},
             explanation=explanation,
             lang=lang,
             evidence_scope="none",
@@ -854,10 +965,21 @@ def check_claim_support(
             verdict=SupportVerdict.INSUFFICIENT_EVIDENCE,
             confidence=0.0,
             claim=claim,
-            evidence={"text": "", "source_field": "none", "source_url": "", "evidence_scope": "none"},
+            evidence={
+                "text": "",
+                "source_field": "none",
+                "source_url": "",
+                "evidence_scope": "none",
+                "source_name": "none",
+            },
             nli_scores=None,
             engine="none",
-            resolution={"verdict": "ambiguous", **failure_status, "recovery_code": "ambiguous_citation"},
+            resolution={
+                "verdict": "ambiguous",
+                **failure_status,
+                "recovery_code": "ambiguous_citation",
+                **input_source_provenance(candidate),
+            },
             explanation="The citation is ambiguous; provide a DOI/arXiv id before judging support.",
             lang=lang,
             evidence_scope="none",
@@ -866,7 +988,11 @@ def check_claim_support(
         "verdict": "matched",
         "title": outcome.best.title,
         "year": outcome.best.year,
+        "canonical_metadata_quality": canonical_metadata_quality(outcome.best),
+        "source_metadata_missing_fields": source_metadata_missing_fields(outcome.best),
+        "source_metadata_confidence_effect": source_metadata_confidence_effect(outcome.best),
         **failure_status,
+        **input_source_provenance(candidate),
     }
     resolved = _merge_candidate_evidence(outcome.best, candidate)
     return assess_support(claim, resolved, backend=backend, policy=policy, lang=lang, resolution=resolution)
@@ -1424,8 +1550,14 @@ def _source_failure_details(source: MetadataSource) -> List[Dict[str, Any]]:
                 "kind": getattr(http_client, "last_error_kind", ""),
                 "status_code": getattr(http_client, "last_status_code", None),
                 "url": getattr(http_client, "last_url", ""),
+                "final_url": getattr(http_client, "last_final_url", ""),
+                "redirected": bool(getattr(http_client, "last_redirected", False)),
                 "error": getattr(http_client, "last_error", ""),
                 "cache_hit": bool(getattr(http_client, "last_cache_hit", False)),
+                "attempt_count": int(getattr(http_client, "last_attempt_count", 0) or 0),
+                "retry_count": int(getattr(http_client, "last_retry_count", 0) or 0),
+                "retry_after_seconds": getattr(http_client, "last_retry_after_seconds", None),
+                "retry_delay_seconds": getattr(http_client, "last_retry_delay_seconds", None),
             }
         )
     return _dedupe_failure_details(details)
@@ -1454,6 +1586,120 @@ def _aggregate_evidence_scope(scopes: List[str]) -> str:
     if "full_text" in unique:
         return "mixed_with_full_text"
     return "mixed"
+
+
+def _support_set_evidence_provenance(result: ClaimSupportSetResult) -> Dict[str, List[str]]:
+    scopes: List[str] = []
+    source_names: List[str] = []
+    source_fields: List[str] = []
+
+    for child in result.results:
+        source_field = str(child.evidence.get("source_field", "")).strip()
+        source_url = str(child.evidence.get("source_url", "")).strip()
+        scope = str(child.evidence_scope or child.evidence.get("evidence_scope", "")).strip()
+        source_name = str(
+            child.evidence.get("source_name") or infer_evidence_source_name(source_field, source_url)
+        ).strip()
+
+        if scope:
+            scopes.append(scope)
+        if source_name:
+            source_names.append(source_name)
+        if source_field:
+            source_fields.append(source_field)
+
+    if not scopes and result.evidence_scope:
+        scopes.append(result.evidence_scope)
+
+    return {
+        "evidence_scopes": _ordered_nonempty_values(scopes, default="none"),
+        "evidence_source_names": _ordered_nonempty_values(source_names, default="none"),
+        "evidence_source_fields": _ordered_nonempty_values(source_fields, default="none"),
+    }
+
+
+def _support_set_mode_details(result: ClaimSupportSetResult) -> Dict[str, Any]:
+    index_by_verdict: Dict[str, List[int]] = {verdict.value: [] for verdict in SupportVerdict}
+    for index, child in enumerate(result.results):
+        index_by_verdict.setdefault(child.verdict.value, []).append(index)
+
+    evidence_provenance = _support_set_evidence_provenance(result)
+    evidence_scopes = evidence_provenance["evidence_scopes"]
+    full_text_present = any(scope in {"full_text", "mixed_with_full_text"} for scope in evidence_scopes)
+    total = len(result.results)
+    strong_count = len(index_by_verdict.get(SupportVerdict.SUPPORTED.value, []))
+    weak_count = len(index_by_verdict.get(SupportVerdict.WEAKLY_SUPPORTED.value, []))
+    contradicted_count = len(index_by_verdict.get(SupportVerdict.CONTRADICTED.value, []))
+    insufficient_count = len(index_by_verdict.get(SupportVerdict.INSUFFICIENT_EVIDENCE.value, []))
+
+    decision_by_mode = {
+        "contradiction_dominates": "contradiction_dominates_aggregate",
+        "single_strong_support": "one_strong_citation_supports_claim",
+        "multiple_strong_support": "multiple_strong_citations_support_claim",
+        "multiple_weak_support": "multiple_weak_citations_remain_tentative",
+        "single_weak_support": "single_weak_citation_remains_tentative",
+        "insufficient_evidence": "no_citation_confirms_claim",
+    }
+    reasons_by_mode = {
+        "contradiction_dominates": [
+            "at_least_one_citation_contradicted",
+            "contradictions_dominate_support_set",
+        ],
+        "single_strong_support": ["one_citation_supported"],
+        "multiple_strong_support": ["multiple_citations_supported"],
+        "multiple_weak_support": [
+            "multiple_citations_weakly_supported",
+            "weak_sources_do_not_become_strong_support",
+        ],
+        "single_weak_support": [
+            "one_citation_weakly_supported",
+            "weak_source_requires_stronger_evidence_or_full_text",
+        ],
+        "insufficient_evidence": ["no_citation_supported_or_weakly_supported"],
+    }
+    if not full_text_present:
+        reasons = list(reasons_by_mode.get(result.support_mode, []))
+        reasons.append("no_full_text_evidence_in_aggregate")
+    else:
+        reasons = list(reasons_by_mode.get(result.support_mode, []))
+        reasons.append("user_provided_full_text_evidence_present")
+
+    return {
+        "schema_version": 1,
+        "support_mode": result.support_mode,
+        "decision": decision_by_mode.get(result.support_mode, "unknown"),
+        "policy": (
+            "contradictions_dominate; multiple_weak_citations_remain_tentative; "
+            "no_unstated_multi_hop_or_full_text_support"
+        ),
+        "reasons": reasons,
+        "total_citation_count": total,
+        "strong_support_count": strong_count,
+        "weak_support_count": weak_count,
+        "contradiction_count": contradicted_count,
+        "insufficient_evidence_count": insufficient_count,
+        "supported_indexes": list(index_by_verdict.get(SupportVerdict.SUPPORTED.value, [])),
+        "weakly_supported_indexes": list(index_by_verdict.get(SupportVerdict.WEAKLY_SUPPORTED.value, [])),
+        "contradicted_indexes": list(index_by_verdict.get(SupportVerdict.CONTRADICTED.value, [])),
+        "insufficient_evidence_indexes": list(
+            index_by_verdict.get(SupportVerdict.INSUFFICIENT_EVIDENCE.value, [])
+        ),
+        "evidence_scope": result.evidence_scope,
+        "evidence_scopes": evidence_scopes,
+        "full_text_evidence_present": full_text_present,
+    }
+
+
+def _ordered_nonempty_values(values: List[str], *, default: str = "none") -> List[str]:
+    ordered: List[str] = []
+    seen = set()
+    for value in values:
+        cleaned = str(value or "").strip()
+        if not cleaned or cleaned in seen:
+            continue
+        seen.add(cleaned)
+        ordered.append(cleaned)
+    return ordered or [default]
 
 
 def _merge_candidate_evidence(record: CitationRecord, candidate: CitationRecord) -> CitationRecord:
@@ -1612,6 +1858,136 @@ def _counterevidence_next_action(
     return stable_next_action("continue")
 
 
+def _counterevidence_review_summary(
+    candidates: List[Dict[str, Any]],
+    *,
+    source_failure_mode: str,
+    sources_failed: List[str],
+    next_action: str,
+) -> Dict[str, Any]:
+    signal_counts: Dict[str, int] = {}
+    matched_query_role_counts: Dict[str, int] = {}
+    for candidate in candidates:
+        if not isinstance(candidate, dict):
+            continue
+        signal = str(candidate.get("signal", "") or "unknown")
+        signal_counts[signal] = signal_counts.get(signal, 0) + 1
+        roles = candidate.get("matched_query_roles", [])
+        if not isinstance(roles, list):
+            continue
+        for role in roles:
+            role_name = str(role)
+            matched_query_role_counts[role_name] = matched_query_role_counts.get(role_name, 0) + 1
+
+    top_candidate = candidates[0] if candidates and isinstance(candidates[0], dict) else {}
+    compact_top_candidate = None
+    if top_candidate:
+        compact_top_candidate = {
+            "title": top_candidate.get("title", ""),
+            "signal": top_candidate.get("signal", ""),
+            "score": top_candidate.get("score"),
+            "matched_query_roles": list(top_candidate.get("matched_query_roles", []) or []),
+            "evidence_scope": top_candidate.get("evidence_scope", ""),
+        }
+
+    return {
+        "candidate_count": len(candidates),
+        "signal_counts": dict(sorted(signal_counts.items())),
+        "matched_query_role_counts": dict(sorted(matched_query_role_counts.items())),
+        "top_candidate": compact_top_candidate,
+        "recommended_next_steps": _counterevidence_recommended_next_steps(
+            candidates,
+            source_failure_mode=source_failure_mode,
+            sources_failed=sources_failed,
+            next_action=next_action,
+        ),
+        "source_failure_mode": source_failure_mode,
+        "sources_failed": list(sources_failed),
+        "outage_limited": source_failure_mode == "all_sources_failed",
+        "next_action": next_action,
+        "policy": "review_leads_not_contradiction_verdicts",
+    }
+
+
+def _counterevidence_recommended_next_steps(
+    candidates: List[Dict[str, Any]],
+    *,
+    source_failure_mode: str,
+    sources_failed: List[str],
+    next_action: str,
+) -> Dict[str, Any]:
+    explicit_indexes: List[int] = []
+    source_outage_safety_indexes: List[int] = []
+    related_indexes: List[int] = []
+    for index, candidate in enumerate(candidates):
+        if not isinstance(candidate, dict):
+            continue
+        signal = str(candidate.get("signal", "") or "")
+        if signal == "explicit_contradiction_cue":
+            explicit_indexes.append(index)
+        elif signal == "source_outage_safety_cue":
+            source_outage_safety_indexes.append(index)
+        else:
+            related_indexes.append(index)
+
+    steps: List[Dict[str, Any]] = []
+    if explicit_indexes:
+        steps.append(
+            {
+                "action": "review_explicit_contradiction_leads",
+                "queue": "explicit_contradiction_candidate_indexes",
+                "candidate_indexes": explicit_indexes,
+                "count": len(explicit_indexes),
+                "priority": 1,
+            }
+        )
+    if source_outage_safety_indexes:
+        steps.append(
+            {
+                "action": "review_source_outage_safety_leads",
+                "queue": "source_outage_safety_candidate_indexes",
+                "candidate_indexes": source_outage_safety_indexes,
+                "count": len(source_outage_safety_indexes),
+                "priority": 2,
+            }
+        )
+    if related_indexes:
+        steps.append(
+            {
+                "action": "review_related_candidates",
+                "queue": "related_candidate_indexes",
+                "candidate_indexes": related_indexes,
+                "count": len(related_indexes),
+                "priority": 3,
+            }
+        )
+    if not steps and (source_failure_mode != "none" or sources_failed):
+        steps.append(
+            {
+                "action": "retry_or_check_source_health",
+                "queue": "source_retry_sources",
+                "sources": list(sources_failed),
+                "count": len(sources_failed),
+                "priority": 4,
+            }
+        )
+
+    first = steps[0] if steps else {}
+    return {
+        "status": "review_required" if candidates else "source_retry" if steps else "clear",
+        "next_action": next_action,
+        "first_action": first.get("action", "continue"),
+        "first_queue": first.get("queue", ""),
+        "queue_order": [step["queue"] for step in steps],
+        "explicit_contradiction_candidate_indexes": explicit_indexes,
+        "source_outage_safety_candidate_indexes": source_outage_safety_indexes,
+        "related_candidate_indexes": related_indexes,
+        "source_retry_sources": list(sources_failed) if not candidates and (source_failure_mode != "none" or sources_failed) else [],
+        "steps": steps,
+        "policy": "prioritize_explicit_contradiction_cues_but_treat_all_candidates_as_review_leads",
+    }
+
+
 def _support_risk_item(index: int, result: SupportResult) -> Dict[str, Any]:
     if result.verdict == SupportVerdict.SUPPORTED:
         risk, score, recommendation = "low", 0.05, "Claim is supported by the available abstract-level evidence."
@@ -1633,6 +2009,7 @@ def _support_risk_item(index: int, result: SupportResult) -> Dict[str, Any]:
         "verdict": result.verdict.value,
         "risk": risk,
         "risk_score": round(score, 4),
+        "risk_reason": _support_risk_reason(result),
         "claim": result.claim,
         "support_confidence": round(result.confidence, 4),
         "support_engine": result.engine,
@@ -1640,12 +2017,21 @@ def _support_risk_item(index: int, result: SupportResult) -> Dict[str, Any]:
         "resolution_verdict": str(result.resolution.get("verdict", "")),
         "resolved_title": str(result.resolution.get("title", "")),
         "resolved_year": result.resolution.get("year"),
+        "canonical_metadata_quality": _resolution_metadata_quality(result.resolution),
+        "source_metadata_missing_fields": _resolution_metadata_missing_fields(result.resolution),
+        "source_metadata_confidence_effect": _resolution_metadata_confidence_effect(result.resolution),
         "evidence_scope": result.evidence_scope,
         "evidence_source_field": str(result.evidence.get("source_field", "")),
         "evidence_source_url": str(result.evidence.get("source_url", "")),
+        "evidence_source_name": str(
+            result.evidence.get("source_name")
+            or infer_evidence_source_name(result.evidence.get("source_field", ""), result.evidence.get("source_url", ""))
+        ),
         "next_action": next_action,
+        "suggested_fix": _support_suggested_fix(result, next_action),
         "recommendation": recommendation,
     }
+    item.update(_support_result_input_source_provenance(result))
     item.update(_counterevidence_review_for_result(result))
     return item
 
@@ -1657,24 +2043,199 @@ def _support_set_risk_item(index: int, result: ClaimSupportSetResult) -> Dict[st
         score = 0.05
     else:
         score = 0.72 if result.verdict == SupportVerdict.INSUFFICIENT_EVIDENCE else 0.6
+    evidence_provenance = _support_set_evidence_provenance(result)
     item = {
         "index": index,
         "verdict": result.verdict.value,
         "risk": result.risk,
         "risk_score": round(score, 4),
+        "risk_reason": _support_set_risk_reason(result),
         "claim": result.claim,
         "support_confidence": round(result.confidence, 4),
         "support_engine": "citation_set",
         "summary": dict(result.summary),
         "evidence_scope": result.evidence_scope,
+        "evidence_scopes": evidence_provenance["evidence_scopes"],
+        "evidence_source_names": evidence_provenance["evidence_source_names"],
+        "evidence_source_fields": evidence_provenance["evidence_source_fields"],
+        "source_metadata_missing_fields": _support_set_metadata_missing_fields(result),
+        "source_metadata_confidence_effects": _support_set_metadata_confidence_effects(result),
         "support_mode": result.support_mode,
+        "support_mode_details": _support_set_mode_details(result),
         "supporting_citation_count": result.supporting_citation_count,
         "contradicting_citation_count": result.contradicting_citation_count,
         "next_action": _support_set_next_action(result.verdict),
+        "suggested_fix": _support_set_suggested_fix(result),
         "recommendation": result.recommendation,
     }
+    item.update(_support_set_input_source_provenance(result))
     item.update(_counterevidence_review_for_set(result.verdict, result.summary))
     return item
+
+
+def _support_risk_reason(result: SupportResult) -> str:
+    if result.verdict == SupportVerdict.SUPPORTED:
+        return "available_evidence_supports_claim"
+    if result.verdict == SupportVerdict.WEAKLY_SUPPORTED:
+        return "available_evidence_is_partial"
+    if result.verdict == SupportVerdict.CONTRADICTED:
+        return "available_evidence_contradicts_claim"
+    resolution_verdict = str(result.resolution.get("verdict", ""))
+    if resolution_verdict == "not_found":
+        return "citation_identity_unresolved"
+    if resolution_verdict == "ambiguous":
+        return "citation_identity_ambiguous"
+    return "available_evidence_does_not_confirm_claim"
+
+
+def _support_set_risk_reason(result: ClaimSupportSetResult) -> str:
+    reasons_by_mode = {
+        "contradiction_dominates": "citation_set_contains_contradiction",
+        "single_strong_support": "citation_set_has_single_strong_support",
+        "multiple_strong_support": "citation_set_has_multiple_strong_support",
+        "multiple_weak_support": "citation_set_has_only_weak_support",
+        "single_weak_support": "citation_set_has_only_weak_support",
+        "insufficient_evidence": "citation_set_evidence_does_not_confirm_claim",
+    }
+    return reasons_by_mode.get(result.support_mode, "citation_set_requires_review")
+
+
+def _support_suggested_fix(result: SupportResult, next_action: str) -> Dict[str, Any]:
+    resolution_verdict = str(result.resolution.get("verdict", ""))
+    if next_action in {"resolve_citation_identity", "disambiguate_identifier"}:
+        return {
+            "kind": "resolve_citation_identity",
+            "action": next_action,
+            "resolution_verdict": resolution_verdict,
+            "requested_identifiers": ["doi", "arxiv_id"],
+            "requires_user_confirmation": True,
+            "policy": "resolve_identity_before_judging_support",
+        }
+    if next_action == "rewrite_or_replace_evidence":
+        return {
+            "kind": "rewrite_claim_or_replace_evidence",
+            "action": next_action,
+            "requires_user_confirmation": True,
+            "policy": "contradicted_support_requires_human_review",
+        }
+    if next_action in {"tighten_claim_or_inspect_full_text", "inspect_full_text_or_find_stronger_citation"}:
+        return {
+            "kind": "inspect_full_text_or_find_stronger_citation",
+            "action": next_action,
+            "evidence_scope": result.evidence_scope,
+            "requires_user_confirmation": True,
+            "policy": "limited_evidence_is_not_final_full_text_judgment",
+        }
+    return {
+        "kind": "keep_claim",
+        "action": next_action,
+        "evidence_scope": result.evidence_scope,
+        "requires_user_confirmation": False,
+    }
+
+
+def _support_set_suggested_fix(result: ClaimSupportSetResult) -> Dict[str, Any]:
+    next_action = _support_set_next_action(result.verdict)
+    if next_action == "keep_claim":
+        return {
+            "kind": "keep_claim",
+            "action": next_action,
+            "support_mode": result.support_mode,
+            "requires_user_confirmation": False,
+        }
+    if next_action == "rewrite_or_replace_evidence":
+        return {
+            "kind": "rewrite_claim_or_replace_evidence",
+            "action": next_action,
+            "support_mode": result.support_mode,
+            "requires_user_confirmation": True,
+            "policy": "contradicted_support_requires_human_review",
+        }
+    return {
+        "kind": "inspect_full_text_or_find_stronger_citation",
+        "action": next_action,
+        "support_mode": result.support_mode,
+        "evidence_scope": result.evidence_scope,
+        "requires_user_confirmation": True,
+        "policy": "multiple_weak_or_insufficient_support_remains_tentative",
+    }
+
+
+def _support_result_input_source_provenance(result: SupportResult) -> Dict[str, Any]:
+    return input_source_provenance(result.resolution)
+
+
+def _support_set_input_source_provenance(result: ClaimSupportSetResult) -> Dict[str, Any]:
+    paths = []
+    formats = []
+    types = []
+    ids = []
+    indexes = []
+    locators = []
+    line_starts = []
+    line_ends = []
+    for child in result.results:
+        provenance = input_source_provenance(child.resolution)
+        if provenance.get("input_source_path"):
+            paths.append(str(provenance["input_source_path"]))
+        if provenance.get("input_source_format"):
+            formats.append(str(provenance["input_source_format"]))
+        if provenance.get("input_source_type"):
+            types.append(str(provenance["input_source_type"]))
+        if provenance.get("input_source_id"):
+            ids.append(str(provenance["input_source_id"]))
+        if provenance.get("input_source_index") is not None:
+            indexes.append(provenance["input_source_index"])
+        if provenance.get("input_source_locator"):
+            locators.append(str(provenance["input_source_locator"]))
+        if provenance.get("input_source_line_start") is not None:
+            line_starts.append(provenance["input_source_line_start"])
+        if provenance.get("input_source_line_end") is not None:
+            line_ends.append(provenance["input_source_line_end"])
+    return {
+        "input_source_paths": _ordered_nonempty_values(paths, default="none"),
+        "input_source_formats": _ordered_nonempty_values(formats, default="none"),
+        "input_source_types": _ordered_nonempty_values(types, default="none"),
+        "input_source_ids": _ordered_nonempty_values(ids, default="none"),
+        "input_source_indexes": indexes,
+        "input_source_locators": _ordered_nonempty_values(locators, default="none"),
+        "input_source_line_starts": line_starts,
+        "input_source_line_ends": line_ends,
+    }
+
+
+def _resolution_metadata_quality(resolution: Dict[str, Any]) -> Dict[str, Any]:
+    quality = resolution.get("canonical_metadata_quality", {})
+    return dict(quality) if isinstance(quality, dict) else {}
+
+
+def _resolution_metadata_missing_fields(resolution: Dict[str, Any]) -> List[str]:
+    fields = resolution.get("source_metadata_missing_fields")
+    if isinstance(fields, list):
+        return [str(field) for field in fields]
+    quality = _resolution_metadata_quality(resolution)
+    quality_fields = quality.get("missing_fields", [])
+    return [str(field) for field in quality_fields] if isinstance(quality_fields, list) else []
+
+
+def _resolution_metadata_confidence_effect(resolution: Dict[str, Any]) -> str:
+    effect = resolution.get("source_metadata_confidence_effect")
+    if effect:
+        return str(effect)
+    quality = _resolution_metadata_quality(resolution)
+    return str(quality.get("confidence_effect", "")) if quality else ""
+
+
+def _support_set_metadata_missing_fields(result: ClaimSupportSetResult) -> List[str]:
+    fields: List[str] = []
+    for child in result.results:
+        fields.extend(_resolution_metadata_missing_fields(child.resolution))
+    return _ordered_nonempty_values(fields, default="none")
+
+
+def _support_set_metadata_confidence_effects(result: ClaimSupportSetResult) -> List[str]:
+    effects = [_resolution_metadata_confidence_effect(child.resolution) for child in result.results]
+    return _ordered_nonempty_values(effects, default="none")
 
 
 def _support_audit_risk_item(

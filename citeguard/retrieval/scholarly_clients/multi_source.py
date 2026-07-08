@@ -114,7 +114,13 @@ def _source_failure_detail(source: MetadataSource, exc: Optional[Exception] = No
     error = getattr(http_client, "last_error", "") if http_client is not None else ""
     status_code = getattr(http_client, "last_status_code", None) if http_client is not None else None
     url = getattr(http_client, "last_url", "") if http_client is not None else ""
+    final_url = getattr(http_client, "last_final_url", "") if http_client is not None else ""
+    redirected = bool(getattr(http_client, "last_redirected", False)) if http_client is not None else False
     cache_hit = bool(getattr(http_client, "last_cache_hit", False)) if http_client is not None else False
+    attempt_count = int(getattr(http_client, "last_attempt_count", 0) or 0) if http_client is not None else 0
+    retry_count = int(getattr(http_client, "last_retry_count", 0) or 0) if http_client is not None else 0
+    retry_after_seconds = getattr(http_client, "last_retry_after_seconds", None) if http_client is not None else None
+    retry_delay_seconds = getattr(http_client, "last_retry_delay_seconds", None) if http_client is not None else None
 
     if exc is not None and not code:
         code, kind = _classify_source_exception(exc)
@@ -126,8 +132,14 @@ def _source_failure_detail(source: MetadataSource, exc: Optional[Exception] = No
         "kind": kind,
         "status_code": status_code,
         "url": url,
+        "final_url": final_url,
+        "redirected": redirected,
         "error": error,
         "cache_hit": cache_hit,
+        "attempt_count": attempt_count,
+        "retry_count": retry_count,
+        "retry_after_seconds": retry_after_seconds,
+        "retry_delay_seconds": retry_delay_seconds,
     }
 
 

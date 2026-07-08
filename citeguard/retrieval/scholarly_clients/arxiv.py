@@ -10,7 +10,14 @@ from citeguard.graph import CitationRecord
 from .base import MetadataSource
 from .evidence import attach_evidence_chunks, harvest_remote_evidence_report
 from .http import HTTPClient
-from .utils import find_local_match, normalize_arxiv_id, normalize_doi, record_match_score, stable_record_id
+from .utils import (
+    find_local_match,
+    metadata_quality,
+    normalize_arxiv_id,
+    normalize_doi,
+    record_match_score,
+    stable_record_id,
+)
 
 
 ATOM_NS = {"a": "http://www.w3.org/2005/Atom", "arxiv": "http://arxiv.org/schemas/atom"}
@@ -106,7 +113,21 @@ class ArxivMetadataSource(MetadataSource):
                 )
                 evidence_chunks = evidence_report["chunks"]
                 evidence_failures = evidence_report["failures"]
-            metadata = {"source_score": 0.0}
+            year = int(published[:4]) if len(published) >= 4 and published[:4].isdigit() else None
+            abstract = " ".join(summary.split())
+            metadata = {
+                "source_score": 0.0,
+                "metadata_quality": metadata_quality(
+                    title=title,
+                    authors=authors,
+                    year=year,
+                    venue="arXiv",
+                    abstract=abstract,
+                    doi=doi,
+                    arxiv_id=arxiv_id,
+                    url=entry_id,
+                ),
+            }
             if evidence_failures:
                 metadata["evidence_harvest_failures"] = evidence_failures
             records.append(
@@ -114,9 +135,9 @@ class ArxivMetadataSource(MetadataSource):
                     citation_id=stable_record_id("arxiv", arxiv_id or title),
                     title=title,
                     authors=authors,
-                    year=int(published[:4]) if len(published) >= 4 and published[:4].isdigit() else None,
+                    year=year,
                     venue="arXiv",
-                    abstract=" ".join(summary.split()),
+                    abstract=abstract,
                     doi=doi,
                     arxiv_id=arxiv_id,
                     url=entry_id,

@@ -13,8 +13,19 @@ from citeguard.retrieval.scholarly_clients.utils import (
 )
 
 DOI_RE = re.compile(r"10\.\d{4,9}/[-._;()/:a-z0-9]+", re.IGNORECASE)
-ARXIV_LABELLED_RE = re.compile(r"arxiv:\s*(\d{4}\.\d{4,5})", re.IGNORECASE)
-ARXIV_BARE_RE = re.compile(r"\b(\d{4}\.\d{4,5})\b")
+ARXIV_NEW_ID_PATTERN = r"\d{4}\.\d{4,5}"
+ARXIV_OLD_ID_PATTERN = r"[a-z][a-z-]*(?:\.[a-z]{2})?/\d{7}"
+ARXIV_ID_PATTERN = rf"(?:{ARXIV_NEW_ID_PATTERN}|{ARXIV_OLD_ID_PATTERN})(?:v\d+)?"
+ARXIV_LABELLED_RE = re.compile(rf"arxiv:\s*({ARXIV_ID_PATTERN})", re.IGNORECASE)
+ARXIV_URL_RE = re.compile(
+    rf"https?://arxiv\.org/(?:abs|pdf|html)/({ARXIV_ID_PATTERN})(?:\.pdf)?",
+    re.IGNORECASE,
+)
+ARXIV_BARE_URL_RE = re.compile(
+    rf"\barxiv\.org/(?:abs|pdf|html)/({ARXIV_ID_PATTERN})(?:\.pdf)?",
+    re.IGNORECASE,
+)
+ARXIV_BARE_RE = re.compile(rf"\b({ARXIV_ID_PATTERN})\b", re.IGNORECASE)
 YEAR_RE = re.compile(r"\b(?:19|20)\d{2}\b")
 
 
@@ -25,6 +36,12 @@ def extract_doi(text: str) -> str:
 
 def extract_arxiv_id(text: str) -> str:
     match = ARXIV_LABELLED_RE.search(text or "")
+    if match:
+        return normalize_arxiv_id(match.group(1))
+    match = ARXIV_URL_RE.search(text or "")
+    if match:
+        return normalize_arxiv_id(match.group(1))
+    match = ARXIV_BARE_URL_RE.search(text or "")
     if match:
         return normalize_arxiv_id(match.group(1))
     match = ARXIV_BARE_RE.search(text or "")

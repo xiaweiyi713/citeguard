@@ -527,6 +527,54 @@
       "case_type": "contradiction",
       "split": "train",
       "label_notes": "Chinese live-source reliability case: rate limiting contradicts a non-existence conclusion and should route to retry/source-health review."
+    },
+    {
+      "id": "s45",
+      "claim": "A real citation-auditing paper proves the tool automatically eliminates citation hallucinations in deployed writing agents.",
+      "evidence": "The paper introduces a citation-auditing workflow, finds citation errors in generated bibliographies, and recommends human review for high-risk outputs; it does not evaluate deployed agents or show automatic elimination of hallucinations.",
+      "gold": "insufficient_evidence",
+      "lang": "en",
+      "evidence_scope": "abstract",
+      "label_source": "maintainer_synthetic",
+      "case_type": "hard_negative",
+      "split": "test",
+      "label_notes": "Hard negative for false-support risk: a real, topically related citation-auditing paper does not support an overstrong deployed-agent elimination claim."
+    },
+    {
+      "id": "s46",
+      "claim": "The cited paper proves deployed writing agents can maintain citation accuracy without human review.",
+      "evidence": "The paper reports that a citation-auditing assistant flagged incorrect metadata in a controlled bibliography task and recommends human review for high-risk outputs before publication.",
+      "gold": "insufficient_evidence",
+      "lang": "en",
+      "evidence_scope": "abstract",
+      "label_source": "maintainer_synthetic",
+      "case_type": "hard_negative",
+      "split": "test",
+      "label_notes": "Hard negative for supported false positives: a real, related citation-auditing study does not prove autonomous deployed-agent accuracy without human review."
+    },
+    {
+      "id": "s47",
+      "claim": "The cited paper shows that agent citation audits improve manuscript acceptance rates.",
+      "evidence": "The paper presents an agent-facing citation auditor that flags missing identifiers, metadata mismatches, and unsupported claims for human review, but it does not evaluate manuscript acceptance outcomes.",
+      "gold": "insufficient_evidence",
+      "lang": "en",
+      "evidence_scope": "abstract",
+      "label_source": "maintainer_synthetic",
+      "case_type": "hard_negative",
+      "split": "test",
+      "label_notes": "Hard negative for false-support risk: an agent-auditor workflow paper does not support downstream manuscript acceptance claims."
+    },
+    {
+      "id": "s48",
+      "claim": "Counter-evidence search leads are final contradiction verdicts.",
+      "evidence": "Counter-evidence search returns review leads for human inspection and must not be presented as a contradiction verdict without support adjudication.",
+      "gold": "contradicted",
+      "lang": "en",
+      "evidence_scope": "abstract",
+      "label_source": "maintainer_synthetic",
+      "case_type": "contradiction",
+      "split": "test",
+      "label_notes": "Contradiction example for retrieval safety: counter-evidence leads are signals to review, not final contradiction verdicts."
     }
   ],
   "set_cases": [

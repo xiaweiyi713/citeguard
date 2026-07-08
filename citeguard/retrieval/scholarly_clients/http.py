@@ -8,6 +8,8 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+from datetime import timezone
+from email.utils import parsedate_to_datetime
 from typing import Callable, Dict, Optional
 
 from citeguard.version import __version__
@@ -27,20 +29,31 @@ class HTTPClient:
         retries: int = 1,
         retry_backoff: float = 0.2,
         retry_after_max: float = 2.0,
+        min_interval: float = 0.0,
         sleep: Optional[Callable[[float], None]] = None,
+        clock: Optional[Callable[[], float]] = None,
     ) -> None:
         self.timeout = timeout
         self.user_agent = user_agent or DEFAULT_HTTP_USER_AGENT
         self.retries = max(0, int(retries))
         self.retry_backoff = max(0.0, float(retry_backoff))
         self.retry_after_max = max(0.0, float(retry_after_max))
+        self.min_interval = max(0.0, float(min_interval))
         self.sleep = sleep or time.sleep
+        self.clock = clock or time.monotonic
         self.last_error = ""
         self.last_error_code = ""
         self.last_error_kind = ""
         self.last_status_code: Optional[int] = None
         self.last_url = ""
+        self.last_final_url = ""
+        self.last_redirected = False
         self.last_cache_hit = False
+        self.last_attempt_count = 0
+        self.last_retry_count = 0
+        self.last_retry_after_seconds: Optional[float] = None
+        self.last_retry_delay_seconds: Optional[float] = None
+        self._last_request_monotonic: Optional[float] = None
         self._cache: Dict[str, str] = {}
 
     def get_text(
@@ -56,34 +69,59 @@ class HTTPClient:
             self._clear_error()
             self.last_status_code = None
             self.last_url = full_url
+            self.last_final_url = full_url
+            self.last_redirected = False
             self.last_cache_hit = True
+            self.last_attempt_count = 0
+            self.last_retry_count = 0
+            self.last_retry_after_seconds = None
+            self.last_retry_delay_seconds = None
             return self._cache[full_url]
 
         self._clear_error()
         self.last_status_code = None
         self.last_url = full_url
+        self.last_final_url = full_url
+        self.last_redirected = False
         self.last_cache_hit = False
+        self.last_attempt_count = 0
+        self.last_retry_count = 0
+        self.last_retry_after_seconds = None
+        self.last_retry_delay_seconds = None
         request_headers = {"User-Agent": self.user_agent}
         if headers:
             request_headers.update(headers)
         request = urllib.request.Request(full_url, headers=request_headers)
         payload = ""
         for attempt in range(self.retries + 1):
+            self.last_attempt_count = attempt + 1
+            self.last_retry_count = attempt
             try:
+                self._sleep_for_min_interval()
                 with urllib.request.urlopen(request, timeout=timeout or self.timeout) as response:  # nosec B310
+                    self._last_request_monotonic = self.clock()
                     self.last_status_code = getattr(response, "status", None) or getattr(response, "code", None)
+                    self.last_final_url = getattr(response, "geturl", lambda: full_url)() or full_url
+                    self.last_redirected = self.last_final_url != full_url
                     payload = response.read().decode("utf-8")
                     self._clear_error()
                     break
             except urllib.error.HTTPError as exc:
+                self._last_request_monotonic = self.clock()
                 self.last_status_code = exc.code
+                self.last_final_url = getattr(exc, "url", "") or full_url
+                self.last_redirected = self.last_final_url != full_url
                 self.last_error = f"http_{exc.code}"
                 self.last_error_code = "source_unavailable"
                 self.last_error_kind = "rate_limited" if exc.code == 429 else "http_error"
+                self.last_retry_after_seconds = _retry_after_seconds(exc)
                 if not self._should_retry_http_error(exc, attempt):
                     return ""
                 self._sleep_before_retry(exc, attempt)
             except Exception as exc:
+                self._last_request_monotonic = self.clock()
+                self.last_final_url = full_url
+                self.last_redirected = False
                 self.last_error = exc.__class__.__name__
                 self.last_error_code, self.last_error_kind = _classify_exception(exc)
                 if attempt >= self.retries:
@@ -113,7 +151,10 @@ class HTTPClient:
             return {}
         try:
             return json.loads(payload)
-        except json.JSONDecodeError:
+        except json.JSONDecodeError as exc:
+            self.last_error = exc.__class__.__name__
+            self.last_error_code = "source_unavailable"
+            self.last_error_kind = "invalid_json"
             return {}
 
     def _build_url(self, url: str, params: Optional[dict] = None) -> str:
@@ -131,6 +172,15 @@ class HTTPClient:
         retry_after = _retry_after_seconds(exc) if exc is not None else None
         if retry_after is not None:
             delay = max(delay, min(retry_after, self.retry_after_max))
+        self.last_retry_delay_seconds = delay
+        if delay > 0:
+            self.sleep(delay)
+
+    def _sleep_for_min_interval(self) -> None:
+        if self.min_interval <= 0 or self._last_request_monotonic is None:
+            return
+        elapsed = self.clock() - self._last_request_monotonic
+        delay = self.min_interval - elapsed
         if delay > 0:
             self.sleep(delay)
 
@@ -138,17 +188,25 @@ class HTTPClient:
         self.last_error = ""
         self.last_error_code = ""
         self.last_error_kind = ""
+        self.last_retry_after_seconds = None
 
 
 def _retry_after_seconds(exc: urllib.error.HTTPError) -> Optional[float]:
     raw = exc.headers.get("Retry-After") if exc.headers else None
     if raw is None:
         return None
+    value = str(raw).strip()
     try:
-        value = float(str(raw).strip())
+        seconds = float(value)
     except ValueError:
-        return None
-    return value if value >= 0 else None
+        try:
+            retry_at = parsedate_to_datetime(value)
+        except (TypeError, ValueError, IndexError, OverflowError):
+            return None
+        if retry_at.tzinfo is None:
+            retry_at = retry_at.replace(tzinfo=timezone.utc)
+        return max(0.0, retry_at.timestamp() - time.time())
+    return seconds if seconds >= 0 else None
 
 
 def _classify_exception(exc: Exception) -> tuple[str, str]:

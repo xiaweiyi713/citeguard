@@ -7,6 +7,6 @@
     "venue": "NeurIPS",
     "arxiv_id": "1706.03762",
     "lang": "en",
-    "full_text": "Synthetic lawful excerpt for local demos: the Transformer relies entirely on attention mechanisms, dispensing with recurrence and convolutions."
+    "full_text_file": "examples/lawful_full_text_excerpt.txt"
   }
 ]

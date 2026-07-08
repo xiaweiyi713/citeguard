@@ -8,6 +8,7 @@ from citeguard.citation import normalize_text, sequence_similarity, tokenize_tex
 from citeguard.graph import CitationRecord
 
 from .base import MetadataSource
+from .utils import normalize_arxiv_id, normalize_doi
 
 
 class InMemoryMetadataSource(MetadataSource):
@@ -35,12 +36,14 @@ class InMemoryMetadataSource(MetadataSource):
     def lookup(self, candidate: CitationRecord) -> Optional[CitationRecord]:
         normalized_title = normalize_text(candidate.title)
         if candidate.doi:
+            candidate_doi = normalize_doi(candidate.doi)
             for record in self._records:
-                if record.doi and record.doi.lower() == candidate.doi.lower():
+                if record.doi and normalize_doi(record.doi) == candidate_doi:
                     return record
         if candidate.arxiv_id:
+            candidate_arxiv_id = normalize_arxiv_id(candidate.arxiv_id)
             for record in self._records:
-                if record.arxiv_id and record.arxiv_id.lower() == candidate.arxiv_id.lower():
+                if record.arxiv_id and normalize_arxiv_id(record.arxiv_id) == candidate_arxiv_id:
                     return record
         for record in self._records:
             if normalize_text(record.title) == normalized_title:

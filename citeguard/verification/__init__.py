@@ -40,8 +40,10 @@ from .support import (
     check_claim_support_set,
     enrich_support_payload_with_counterevidence,
     infer_evidence_scope,
+    infer_evidence_source_name,
     search_counterevidence_candidates,
 )
+from .support_eval import compute_support_release_summary
 from .verify import verify_citation
 
 __all__ = [
@@ -75,12 +77,14 @@ __all__ = [
     "filter_high_risk_payload",
     "check_claim_support",
     "check_claim_support_set",
+    "compute_support_release_summary",
     "enrich_support_payload_with_counterevidence",
     "clear_cache",
     "extract_citation_candidates",
     "export_cache_records",
     "inspect_cache",
     "infer_evidence_scope",
+    "infer_evidence_source_name",
     "load_citation_candidates",
     "parse_citation",
     "resolve_citation",

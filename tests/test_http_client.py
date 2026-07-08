@@ -5,15 +5,17 @@ from __future__ import annotations
 import io
 import urllib.error
 import unittest
+from email.utils import formatdate
 from unittest import mock
 
 from citeguard.retrieval.scholarly_clients import HTTPClient
 
 
 class _Response:
-    def __init__(self, payload: str, status: int = 200):
+    def __init__(self, payload: str, status: int = 200, final_url: str = ""):
         self.payload = payload.encode("utf-8")
         self.status = status
+        self.final_url = final_url
 
     def __enter__(self):
         return self
@@ -23,6 +25,9 @@ class _Response:
 
     def read(self):
         return self.payload
+
+    def geturl(self):
+        return self.final_url
 
 
 def _http_error(code: int, retry_after: str = ""):
@@ -44,6 +49,22 @@ class HTTPClientTests(unittest.TestCase):
         self.assertEqual(urlopen.call_count, 2)
         self.assertEqual(client.last_error, "")
         self.assertEqual(client.last_status_code, 200)
+        self.assertEqual(client.last_attempt_count, 2)
+        self.assertEqual(client.last_retry_count, 1)
+        self.assertIsNone(client.last_retry_after_seconds)
+
+    def test_records_final_url_after_redirect(self):
+        client = HTTPClient(retries=0, retry_backoff=0.0)
+        with mock.patch(
+            "urllib.request.urlopen",
+            side_effect=[_Response("ok", final_url="https://publisher.example/article")],
+        ):
+            payload = client.get_text("https://doi.org/10.5555/redirect")
+
+        self.assertEqual(payload, "ok")
+        self.assertEqual(client.last_url, "https://doi.org/10.5555/redirect")
+        self.assertEqual(client.last_final_url, "https://publisher.example/article")
+        self.assertTrue(client.last_redirected)
 
     def test_respects_retry_after_with_upper_bound(self):
         sleeps = []
@@ -58,6 +79,8 @@ class HTTPClientTests(unittest.TestCase):
         self.assertEqual(sleeps, [2.0])
         self.assertEqual(client.last_error_code, "")
         self.assertEqual(client.last_error_kind, "")
+        self.assertIsNone(client.last_retry_after_seconds)
+        self.assertEqual(client.last_retry_delay_seconds, 2.0)
 
     def test_rate_limit_records_machine_readable_source_failure(self):
         client = HTTPClient(retries=0, retry_backoff=0.0)
@@ -69,6 +92,32 @@ class HTTPClientTests(unittest.TestCase):
         self.assertEqual(client.last_error_code, "source_unavailable")
         self.assertEqual(client.last_error_kind, "rate_limited")
         self.assertEqual(client.last_status_code, 429)
+        self.assertEqual(client.last_attempt_count, 1)
+        self.assertEqual(client.last_retry_count, 0)
+        self.assertEqual(client.last_retry_after_seconds, 1.0)
+        self.assertIsNone(client.last_retry_delay_seconds)
+
+    def test_rate_limit_accepts_retry_after_http_date(self):
+        retry_after = formatdate(1005.0, usegmt=True)
+        client = HTTPClient(retries=0, retry_backoff=0.0)
+        with mock.patch("citeguard.retrieval.scholarly_clients.http.time.time", return_value=1000.0):
+            with mock.patch("urllib.request.urlopen", side_effect=[_http_error(429, retry_after=retry_after)]):
+                payload = client.get_text("https://example.test")
+
+        self.assertEqual(payload, "")
+        self.assertEqual(client.last_error_kind, "rate_limited")
+        self.assertEqual(client.last_retry_after_seconds, 5.0)
+
+    def test_past_retry_after_http_date_is_zero_wait_hint(self):
+        retry_after = formatdate(995.0, usegmt=True)
+        client = HTTPClient(retries=0, retry_backoff=0.0)
+        with mock.patch("citeguard.retrieval.scholarly_clients.http.time.time", return_value=1000.0):
+            with mock.patch("urllib.request.urlopen", side_effect=[_http_error(429, retry_after=retry_after)]):
+                payload = client.get_text("https://example.test")
+
+        self.assertEqual(payload, "")
+        self.assertEqual(client.last_error_kind, "rate_limited")
+        self.assertEqual(client.last_retry_after_seconds, 0.0)
 
     def test_timeout_records_machine_readable_timeout(self):
         client = HTTPClient(retries=0, retry_backoff=0.0)
@@ -102,6 +151,19 @@ class HTTPClientTests(unittest.TestCase):
 
         self.assertEqual(payload["answer"], 42)
 
+    def test_get_json_records_malformed_source_json(self):
+        client = HTTPClient(retries=0, retry_backoff=0.0)
+        with mock.patch("urllib.request.urlopen", side_effect=[_Response("{not json}")]):
+            payload = client.get_json("https://example.test")
+
+        self.assertEqual(payload, {})
+        self.assertEqual(client.last_status_code, 200)
+        self.assertEqual(client.last_error, "JSONDecodeError")
+        self.assertEqual(client.last_error_code, "source_unavailable")
+        self.assertEqual(client.last_error_kind, "invalid_json")
+        self.assertEqual(client.last_attempt_count, 1)
+        self.assertEqual(client.last_retry_count, 0)
+
     def test_cache_hit_clears_stale_source_failure_diagnostics(self):
         client = HTTPClient(retries=0, retry_backoff=0.0)
         with mock.patch(
@@ -116,10 +178,40 @@ class HTTPClientTests(unittest.TestCase):
         self.assertEqual(urlopen.call_count, 2)
         self.assertTrue(client.last_cache_hit)
         self.assertEqual(client.last_url, "https://example.test/cached")
+        self.assertEqual(client.last_final_url, "https://example.test/cached")
+        self.assertFalse(client.last_redirected)
+        self.assertEqual(client.last_attempt_count, 0)
+        self.assertEqual(client.last_retry_count, 0)
+        self.assertIsNone(client.last_retry_after_seconds)
+        self.assertIsNone(client.last_retry_delay_seconds)
         self.assertEqual(client.last_error, "")
         self.assertEqual(client.last_error_code, "")
         self.assertEqual(client.last_error_kind, "")
         self.assertIsNone(client.last_status_code)
+
+    def test_min_interval_waits_between_uncached_network_requests(self):
+        sleeps = []
+        now = [100.0]
+
+        def sleep(delay):
+            sleeps.append(delay)
+            now[0] += delay
+
+        client = HTTPClient(
+            retries=0,
+            retry_backoff=0.0,
+            min_interval=0.5,
+            sleep=sleep,
+            clock=lambda: now[0],
+        )
+        with mock.patch(
+            "urllib.request.urlopen",
+            side_effect=[_Response("first"), _Response("second")],
+        ):
+            self.assertEqual(client.get_text("https://example.test/one"), "first")
+            self.assertEqual(client.get_text("https://example.test/two"), "second")
+
+        self.assertEqual(sleeps, [0.5])
 
 
 if __name__ == "__main__":

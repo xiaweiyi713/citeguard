@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "dataset": "support_eval.json",
-  "notes": "Complete seed label provenance sidecar. Entries document synthetic maintainer labels and are not a human-reviewed benchmark.",
+  "notes": "Generated support label provenance sidecar template. Preserve annotator labels, disagreement status, adjudicator, source locator, and notes for every reviewed case.",
   "cases": [
     {
       "case_id": "s01",
@@ -12,7 +12,12 @@
       "disagreement": "not_applicable",
       "adjudicator": "",
       "source_locator": "",
-      "notes": "Synthetic direct-support seed label; not human reviewed."
+      "notes": "Synthetic direct-support seed label; not human reviewed.",
+      "label_source": "maintainer_synthetic",
+      "case_type": "direct_support",
+      "evidence_scope": "abstract",
+      "split": "train",
+      "lang": "en"
     },
     {
       "case_id": "s02",
@@ -23,7 +28,12 @@
       "disagreement": "not_applicable",
       "adjudicator": "",
       "source_locator": "",
-      "notes": "Synthetic direct-support seed label; not human reviewed."
+      "notes": "Synthetic direct-support seed label; not human reviewed.",
+      "label_source": "maintainer_synthetic",
+      "case_type": "direct_support",
+      "evidence_scope": "abstract",
+      "split": "dev",
+      "lang": "en"
     },
     {
       "case_id": "s03",
@@ -34,7 +44,12 @@
       "disagreement": "not_applicable",
       "adjudicator": "",
       "source_locator": "",
-      "notes": "Synthetic unrelated-negative seed label; not human reviewed."
+      "notes": "Synthetic unrelated-negative seed label; not human reviewed.",
+      "label_source": "maintainer_synthetic",
+      "case_type": "unrelated_negative",
+      "evidence_scope": "abstract",
+      "split": "train",
+      "lang": "en"
     },
     {
       "case_id": "s04",
@@ -45,7 +60,12 @@
       "disagreement": "not_applicable",
       "adjudicator": "",
       "source_locator": "",
-      "notes": "Synthetic contradiction: the evidence says the method does not improve and reduces the target metric."
+      "notes": "Synthetic contradiction: the evidence says the method does not improve and reduces the target metric.",
+      "label_source": "maintainer_synthetic",
+      "case_type": "contradiction",
+      "evidence_scope": "abstract",
+      "split": "train",
+      "lang": "en"
     },
     {
       "case_id": "s05",
@@ -56,7 +76,12 @@
       "disagreement": "not_applicable",
       "adjudicator": "",
       "source_locator": "",
-      "notes": "Synthetic direct-support seed label; not human reviewed."
+      "notes": "Synthetic direct-support seed label; not human reviewed.",
+      "label_source": "maintainer_synthetic",
+      "case_type": "direct_support",
+      "evidence_scope": "abstract",
+      "split": "test",
+      "lang": "zh"
     },
     {
       "case_id": "s06",
@@ -67,7 +92,12 @@
       "disagreement": "not_applicable",
       "adjudicator": "",
       "source_locator": "",
-      "notes": "Synthetic unrelated-negative seed label; not human reviewed."
+      "notes": "Synthetic unrelated-negative seed label; not human reviewed.",
+      "label_source": "maintainer_synthetic",
+      "case_type": "unrelated_negative",
+      "evidence_scope": "abstract",
+      "split": "dev",
+      "lang": "zh"
     },
     {
       "case_id": "s07",
@@ -78,7 +108,12 @@
       "disagreement": "not_applicable",
       "adjudicator": "",
       "source_locator": "",
-      "notes": "Synthetic hard negative: related topic, but the evidence does not support the stronger always-improves claim."
+      "notes": "Synthetic hard negative: related topic, but the evidence does not support the stronger always-improves claim.",
+      "label_source": "maintainer_synthetic",
+      "case_type": "hard_negative",
+      "evidence_scope": "abstract",
+      "split": "train",
+      "lang": "en"
     },
     {
       "case_id": "s08",
@@ -89,7 +124,12 @@
       "disagreement": "not_applicable",
       "adjudicator": "",
       "source_locator": "",
-      "notes": "Synthetic contradiction: the evidence states remote landing-page harvesting is optional."
+      "notes": "Synthetic contradiction: the evidence states remote landing-page harvesting is optional.",
+      "label_source": "maintainer_synthetic",
+      "case_type": "contradiction",
+      "evidence_scope": "abstract",
+      "split": "dev",
+      "lang": "en"
     },
     {
       "case_id": "s09",
@@ -100,7 +140,12 @@
       "disagreement": "not_applicable",
       "adjudicator": "",
       "source_locator": "",
-      "notes": "Synthetic direct-support seed label; not human reviewed."
+      "notes": "Synthetic direct-support seed label; not human reviewed.",
+      "label_source": "maintainer_synthetic",
+      "case_type": "direct_support",
+      "evidence_scope": "abstract",
+      "split": "test",
+      "lang": "en"
     },
     {
       "case_id": "s10",
@@ -111,7 +156,12 @@
       "disagreement": "not_applicable",
       "adjudicator": "",
       "source_locator": "",
-      "notes": "Synthetic contradiction: real papers may not support nearby claims, contradicting the universal support claim."
+      "notes": "Synthetic contradiction: real papers may not support nearby claims, contradicting the universal support claim.",
+      "label_source": "maintainer_synthetic",
+      "case_type": "contradiction",
+      "evidence_scope": "abstract",
+      "split": "test",
+      "lang": "zh"
     },
     {
       "case_id": "s11",
@@ -122,7 +172,12 @@
       "disagreement": "not_applicable",
       "adjudicator": "",
       "source_locator": "",
-      "notes": "Synthetic weak-support boundary: title establishes topical relevance but cannot prove the stronger claim."
+      "notes": "Synthetic weak-support boundary: title establishes topical relevance but cannot prove the stronger claim.",
+      "label_source": "maintainer_synthetic",
+      "case_type": "weak_support",
+      "evidence_scope": "title",
+      "split": "train",
+      "lang": "en"
     },
     {
       "case_id": "s12",
@@ -133,7 +188,12 @@
       "disagreement": "not_applicable",
       "adjudicator": "",
       "source_locator": "",
-      "notes": "Synthetic metadata-snippet support label for the source-outage distinction."
+      "notes": "Synthetic metadata-snippet support label for the source-outage distinction.",
+      "label_source": "maintainer_synthetic",
+      "case_type": "direct_support",
+      "evidence_scope": "metadata_snippet",
+      "split": "dev",
+      "lang": "en"
     },
     {
       "case_id": "s13",
@@ -144,7 +204,12 @@
       "disagreement": "not_applicable",
       "adjudicator": "",
       "source_locator": "",
-      "notes": "Synthetic full-text-required case: longitudinal details are absent from abstract-level evidence."
+      "notes": "Synthetic full-text-required case: longitudinal details are absent from abstract-level evidence.",
+      "label_source": "maintainer_synthetic",
+      "case_type": "full_text_required",
+      "evidence_scope": "abstract",
+      "split": "dev",
+      "lang": "en"
     },
     {
       "case_id": "s14",
@@ -155,7 +220,12 @@
       "disagreement": "not_applicable",
       "adjudicator": "",
       "source_locator": "",
-      "notes": "Synthetic lawful full-text support label; not human reviewed."
+      "notes": "Synthetic lawful full-text support label; not human reviewed.",
+      "label_source": "maintainer_synthetic",
+      "case_type": "direct_support",
+      "evidence_scope": "full_text",
+      "split": "dev",
+      "lang": "en"
     },
     {
       "case_id": "s15",
@@ -166,7 +236,12 @@
       "disagreement": "not_applicable",
       "adjudicator": "",
       "source_locator": "",
-      "notes": "Synthetic hard negative: related auditing evidence does not support the eliminate-all claim."
+      "notes": "Synthetic hard negative: related auditing evidence does not support the eliminate-all claim.",
+      "label_source": "maintainer_synthetic",
+      "case_type": "hard_negative",
+      "evidence_scope": "abstract",
+      "split": "train",
+      "lang": "en"
     },
     {
       "case_id": "s16",
@@ -177,7 +252,12 @@
       "disagreement": "not_applicable",
       "adjudicator": "",
       "source_locator": "",
-      "notes": "Synthetic contradiction for the source-outage safety policy."
+      "notes": "Synthetic contradiction for the source-outage safety policy.",
+      "label_source": "maintainer_synthetic",
+      "case_type": "contradiction",
+      "evidence_scope": "abstract",
+      "split": "test",
+      "lang": "en"
     },
     {
       "case_id": "s17",
@@ -188,7 +268,12 @@
       "disagreement": "not_applicable",
       "adjudicator": "",
       "source_locator": "",
-      "notes": "Synthetic full-text-required case: methods or participant-flow details are absent from the abstract."
+      "notes": "Synthetic full-text-required case: methods or participant-flow details are absent from the abstract.",
+      "label_source": "maintainer_synthetic",
+      "case_type": "full_text_required",
+      "evidence_scope": "abstract",
+      "split": "test",
+      "lang": "en"
     },
     {
       "case_id": "s18",
@@ -199,7 +284,12 @@
       "disagreement": "not_applicable",
       "adjudicator": "",
       "source_locator": "",
-      "notes": "Synthetic Chinese title-only weak-support boundary case."
+      "notes": "Synthetic Chinese title-only weak-support boundary case.",
+      "label_source": "maintainer_synthetic",
+      "case_type": "weak_support",
+      "evidence_scope": "title",
+      "split": "test",
+      "lang": "zh"
     },
     {
       "case_id": "s19",
@@ -210,7 +300,12 @@
       "disagreement": "not_applicable",
       "adjudicator": "",
       "source_locator": "",
-      "notes": "Synthetic title-only weak-support case; must not be upgraded to full support."
+      "notes": "Synthetic title-only weak-support case; must not be upgraded to full support.",
+      "label_source": "maintainer_synthetic",
+      "case_type": "weak_support",
+      "evidence_scope": "title",
+      "split": "train",
+      "lang": "en"
     },
     {
       "case_id": "s20",
@@ -221,7 +316,12 @@
       "disagreement": "not_applicable",
       "adjudicator": "",
       "source_locator": "",
-      "notes": "Synthetic full-text-required temporal follow-up case."
+      "notes": "Synthetic full-text-required temporal follow-up case.",
+      "label_source": "maintainer_synthetic",
+      "case_type": "full_text_required",
+      "evidence_scope": "abstract",
+      "split": "train",
+      "lang": "en"
     },
     {
       "case_id": "s21",
@@ -232,7 +332,12 @@
       "disagreement": "not_applicable",
       "adjudicator": "",
       "source_locator": "",
-      "notes": "Synthetic Chinese contradiction for the not_found-is-not-fabricated safety policy."
+      "notes": "Synthetic Chinese contradiction for the not_found-is-not-fabricated safety policy.",
+      "label_source": "maintainer_synthetic",
+      "case_type": "contradiction",
+      "evidence_scope": "abstract",
+      "split": "dev",
+      "lang": "zh"
     },
     {
       "case_id": "s22",
@@ -243,7 +348,12 @@
       "disagreement": "not_applicable",
       "adjudicator": "",
       "source_locator": "",
-      "notes": "Synthetic aggregation-boundary contradiction: multiple weak links are not automatically full support."
+      "notes": "Synthetic aggregation-boundary contradiction: multiple weak links are not automatically full support.",
+      "label_source": "maintainer_synthetic",
+      "case_type": "contradiction",
+      "evidence_scope": "metadata_snippet",
+      "split": "dev",
+      "lang": "en"
     },
     {
       "case_id": "s23",
@@ -254,7 +364,12 @@
       "disagreement": "not_applicable",
       "adjudicator": "",
       "source_locator": "",
-      "notes": "Synthetic hard negative for deployed-system overclaiming."
+      "notes": "Synthetic hard negative for deployed-system overclaiming.",
+      "label_source": "maintainer_synthetic",
+      "case_type": "hard_negative",
+      "evidence_scope": "abstract",
+      "split": "test",
+      "lang": "en"
     },
     {
       "case_id": "s24",
@@ -265,7 +380,12 @@
       "disagreement": "not_applicable",
       "adjudicator": "",
       "source_locator": "",
-      "notes": "Synthetic metadata-snippet support label for the input-contract claim."
+      "notes": "Synthetic metadata-snippet support label for the input-contract claim.",
+      "label_source": "maintainer_synthetic",
+      "case_type": "direct_support",
+      "evidence_scope": "metadata_snippet",
+      "split": "test",
+      "lang": "en"
     },
     {
       "case_id": "s25",
@@ -276,7 +396,12 @@
       "disagreement": "not_applicable",
       "adjudicator": "",
       "source_locator": "",
-      "notes": "Synthetic title-only weak-support boundary; not human reviewed."
+      "notes": "Synthetic title-only weak-support boundary; not human reviewed.",
+      "label_source": "maintainer_synthetic",
+      "case_type": "weak_support",
+      "evidence_scope": "title",
+      "split": "train",
+      "lang": "en"
     },
     {
       "case_id": "s26",
@@ -287,7 +412,12 @@
       "disagreement": "not_applicable",
       "adjudicator": "",
       "source_locator": "",
-      "notes": "Synthetic metadata-only hard boundary; source-health fields do not prove every source responded."
+      "notes": "Synthetic metadata-only hard boundary; source-health fields do not prove every source responded.",
+      "label_source": "maintainer_synthetic",
+      "case_type": "metadata_only",
+      "evidence_scope": "metadata",
+      "split": "dev",
+      "lang": "en"
     },
     {
       "case_id": "s27",
@@ -298,7 +428,12 @@
       "disagreement": "not_applicable",
       "adjudicator": "",
       "source_locator": "",
-      "notes": "Synthetic mixed-with-full-text contradiction for source-outage safety policy."
+      "notes": "Synthetic mixed-with-full-text contradiction for source-outage safety policy.",
+      "label_source": "maintainer_synthetic",
+      "case_type": "contradiction",
+      "evidence_scope": "mixed_with_full_text",
+      "split": "test",
+      "lang": "en"
     },
     {
       "case_id": "s28",
@@ -309,7 +444,12 @@
       "disagreement": "not_applicable",
       "adjudicator": "",
       "source_locator": "",
-      "notes": "Synthetic hard negative: offline auditing results do not support deployed-journal peer-review outcome claims."
+      "notes": "Synthetic hard negative: offline auditing results do not support deployed-journal peer-review outcome claims.",
+      "label_source": "maintainer_synthetic",
+      "case_type": "hard_negative",
+      "evidence_scope": "abstract",
+      "split": "train",
+      "lang": "en"
     },
     {
       "case_id": "s29",
@@ -320,7 +460,12 @@
       "disagreement": "not_applicable",
       "adjudicator": "",
       "source_locator": "",
-      "notes": "Synthetic contradiction: counter-evidence retrieval candidates are review leads, not final contradiction verdicts."
+      "notes": "Synthetic contradiction: counter-evidence retrieval candidates are review leads, not final contradiction verdicts.",
+      "label_source": "maintainer_synthetic",
+      "case_type": "contradiction",
+      "evidence_scope": "metadata_snippet",
+      "split": "dev",
+      "lang": "en"
     },
     {
       "case_id": "s30",
@@ -331,7 +476,12 @@
       "disagreement": "not_applicable",
       "adjudicator": "",
       "source_locator": "",
-      "notes": "Synthetic full-text-required case: adverse-event and long-term follow-up claims are absent from the abstract."
+      "notes": "Synthetic full-text-required case: adverse-event and long-term follow-up claims are absent from the abstract.",
+      "label_source": "maintainer_synthetic",
+      "case_type": "full_text_required",
+      "evidence_scope": "abstract",
+      "split": "test",
+      "lang": "en"
     },
     {
       "case_id": "s31",
@@ -342,7 +492,12 @@
       "disagreement": "not_applicable",
       "adjudicator": "",
       "source_locator": "",
-      "notes": "Synthetic hard negative: seed benchmark provenance does not support independently human-reviewed benchmark claims."
+      "notes": "Synthetic hard negative: seed benchmark provenance does not support independently human-reviewed benchmark claims.",
+      "label_source": "maintainer_synthetic",
+      "case_type": "hard_negative",
+      "evidence_scope": "abstract",
+      "split": "test",
+      "lang": "en"
     },
     {
       "case_id": "s32",
@@ -353,7 +508,12 @@
       "disagreement": "not_applicable",
       "adjudicator": "",
       "source_locator": "",
-      "notes": "Synthetic contradiction: source outages lower confidence and must not increase fabrication confidence."
+      "notes": "Synthetic contradiction: source outages lower confidence and must not increase fabrication confidence.",
+      "label_source": "maintainer_synthetic",
+      "case_type": "contradiction",
+      "evidence_scope": "metadata_snippet",
+      "split": "dev",
+      "lang": "en"
     },
     {
       "case_id": "s33",
@@ -364,7 +524,12 @@
       "disagreement": "not_applicable",
       "adjudicator": "",
       "source_locator": "",
-      "notes": "Synthetic full-text-required case: eligibility criteria are absent from the abstract."
+      "notes": "Synthetic full-text-required case: eligibility criteria are absent from the abstract.",
+      "label_source": "maintainer_synthetic",
+      "case_type": "full_text_required",
+      "evidence_scope": "abstract",
+      "split": "train",
+      "lang": "en"
     },
     {
       "case_id": "s34",
@@ -375,7 +540,12 @@
       "disagreement": "not_applicable",
       "adjudicator": "",
       "source_locator": "",
-      "notes": "Synthetic Chinese contradiction: source failures lower confidence and must not increase fabrication confidence."
+      "notes": "Synthetic Chinese contradiction: source failures lower confidence and must not increase fabrication confidence.",
+      "label_source": "maintainer_synthetic",
+      "case_type": "contradiction",
+      "evidence_scope": "metadata_snippet",
+      "split": "train",
+      "lang": "zh"
     },
     {
       "case_id": "s35",
@@ -386,7 +556,12 @@
       "disagreement": "not_applicable",
       "adjudicator": "",
       "source_locator": "",
-      "notes": "Synthetic Chinese hard negative: a Crossref timeout does not prove a citation is fabricated."
+      "notes": "Synthetic Chinese hard negative: a Crossref timeout does not prove a citation is fabricated.",
+      "label_source": "maintainer_synthetic",
+      "case_type": "hard_negative",
+      "evidence_scope": "metadata_snippet",
+      "split": "dev",
+      "lang": "zh"
     },
     {
       "case_id": "s36",
@@ -397,7 +572,12 @@
       "disagreement": "not_applicable",
       "adjudicator": "",
       "source_locator": "",
-      "notes": "Synthetic Chinese contradiction: not-found and rate-limit states are not fabrication evidence."
+      "notes": "Synthetic Chinese contradiction: not-found and rate-limit states are not fabrication evidence.",
+      "label_source": "maintainer_synthetic",
+      "case_type": "contradiction",
+      "evidence_scope": "metadata_snippet",
+      "split": "test",
+      "lang": "zh"
     },
     {
       "case_id": "s37",
@@ -408,7 +588,12 @@
       "disagreement": "not_applicable",
       "adjudicator": "",
       "source_locator": "",
-      "notes": "Synthetic hard negative: simulated alert usage does not prove causal manuscript rejection outcomes."
+      "notes": "Synthetic hard negative: simulated alert usage does not prove causal manuscript rejection outcomes.",
+      "label_source": "maintainer_synthetic",
+      "case_type": "hard_negative",
+      "evidence_scope": "abstract",
+      "split": "train",
+      "lang": "en"
     },
     {
       "case_id": "s38",
@@ -419,7 +604,12 @@
       "disagreement": "not_applicable",
       "adjudicator": "",
       "source_locator": "",
-      "notes": "Synthetic full-text-required case: exclusion reasons are absent from the abstract."
+      "notes": "Synthetic full-text-required case: exclusion reasons are absent from the abstract.",
+      "label_source": "maintainer_synthetic",
+      "case_type": "full_text_required",
+      "evidence_scope": "abstract",
+      "split": "dev",
+      "lang": "en"
     },
     {
       "case_id": "s39",
@@ -430,7 +620,12 @@
       "disagreement": "not_applicable",
       "adjudicator": "",
       "source_locator": "",
-      "notes": "Synthetic Chinese contradiction: temporary source unavailability does not prove fabrication."
+      "notes": "Synthetic Chinese contradiction: temporary source unavailability does not prove fabrication.",
+      "label_source": "maintainer_synthetic",
+      "case_type": "contradiction",
+      "evidence_scope": "metadata_snippet",
+      "split": "test",
+      "lang": "zh"
     },
     {
       "case_id": "s40",
@@ -441,7 +636,12 @@
       "disagreement": "not_applicable",
       "adjudicator": "",
       "source_locator": "",
-      "notes": "Synthetic Chinese hard negative: a real related tool paper recommends human review, not replacing reviewers."
+      "notes": "Synthetic Chinese hard negative: a real related tool paper recommends human review, not replacing reviewers.",
+      "label_source": "maintainer_synthetic",
+      "case_type": "hard_negative",
+      "evidence_scope": "abstract",
+      "split": "dev",
+      "lang": "zh"
     },
     {
       "case_id": "s41",
@@ -452,7 +652,12 @@
       "disagreement": "not_applicable",
       "adjudicator": "",
       "source_locator": "",
-      "notes": "Synthetic multi-paper hard negative: weak topical evidence must not be over-synthesized into causal deployment support."
+      "notes": "Synthetic multi-paper hard negative: weak topical evidence must not be over-synthesized into causal deployment support.",
+      "label_source": "maintainer_synthetic",
+      "case_type": "hard_negative",
+      "evidence_scope": "mixed",
+      "split": "test",
+      "lang": "en"
     },
     {
       "case_id": "s42",
@@ -463,7 +668,12 @@
       "disagreement": "not_applicable",
       "adjudicator": "",
       "source_locator": "",
-      "notes": "Synthetic contradiction: model availability is not support evidence when the snippet says the paper addresses a different task."
+      "notes": "Synthetic contradiction: model availability is not support evidence when the snippet says the paper addresses a different task.",
+      "label_source": "maintainer_synthetic",
+      "case_type": "contradiction",
+      "evidence_scope": "metadata_snippet",
+      "split": "dev",
+      "lang": "en"
     },
     {
       "case_id": "s43",
@@ -474,7 +684,12 @@
       "disagreement": "not_applicable",
       "adjudicator": "",
       "source_locator": "",
-      "notes": "Synthetic Chinese full-text boundary: supplemental exclusion criteria are not proven by an abstract pointer."
+      "notes": "Synthetic Chinese full-text boundary: supplemental exclusion criteria are not proven by an abstract pointer.",
+      "label_source": "maintainer_synthetic",
+      "case_type": "full_text_required",
+      "evidence_scope": "abstract",
+      "split": "test",
+      "lang": "zh"
     },
     {
       "case_id": "s44",
@@ -485,7 +700,76 @@
       "disagreement": "not_applicable",
       "adjudicator": "",
       "source_locator": "",
-      "notes": "Synthetic Chinese source-health contradiction: Semantic Scholar rate limiting does not prove non-existence."
+      "notes": "Synthetic Chinese source-health contradiction: Semantic Scholar rate limiting does not prove non-existence.",
+      "label_source": "maintainer_synthetic",
+      "case_type": "contradiction",
+      "evidence_scope": "metadata_snippet",
+      "split": "train",
+      "lang": "zh"
+    },
+    {
+      "case_id": "s45",
+      "adjudication_status": "not_human_reviewed",
+      "annotator_count": 0,
+      "annotator_labels": [],
+      "adjudicated_label": "insufficient_evidence",
+      "disagreement": "not_applicable",
+      "adjudicator": "",
+      "source_locator": "",
+      "notes": "Synthetic hard negative: a real related citation-auditing paper does not prove automatic deployed-agent hallucination elimination.",
+      "label_source": "maintainer_synthetic",
+      "case_type": "hard_negative",
+      "evidence_scope": "abstract",
+      "split": "test",
+      "lang": "en"
+    },
+    {
+      "case_id": "s46",
+      "adjudication_status": "not_human_reviewed",
+      "annotator_count": 0,
+      "annotator_labels": [],
+      "adjudicated_label": "insufficient_evidence",
+      "disagreement": "not_applicable",
+      "adjudicator": "",
+      "source_locator": "",
+      "notes": "Synthetic hard negative: related citation-auditing evidence does not prove autonomous deployed-agent citation accuracy without human review.",
+      "label_source": "maintainer_synthetic",
+      "case_type": "hard_negative",
+      "evidence_scope": "abstract",
+      "split": "test",
+      "lang": "en"
+    },
+    {
+      "case_id": "s47",
+      "adjudication_status": "not_human_reviewed",
+      "annotator_count": 0,
+      "annotator_labels": [],
+      "adjudicated_label": "insufficient_evidence",
+      "disagreement": "not_applicable",
+      "adjudicator": "",
+      "source_locator": "",
+      "notes": "Synthetic hard negative: related agent-auditor evidence does not support manuscript acceptance-rate claims.",
+      "label_source": "maintainer_synthetic",
+      "case_type": "hard_negative",
+      "evidence_scope": "abstract",
+      "split": "test",
+      "lang": "en"
+    },
+    {
+      "case_id": "s48",
+      "adjudication_status": "not_human_reviewed",
+      "annotator_count": 0,
+      "annotator_labels": [],
+      "adjudicated_label": "contradicted",
+      "disagreement": "not_applicable",
+      "adjudicator": "",
+      "source_locator": "",
+      "notes": "Synthetic contradiction: counter-evidence search leads are review signals, not final contradiction verdicts.",
+      "label_source": "maintainer_synthetic",
+      "case_type": "contradiction",
+      "evidence_scope": "abstract",
+      "split": "test",
+      "lang": "en"
     },
     {
       "case_id": "ss01",
@@ -496,7 +780,12 @@
       "disagreement": "not_applicable",
       "adjudicator": "",
       "source_locator": "",
-      "notes": "Synthetic citation-set policy case: one strong citation can support the set while unresolved citations remain visible."
+      "notes": "Synthetic citation-set policy case: one strong citation can support the set while unresolved citations remain visible.",
+      "label_source": "maintainer_synthetic",
+      "case_type": "set_aggregation",
+      "evidence_scope": "mixed",
+      "split": "dev",
+      "lang": "en"
     },
     {
       "case_id": "ss02",
@@ -507,7 +796,12 @@
       "disagreement": "not_applicable",
       "adjudicator": "",
       "source_locator": "",
-      "notes": "Synthetic citation-set policy boundary: multiple weak citations remain tentative, not supported."
+      "notes": "Synthetic citation-set policy boundary: multiple weak citations remain tentative, not supported.",
+      "label_source": "maintainer_synthetic",
+      "case_type": "weak_set_boundary",
+      "evidence_scope": "mixed",
+      "split": "test",
+      "lang": "en"
     },
     {
       "case_id": "ss03",
@@ -518,7 +812,12 @@
       "disagreement": "not_applicable",
       "adjudicator": "",
       "source_locator": "",
-      "notes": "Synthetic citation-set policy case: contradiction dominates the aggregate."
+      "notes": "Synthetic citation-set policy case: contradiction dominates the aggregate.",
+      "label_source": "maintainer_synthetic",
+      "case_type": "contradiction_set",
+      "evidence_scope": "mixed",
+      "split": "test",
+      "lang": "en"
     },
     {
       "case_id": "ss04",
@@ -529,7 +828,12 @@
       "disagreement": "not_applicable",
       "adjudicator": "",
       "source_locator": "",
-      "notes": "Synthetic citation-set policy case: non-confirming citations should abstain."
+      "notes": "Synthetic citation-set policy case: non-confirming citations should abstain.",
+      "label_source": "maintainer_synthetic",
+      "case_type": "set_aggregation",
+      "evidence_scope": "mixed",
+      "split": "train",
+      "lang": "en"
     },
     {
       "case_id": "ss05",
@@ -540,7 +844,12 @@
       "disagreement": "not_applicable",
       "adjudicator": "",
       "source_locator": "",
-      "notes": "Synthetic Chinese citation-set boundary: multiple weak or unresolved citations remain tentative."
+      "notes": "Synthetic Chinese citation-set boundary: multiple weak or unresolved citations remain tentative.",
+      "label_source": "maintainer_synthetic",
+      "case_type": "weak_set_boundary",
+      "evidence_scope": "mixed",
+      "split": "test",
+      "lang": "zh"
     },
     {
       "case_id": "ss06",
@@ -551,7 +860,12 @@
       "disagreement": "not_applicable",
       "adjudicator": "",
       "source_locator": "",
-      "notes": "Synthetic source-limited citation-set boundary: multiple inconclusive checks do not prove fabrication."
+      "notes": "Synthetic source-limited citation-set boundary: multiple inconclusive checks do not prove fabrication.",
+      "label_source": "maintainer_synthetic",
+      "case_type": "set_aggregation",
+      "evidence_scope": "mixed",
+      "split": "dev",
+      "lang": "en"
     }
   ]
 }

@@ -3,15 +3,20 @@
 import unittest
 
 from citeguard.verification.support import (
+    ClaimSupportRequest,
     DEFAULT_SUPPORT_POLICY,
-    SupportDecisionPolicy,
     SupportResult,
     SupportVerdict,
+    audit_claim_support,
+    check_claim_support,
+    check_claim_support_set,
     infer_evidence_scope,
+    infer_evidence_source_name,
 )
 
 from citeguard.verification import CitationRecord
 from citeguard.verification import SupportAssessment
+from citeguard.retrieval.scholarly_clients import InMemoryMetadataSource
 from citeguard.verification.support import _extract_nli, build_evidence_spans
 from citeguard.verification.support import assess_support
 
@@ -36,6 +41,7 @@ class SupportModelTests(unittest.TestCase):
         data = result.to_dict()
         self.assertEqual(data["verdict"], "supported")
         self.assertEqual(data["evidence"]["source_field"], "abstract_sentence_1")
+        self.assertEqual(data["evidence"]["source_name"], "citation_metadata")
         self.assertEqual(data["nli_scores"]["entailment"], 0.8)
         self.assertEqual(data["engine"], "ensemble")
         self.assertEqual(data["resolution"]["title"], "A Paper")
@@ -70,7 +76,15 @@ class SupportHelperTests(unittest.TestCase):
             citation_id="c",
             title="A Title",
             abstract="First sentence here. Second sentence about X improving Y.",
-            metadata={"evidence_chunks": [{"text": "Chunk text.", "source_field": "openalex_remote_1", "source_url": "http://e"}]},
+            metadata={
+                "evidence_chunks": [
+                    {
+                        "text": "Chunk text.",
+                        "source_field": "openalex_remote_1",
+                        "source_url": "http://e",
+                    }
+                ]
+            },
         )
         spans = build_evidence_spans(citation)
         texts = [s["text"] for s in spans]
@@ -81,6 +95,10 @@ class SupportHelperTests(unittest.TestCase):
         self.assertEqual(scopes["title"], "title")
         self.assertEqual(scopes["abstract_sentence_1"], "abstract")
         self.assertEqual(scopes["openalex_remote_1"], "metadata_snippet")
+        sources = {s["source_field"]: s["source_name"] for s in spans}
+        self.assertEqual(sources["title"], "citation_metadata")
+        self.assertEqual(sources["abstract_sentence_1"], "citation_metadata")
+        self.assertEqual(sources["openalex_remote_1"], "openalex")
 
     def test_infer_evidence_scope_is_conservative(self):
         self.assertEqual(infer_evidence_scope("abstract_sentence_2"), "abstract")
@@ -88,6 +106,13 @@ class SupportHelperTests(unittest.TestCase):
         self.assertEqual(infer_evidence_scope("metadata_chunk_1"), "metadata")
         self.assertEqual(infer_evidence_scope("remote_chunk_1", "https://example.org"), "metadata_snippet")
         self.assertEqual(infer_evidence_scope("none"), "none")
+
+    def test_infer_evidence_source_name_is_stable_for_agents(self):
+        self.assertEqual(infer_evidence_source_name("abstract_sentence_2"), "citation_metadata")
+        self.assertEqual(infer_evidence_source_name("user_full_text_excerpt_1"), "user_provided")
+        self.assertEqual(infer_evidence_source_name("openalex_remote_1_paragraph_1"), "openalex")
+        self.assertEqual(infer_evidence_source_name("metadata_chunk_1", "https://api.crossref.org/work"), "crossref")
+        self.assertEqual(infer_evidence_source_name("none"), "none")
 
     def test_extract_nli_from_ensemble_components(self):
         ensemble = SupportAssessment(
@@ -168,6 +193,27 @@ def _paper(abstract):
     return CitationRecord(citation_id="p", title="Some Paper", abstract=abstract, source="memory")
 
 
+def _sparse_quality_record():
+    return CitationRecord(
+        citation_id="sparse",
+        title="Sparse source metadata improves audits",
+        authors=["Ada Lovelace"],
+        year=2026,
+        doi="10.5555/sparse",
+        source="crossref",
+        metadata={
+            "metadata_quality": {
+                "schema_version": 1,
+                "present_fields": ["title", "authors", "year", "identifier"],
+                "missing_fields": ["venue", "abstract", "url"],
+                "identifiers": {"doi": True, "arxiv_id": False},
+                "completeness": 0.5714,
+                "confidence_effect": "missing_metadata_lowers_confidence_not_fabrication_evidence",
+            }
+        },
+    )
+
+
 class AssessSupportTests(unittest.TestCase):
     def test_supported_when_entailment_strong(self):
         backend = _FakeBackend({"X improves Y": (0.6, {"entailment": 0.8, "contradiction": 0.05, "neutral": 0.15})})
@@ -176,6 +222,145 @@ class AssessSupportTests(unittest.TestCase):
         self.assertEqual(result.engine, "ensemble")
         self.assertEqual(result.evidence_scope, "abstract")
         self.assertEqual(result.evidence["evidence_scope"], "abstract")
+
+    def test_check_claim_support_exposes_source_metadata_quality(self):
+        record = _sparse_quality_record()
+        backend = _FakeBackend(
+            {
+                "Sparse source metadata improves audits": (
+                    0.6,
+                    {"entailment": 0.8, "contradiction": 0.05, "neutral": 0.15},
+                )
+            }
+        )
+
+        result = check_claim_support(
+            "Sparse source metadata improves audits.",
+            CitationRecord(citation_id="candidate", title=record.title, year=2026),
+            InMemoryMetadataSource([record]),
+            backend=backend,
+        )
+        payload = result.to_dict()
+
+        self.assertEqual(result.verdict, SupportVerdict.SUPPORTED)
+        self.assertEqual(payload["resolution"]["canonical_metadata_quality"]["missing_fields"], ["venue", "abstract", "url"])
+        self.assertEqual(payload["source_metadata_missing_fields"], ["venue", "abstract", "url"])
+        self.assertEqual(
+            payload["source_metadata_confidence_effect"],
+            "missing_metadata_lowers_confidence_not_fabrication_evidence",
+        )
+
+    def test_support_audit_risk_ranking_exposes_source_metadata_quality(self):
+        record = _sparse_quality_record()
+        backend = _FakeBackend(
+            {
+                "Sparse source metadata improves audits": (
+                    0.6,
+                    {"entailment": 0.8, "contradiction": 0.05, "neutral": 0.15},
+                )
+            }
+        )
+
+        report = audit_claim_support(
+            [ClaimSupportRequest("Sparse source metadata improves audits.", CitationRecord("candidate", title=record.title, year=2026))],
+            InMemoryMetadataSource([record]),
+            backend=backend,
+        )
+        risk_item = report.to_dict()["risk_ranking"][0]
+
+        self.assertEqual(risk_item["verdict"], "supported")
+        self.assertEqual(risk_item["source_metadata_missing_fields"], ["venue", "abstract", "url"])
+        self.assertEqual(
+            risk_item["source_metadata_confidence_effect"],
+            "missing_metadata_lowers_confidence_not_fabrication_evidence",
+        )
+        self.assertTrue(risk_item["canonical_metadata_quality"]["identifiers"]["doi"])
+
+    def test_support_set_aggregates_source_metadata_quality(self):
+        record = _sparse_quality_record()
+        backend = _FakeBackend(
+            {
+                "Sparse source metadata improves audits": (
+                    0.6,
+                    {"entailment": 0.8, "contradiction": 0.05, "neutral": 0.15},
+                )
+            }
+        )
+
+        result = check_claim_support_set(
+            "Sparse source metadata improves audits.",
+            [CitationRecord("candidate", title=record.title, year=2026)],
+            InMemoryMetadataSource([record]),
+            backend=backend,
+        )
+        payload = result.to_dict()
+
+        self.assertEqual(payload["verdict"], "supported")
+        self.assertEqual(payload["source_metadata_missing_fields"], ["venue", "abstract", "url"])
+        self.assertEqual(
+            payload["source_metadata_confidence_effects"],
+            ["missing_metadata_lowers_confidence_not_fabrication_evidence"],
+        )
+        self.assertEqual(payload["support_mode_details"]["schema_version"], 1)
+        self.assertEqual(payload["support_mode_details"]["support_mode"], "single_strong_support")
+        self.assertEqual(payload["support_mode_details"]["decision"], "one_strong_citation_supports_claim")
+        self.assertEqual(payload["support_mode_details"]["supported_indexes"], [0])
+        self.assertEqual(payload["support_mode_details"]["weakly_supported_indexes"], [])
+        self.assertEqual(payload["support_mode_details"]["contradicted_indexes"], [])
+        self.assertEqual(payload["support_mode_details"]["full_text_evidence_present"], False)
+        self.assertIn(
+            "no_unstated_multi_hop_or_full_text_support",
+            payload["support_mode_details"]["policy"],
+        )
+
+    def test_support_set_mode_details_keep_multiple_weak_citations_tentative(self):
+        records = [
+            CitationRecord(
+                citation_id="weak-1",
+                title="CiteGuardBench: A Benchmark for Citation Auditing",
+                source="memory",
+            ),
+            CitationRecord(
+                citation_id="weak-2",
+                title="Citation Auditing Workflows for Reviewers",
+                source="memory",
+            ),
+        ]
+        backend = _FakeBackend(
+            {
+                "Citation Auditing": (
+                    0.30,
+                    {"entailment": 0.02, "contradiction": 0.01, "neutral": 0.97},
+                )
+            }
+        )
+
+        result = check_claim_support_set(
+            "The cited papers prove that citation auditing improves research integrity.",
+            records,
+            InMemoryMetadataSource(records),
+            backend=backend,
+        )
+        payload = result.to_dict()
+
+        self.assertEqual(payload["verdict"], "weakly_supported")
+        self.assertEqual(payload["support_mode"], "multiple_weak_support")
+        self.assertEqual(
+            payload["support_mode_details"]["decision"],
+            "multiple_weak_citations_remain_tentative",
+        )
+        self.assertEqual(payload["support_mode_details"]["strong_support_count"], 0)
+        self.assertEqual(payload["support_mode_details"]["weak_support_count"], 2)
+        self.assertEqual(payload["support_mode_details"]["weakly_supported_indexes"], [0, 1])
+        self.assertEqual(payload["support_mode_details"]["supported_indexes"], [])
+        self.assertIn(
+            "weak_sources_do_not_become_strong_support",
+            payload["support_mode_details"]["reasons"],
+        )
+        self.assertIn(
+            "no_full_text_evidence_in_aggregate",
+            payload["support_mode_details"]["reasons"],
+        )
 
     def test_tie_break_prefers_abstract_over_title(self):
         backend = _FakeBackend(
@@ -319,6 +504,7 @@ class AssessSupportTests(unittest.TestCase):
 
         self.assertEqual(result.verdict, SupportVerdict.SUPPORTED)
         self.assertEqual(result.evidence_scope, "metadata_snippet")
+        self.assertEqual(result.evidence["source_name"], "remote_metadata")
 
     def test_insufficient_when_neutral(self):
         backend = _FakeBackend({"unrelated topic": (0.1, {"entailment": 0.1, "contradiction": 0.1, "neutral": 0.8})})

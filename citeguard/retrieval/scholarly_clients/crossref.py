@@ -10,7 +10,15 @@ from citeguard.graph import CitationRecord
 from .base import MetadataSource
 from .evidence import attach_evidence_chunks, harvest_remote_evidence_report
 from .http import HTTPClient
-from .utils import find_local_match, normalize_doi, record_match_score, stable_record_id, strip_tags
+from .utils import (
+    configured_contact_email,
+    find_local_match,
+    metadata_quality,
+    normalize_doi,
+    record_match_score,
+    stable_record_id,
+    strip_tags,
+)
 
 
 class CrossrefMetadataSource(MetadataSource):
@@ -21,12 +29,12 @@ class CrossrefMetadataSource(MetadataSource):
 
     def __init__(
         self,
-        mailto: str = "research@example.com",
+        mailto: str = "",
         http_client: Optional[HTTPClient] = None,
         harvest_evidence: bool = True,
         evidence_timeout: int = 4,
     ) -> None:
-        self.mailto = mailto
+        self.mailto = configured_contact_email(mailto)
         self.http_client = http_client or HTTPClient()
         self.harvest_evidence = harvest_evidence
         self.evidence_timeout = evidence_timeout
@@ -36,9 +44,12 @@ class CrossrefMetadataSource(MetadataSource):
         return list(self._records)
 
     def search(self, query: str, top_k: int = 5) -> List[CitationRecord]:
+        params = {"query.bibliographic": query, "rows": top_k}
+        if self.mailto:
+            params["mailto"] = self.mailto
         payload = self.http_client.get_json(
             self.BASE_URL,
-            params={"query.bibliographic": query, "rows": top_k, "mailto": self.mailto},
+            params=params,
         )
         items = payload.get("message", {}).get("items", [])
         records = [self._to_record(item) for item in items[:top_k]]
@@ -51,9 +62,12 @@ class CrossrefMetadataSource(MetadataSource):
             return local_match
 
         if candidate.doi:
+            params = {}
+            if self.mailto:
+                params["mailto"] = self.mailto
             payload = self.http_client.get_json(
                 f"{self.BASE_URL}/{quote(normalize_doi(candidate.doi), safe='')}",
-                params={"mailto": self.mailto},
+                params=params,
             )
             message = payload.get("message")
             if message:
@@ -85,6 +99,7 @@ class CrossrefMetadataSource(MetadataSource):
         year = _issued_year(item.get("issued"))
         doi = normalize_doi(_text(item.get("DOI", "")))
         url = str(item.get("URL") or "")
+        abstract = strip_tags(_text(item.get("abstract", "")))
         identifier = doi or url or title or "crossref"
         evidence_chunks = []
         evidence_failures = []
@@ -105,6 +120,15 @@ class CrossrefMetadataSource(MetadataSource):
             "source_score": 0.0,
             "type": item.get("type", ""),
             "is_referenced_by_count": item.get("is-referenced-by-count", 0),
+            "metadata_quality": metadata_quality(
+                title=title,
+                authors=authors,
+                year=year,
+                venue=venue,
+                abstract=abstract,
+                doi=doi,
+                url=url,
+            ),
         }
         if evidence_failures:
             metadata["evidence_harvest_failures"] = evidence_failures
@@ -114,7 +138,7 @@ class CrossrefMetadataSource(MetadataSource):
             authors=authors,
             year=year,
             venue=venue,
-            abstract=strip_tags(_text(item.get("abstract", ""))),
+            abstract=abstract,
             doi=doi,
             url=url,
             source=self.name,

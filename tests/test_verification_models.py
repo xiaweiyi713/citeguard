@@ -14,6 +14,7 @@ from citeguard.verification.models import (
     available_sources,
     classify_source_failure_mode,
     filter_high_risk_payload,
+    review_summary_from_risk_ranking,
     stable_next_action,
     source_failure_recovery_code,
     verification_next_action,
@@ -128,6 +129,113 @@ class ModelsTests(unittest.TestCase):
         self.assertEqual(omitted_summary["next_actions"], {"review_metadata": 1, "keep": 1})
         self.assertEqual(omitted_summary["action_queues"]["metadata_review_indexes"], [2])
         self.assertEqual(omitted_summary["action_queues"]["safe_to_keep_indexes"], [0])
+        self.assertEqual(
+            omitted_summary["recommended_next_steps"]["steps"],
+            [
+                {
+                    "priority": 5,
+                    "action": "review_metadata",
+                    "queue": "metadata_review_indexes",
+                    "count": 1,
+                    "indexes": [2],
+                }
+            ],
+        )
+        self.assertEqual(omitted_summary["recommended_next_steps"]["safe_to_keep_indexes"], [0])
+
+    def test_review_summary_source_traceability_ignores_none_placeholders(self):
+        summary = review_summary_from_risk_ranking(
+            1,
+            [
+                {
+                    "index": 0,
+                    "risk": "medium",
+                    "next_action": "inspect_full_text_or_find_stronger_citation",
+                    "input_source_paths": ["none"],
+                    "input_source_formats": ["none"],
+                    "input_source_locators": ["none"],
+                    "input_source_indexes": [],
+                }
+            ],
+        )
+
+        traceability = summary["source_traceability"]
+        self.assertFalse(traceability["has_source_backed_items"])
+        self.assertEqual(traceability["source_backed_count"], 0)
+        self.assertEqual(traceability["source_paths"], [])
+        self.assertEqual(traceability["source_formats"], [])
+        self.assertEqual(traceability["source_locators"], [])
+
+    def test_review_summary_recommends_stable_next_step_order(self):
+        payload = {
+            "results": [{"id": "rewrite"}, {"id": "resolve"}, {"id": "retry"}, {"id": "safe"}],
+            "risk_ranking": [
+                {
+                    "index": 1,
+                    "risk": "high",
+                    "next_action": "resolve_identifier_or_replace",
+                    "suggested_fix": {
+                        "kind": "add_identifier_or_replace",
+                        "requires_user_confirmation": True,
+                    },
+                },
+                {
+                    "index": 0,
+                    "risk": "high",
+                    "next_action": "rewrite_or_replace_evidence",
+                    "suggested_fix": {
+                        "kind": "rewrite_claim_or_replace_evidence",
+                        "requires_user_confirmation": True,
+                    },
+                },
+                {
+                    "index": 2,
+                    "risk": "medium",
+                    "next_action": "retry_or_check_source_health",
+                    "suggested_fix": {
+                        "kind": "retry_or_check_source_health",
+                        "requires_user_confirmation": False,
+                    },
+                },
+                {
+                    "index": 3,
+                    "risk": "low",
+                    "next_action": "keep",
+                    "suggested_fix": {
+                        "kind": "keep",
+                        "requires_user_confirmation": False,
+                    },
+                },
+            ],
+        }
+        summary = AuditReport(
+            results=[self._result(Verdict.VERIFIED) for _ in payload["results"]],
+            summary={"verified": 1, "not_found": 3},
+            risk_ranking=payload["risk_ranking"],
+        ).to_dict()["review_summary"]
+
+        next_steps = summary["recommended_next_steps"]
+        self.assertEqual(next_steps["first_queue"], "rewrite_or_replace_indexes")
+        self.assertEqual(next_steps["first_action"], "rewrite_or_replace_evidence")
+        self.assertEqual(
+            [(step["queue"], step["indexes"]) for step in next_steps["steps"]],
+            [
+                ("rewrite_or_replace_indexes", [0]),
+                ("identity_resolution_indexes", [1]),
+                ("source_retry_indexes", [2]),
+            ],
+        )
+        self.assertEqual(next_steps["safe_to_keep_count"], 1)
+        self.assertEqual(next_steps["safe_to_keep_indexes"], [3])
+        fix_summary = summary["suggested_fix_summary"]
+        self.assertEqual(fix_summary["confirmation_required_indexes"], [1, 0])
+        self.assertEqual(fix_summary["confirmation_required_count"], 2)
+        self.assertEqual(fix_summary["no_confirmation_required_indexes"], [2, 3])
+        self.assertEqual(fix_summary["fix_kind_indexes"]["add_identifier_or_replace"], [1])
+        self.assertEqual(fix_summary["fix_kind_indexes"]["rewrite_claim_or_replace_evidence"], [0])
+        self.assertFalse(fix_summary["auto_apply_allowed"])
+        self.assertEqual(fix_summary["missing_suggested_fix_indexes"], [])
+        self.assertIn("must_not_silently_apply", fix_summary["policy"])
 
     def test_filter_high_risk_payload_ignores_invalid_risk_indexes(self):
         payload = {

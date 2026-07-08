@@ -10,7 +10,14 @@ from citeguard.graph import CitationRecord
 
 from .base import MetadataSource
 from .http import HTTPClient
-from .utils import find_local_match, normalize_arxiv_id, normalize_doi, record_match_score, stable_record_id
+from .utils import (
+    find_local_match,
+    metadata_quality,
+    normalize_arxiv_id,
+    normalize_doi,
+    record_match_score,
+    stable_record_id,
+)
 
 
 class SemanticScholarMetadataSource(MetadataSource):
@@ -105,19 +112,36 @@ class SemanticScholarMetadataSource(MetadataSource):
             _safe_text(external_ids.get("ArXiv", "")) or _safe_text(external_ids.get("ARXIV", ""))
         )
         title = _safe_text(item.get("title", ""))
+        year = _safe_year(item.get("year"))
+        venue = _safe_text(item.get("venue", ""))
+        abstract = _safe_text(item.get("abstract", ""))
+        url = _safe_text(item.get("url", ""))
         identifier = _safe_text(item.get("paperId", "")) or doi or arxiv_id or title
         return CitationRecord(
             citation_id=stable_record_id("s2", identifier),
             title=title,
             authors=authors,
-            year=_safe_year(item.get("year")),
-            venue=_safe_text(item.get("venue", "")),
-            abstract=_safe_text(item.get("abstract", "")),
+            year=year,
+            venue=venue,
+            abstract=abstract,
             doi=doi,
             arxiv_id=arxiv_id,
-            url=_safe_text(item.get("url", "")),
+            url=url,
             source=self.name,
-            metadata={"source_score": 0.0, "paper_id": _safe_text(item.get("paperId", ""))},
+            metadata={
+                "source_score": 0.0,
+                "paper_id": _safe_text(item.get("paperId", "")),
+                "metadata_quality": metadata_quality(
+                    title=title,
+                    authors=authors,
+                    year=year,
+                    venue=venue,
+                    abstract=abstract,
+                    doi=doi,
+                    arxiv_id=arxiv_id,
+                    url=url,
+                ),
+            },
         )
 
 

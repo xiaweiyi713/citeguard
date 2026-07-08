@@ -1,6 +1,13 @@
 """Public CiteGuard package facade."""
 
-from citeguard.errors import ERROR_CODE_NEXT_ACTION, ERROR_SCHEMA_VERSION, error_payload
+from citeguard.errors import (
+    ERROR_CODE_CATEGORY,
+    ERROR_CODE_NEXT_ACTION,
+    ERROR_CODE_RETRYABLE,
+    ERROR_SCHEMA_VERSION,
+    error_code_registry,
+    error_payload,
+)
 from citeguard.version import __version__
 
 _VERIFICATION_EXPORTS = {
@@ -68,7 +75,10 @@ __all__ = [
     "Verdict",
     "ERROR_SCHEMA_VERSION",
     "ERROR_CODE_NEXT_ACTION",
+    "ERROR_CODE_RETRYABLE",
+    "ERROR_CODE_CATEGORY",
     "__version__",
+    "error_code_registry",
     "error_payload",
     "audit_claim_support",
     "audit_citations",

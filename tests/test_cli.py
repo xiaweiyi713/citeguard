@@ -100,6 +100,48 @@ class FailingMetadataSource:
         raise TimeoutError("source timed out")
 
 
+class RateLimitedMetadataSource:
+    name = "rate_limited_source"
+
+    class HTTPDiagnostics:
+        last_error_code = ""
+        last_error_kind = ""
+        last_error = ""
+        last_status_code = None
+        last_url = ""
+        last_cache_hit = False
+        last_attempt_count = 0
+        last_retry_count = 0
+        last_retry_after_seconds = None
+        last_retry_delay_seconds = None
+
+        def fail(self):
+            self.last_error_code = "source_unavailable"
+            self.last_error_kind = "rate_limited"
+            self.last_error = "http_429"
+            self.last_status_code = 429
+            self.last_url = "https://api.example.test/search"
+            self.last_cache_hit = False
+            self.last_attempt_count = 2
+            self.last_retry_count = 1
+            self.last_retry_after_seconds = 2.0
+            self.last_retry_delay_seconds = 1.5
+
+    def __init__(self):
+        self.http_client = self.HTTPDiagnostics()
+
+    def all_records(self):
+        return []
+
+    def lookup(self, candidate):
+        self.http_client.fail()
+        return None
+
+    def search(self, query, top_k=5):
+        self.http_client.fail()
+        return []
+
+
 class CLITests(unittest.TestCase):
     def setUp(self):
         self.record = CitationRecord(
@@ -134,6 +176,20 @@ class CLITests(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertNotIn("\n  ", stdout.getvalue())
         self.assertEqual(json.loads(stdout.getvalue())["service"], "CiteGuard")
+
+    def test_batch_help_documents_all_reference_input_shapes(self):
+        parser = cli_module.build_parser()
+
+        for command in ("audit", "support-set", "support-audit"):
+            stdout = io.StringIO()
+            with self.subTest(command=command):
+                with mock.patch("sys.stdout", stdout), self.assertRaises(SystemExit) as raised:
+                    parser.parse_args([command, "--help"])
+
+                self.assertEqual(raised.exception.code, 0)
+                help_text = stdout.getvalue()
+                self.assertIn("JSON/JSONL", help_text)
+                self.assertIn("Markdown/LaTeX/BibTeX/BBL/DOCX/plain-text", help_text)
 
     def test_status_can_request_live_source_probe(self):
         stdout = io.StringIO()
@@ -230,6 +286,81 @@ class CLITests(unittest.TestCase):
         self.assertEqual(clear_code, 0)
         clear_payload = json.loads(clear_stdout.getvalue())
         self.assertEqual(clear_payload["cleared_entries"], 1)
+        self.assertEqual(clear_payload["remaining_entries"], 0)
+        self.assertEqual(clear_payload["clear_filters"], {"operation": None, "source": None})
+
+    def test_cache_inspect_can_filter_selected_counts_by_operation(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = os.path.join(tmpdir, "cache.sqlite")
+            cached = CachingMetadataSource(self.source, db_path=path)
+            cached.search("GhostCite", top_k=5)
+            cached.lookup(CitationRecord(citation_id="candidate", title=self.record.title, year=2026))
+
+            stdout = io.StringIO()
+            code = run(["cache", "inspect", "--path", path, "--operation", "lookup"], stdout=stdout)
+
+        self.assertEqual(code, 0)
+        payload = json.loads(stdout.getvalue())
+        self.assertEqual(payload["entries"], 2)
+        self.assertEqual(payload["entry_prefixes"]["search"], 1)
+        self.assertEqual(payload["entry_prefixes"]["lookup"], 1)
+        self.assertEqual(payload["selected_entries"], 1)
+        self.assertEqual(payload["selected_entry_prefixes"]["lookup"], 1)
+        self.assertEqual(payload["selected_entry_prefixes"]["search"], 0)
+        self.assertEqual(payload["inspect_filters"], {"operation": "lookup", "source": None})
+        self.assertNotIn("GhostCite", json.dumps(payload, sort_keys=True))
+
+    def test_cache_clear_can_filter_by_operation(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = os.path.join(tmpdir, "cache.sqlite")
+            cached = CachingMetadataSource(self.source, db_path=path)
+            cached.search("GhostCite", top_k=5)
+            cached.lookup(CitationRecord(citation_id="candidate", title=self.record.title, year=2026))
+
+            clear_stdout = io.StringIO()
+            clear_code = run(["cache", "clear", "--path", path, "--operation", "lookup"], stdout=clear_stdout)
+            inspect_stdout = io.StringIO()
+            inspect_code = run(["cache", "inspect", "--path", path], stdout=inspect_stdout)
+
+        self.assertEqual(clear_code, 0)
+        clear_payload = json.loads(clear_stdout.getvalue())
+        self.assertEqual(clear_payload["cleared_entries"], 1)
+        self.assertEqual(clear_payload["remaining_entries"], 1)
+        self.assertEqual(clear_payload["clear_filters"], {"operation": "lookup", "source": None})
+        self.assertEqual(clear_payload["selected_entry_prefixes"]["lookup"], 1)
+        self.assertEqual(inspect_code, 0)
+        inspect_payload = json.loads(inspect_stdout.getvalue())
+        self.assertEqual(inspect_payload["entries"], 1)
+        self.assertEqual(inspect_payload["entry_prefixes"]["search"], 1)
+        self.assertEqual(inspect_payload["entry_prefixes"]["lookup"], 0)
+
+    def test_cache_clear_can_filter_by_source_without_deleting_nonmatches(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = os.path.join(tmpdir, "cache.sqlite")
+            cached = CachingMetadataSource(self.source, db_path=path)
+            cached.search("GhostCite", top_k=5)
+
+            missing_stdout = io.StringIO()
+            missing_code = run(["cache", "clear", "--path", path, "--source", "openalex"], stdout=missing_stdout)
+            inspect_stdout = io.StringIO()
+            inspect_code = run(["cache", "inspect", "--path", path], stdout=inspect_stdout)
+            matching_stdout = io.StringIO()
+            matching_code = run(["cache", "clear", "--path", path, "--source", "metadata_source"], stdout=matching_stdout)
+
+        self.assertEqual(missing_code, 0)
+        missing_payload = json.loads(missing_stdout.getvalue())
+        self.assertEqual(missing_payload["cleared_entries"], 0)
+        self.assertEqual(missing_payload["remaining_entries"], 1)
+        self.assertEqual(missing_payload["clear_filters"], {"operation": None, "source": "openalex"})
+        self.assertEqual(inspect_code, 0)
+        inspect_payload = json.loads(inspect_stdout.getvalue())
+        self.assertEqual(inspect_payload["entries"], 1)
+        self.assertEqual(inspect_payload["entry_prefixes"]["search"], 1)
+        self.assertEqual(matching_code, 0)
+        matching_payload = json.loads(matching_stdout.getvalue())
+        self.assertEqual(matching_payload["cleared_entries"], 1)
+        self.assertEqual(matching_payload["remaining_entries"], 0)
+        self.assertEqual(matching_payload["clear_filters"], {"operation": None, "source": "metadata_source"})
 
     def test_cache_export_writes_offline_replay_fixture(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -285,6 +416,80 @@ class CLITests(unittest.TestCase):
         metadata = outputs[0][0]["metadata"]
         self.assertNotIn("cache_updated_at", metadata)
         self.assertNotIn("timestamp", metadata["cache_provenance"])
+        self.assertEqual(replay_source.all_records()[0].title, self.record.title)
+
+    def test_cache_export_can_write_manifest_replay_fixture(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            cache_db = os.path.join(tmpdir, "cache.sqlite")
+            fixture_path = os.path.join(tmpdir, "fixture.json")
+            cached = CachingMetadataSource(self.source, db_path=cache_db)
+            cached.search("GhostCite", top_k=5)
+
+            stdout = io.StringIO()
+            code = run(
+                [
+                    "cache",
+                    "export",
+                    "--path",
+                    cache_db,
+                    "--deterministic",
+                    "--include-manifest",
+                    "--output",
+                    fixture_path,
+                ],
+                stdout=stdout,
+            )
+            with open(fixture_path, encoding="utf-8") as handle:
+                fixture = json.load(handle)
+            replay_source = build_configured_source(env={"CITEGUARD_FIXTURE_CITATIONS": fixture_path})
+
+        self.assertEqual(code, 0)
+        manifest = json.loads(stdout.getvalue())
+        self.assertEqual(manifest["fixture_format"], "manifest_records")
+        self.assertEqual(fixture["fixture_manifest"]["fixture_format"], "manifest_records")
+        self.assertTrue(fixture["fixture_manifest"]["deterministic"])
+        self.assertEqual(fixture["fixture_manifest"]["record_count"], 1)
+        self.assertEqual(fixture["records"][0]["title"], self.record.title)
+        replayed = replay_source.all_records()[0]
+        self.assertEqual(replayed.title, self.record.title)
+        self.assertEqual(replayed.metadata["cache_provenance"]["operation"], "search")
+
+    def test_cache_export_can_filter_replay_fixture_by_operation(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            cache_db = os.path.join(tmpdir, "cache.sqlite")
+            fixture_path = os.path.join(tmpdir, "fixture.json")
+            cached = CachingMetadataSource(self.source, db_path=cache_db)
+            cached.search("GhostCite", top_k=5)
+            cached.lookup(CitationRecord(citation_id="candidate", title=self.record.title, year=2026))
+
+            stdout = io.StringIO()
+            code = run(
+                [
+                    "cache",
+                    "export",
+                    "--path",
+                    cache_db,
+                    "--deterministic",
+                    "--operation",
+                    "lookup",
+                    "--output",
+                    fixture_path,
+                ],
+                stdout=stdout,
+            )
+            with open(fixture_path, encoding="utf-8") as handle:
+                fixture = json.load(handle)
+            replay_source = build_configured_source(env={"CITEGUARD_FIXTURE_CITATIONS": fixture_path})
+
+        self.assertEqual(code, 0)
+        manifest = json.loads(stdout.getvalue())
+        self.assertEqual(manifest["cache_entry_count"], 2)
+        self.assertEqual(manifest["selected_cache_entry_count"], 1)
+        self.assertEqual(manifest["selected_cache_entry_prefixes"]["lookup"], 1)
+        self.assertEqual(manifest["selected_cache_entry_prefixes"]["search"], 0)
+        self.assertEqual(manifest["export_filters"]["operation"], "lookup")
+        self.assertIsNone(manifest["export_filters"]["source"])
+        self.assertEqual(fixture[0]["metadata"]["cache_provenance"]["operation"], "lookup")
         self.assertEqual(replay_source.all_records()[0].title, self.record.title)
 
     def test_cache_export_prints_fixture_payload_without_output_path(self):
@@ -603,6 +808,61 @@ class CLITests(unittest.TestCase):
         self.assertEqual(payload["support_mode"], "single_strong_support")
         self.assertEqual(payload["supporting_citation_count"], 1)
         self.assertEqual(payload["contradicting_citation_count"], 0)
+        self.assertEqual(payload["support_mode_details"]["decision"], "one_strong_citation_supports_claim")
+        self.assertEqual(payload["support_mode_details"]["supported_indexes"], [1])
+        self.assertEqual(payload["support_mode_details"]["insufficient_evidence_indexes"], [0])
+        self.assertIn(
+            "no_unstated_multi_hop_or_full_text_support",
+            payload["support_mode_details"]["policy"],
+        )
+
+    def test_support_set_can_read_markdown_references_directly(self):
+        stdout = io.StringIO()
+        with tempfile.NamedTemporaryFile("w", encoding="utf-8", suffix=".md", delete=False) as handle:
+            handle.write(
+                "## References\n\n"
+                "1. Xu, Zhe and Wang, Lin. GhostCite: A Large-Scale Analysis of Citation Validity. "
+                "arXiv, 2026. DOI: 10.48550/arxiv.2602.06718.\n"
+            )
+            path = handle.name
+
+        try:
+            code = run(
+                [
+                    "support-set",
+                    path,
+                    "--claim",
+                    "GhostCite studies citation validity.",
+                    "--lang",
+                    "en",
+                ],
+                source=self.source,
+                support_backend=EntailingSupportBackend(),
+                stdout=stdout,
+            )
+        finally:
+            os.unlink(path)
+
+        self.assertEqual(code, 0)
+        payload = json.loads(stdout.getvalue())
+        self.assertEqual(payload["verdict"], "supported")
+        self.assertEqual(payload["summary"]["supported"], 1)
+        self.assertEqual(payload["support_mode"], "single_strong_support")
+        self.assertEqual(payload["results"][0]["resolution"]["verdict"], "matched")
+        self.assertEqual(payload["input_source_paths"], [path])
+        self.assertEqual(payload["input_source_formats"], ["markdown"])
+        self.assertEqual(payload["input_source_indexes"], [1])
+        self.assertEqual(payload["input_source_locators"], [f"{path}#citation-1"])
+        self.assertEqual(payload["input_source_line_starts"], [3])
+        self.assertEqual(payload["input_source_line_ends"], [3])
+        self.assertEqual(payload["results"][0]["resolution"]["input_source_path"], path)
+        self.assertEqual(payload["results"][0]["resolution"]["input_source_line_start"], 3)
+        self.assertEqual(payload["results"][0]["resolution"]["input_source_line_end"], 3)
+        self.assertEqual(
+            payload["results"][0]["resolution"]["title"],
+            "GhostCite: A Large-Scale Analysis of Citation Validity",
+        )
+        self.assertEqual(payload["results"][0]["resolution"]["year"], 2026)
 
     def test_support_set_reads_full_text_excerpts_from_json(self):
         stdout = io.StringIO()
@@ -877,7 +1137,42 @@ class CLITests(unittest.TestCase):
         self.assertFalse(payload["ok"])
         self.assertEqual(payload["error"]["code"], "argument_parse_error")
         self.assertEqual(payload["error"]["next_action"], "repair_input")
+        self.assertEqual(payload["error"]["details"]["prog"], "citeguard support")
+        self.assertEqual(payload["error"]["details"]["command"], "support")
+        self.assertEqual(payload["error"]["details"]["arguments"], ["--claim"])
         self.assertIn("--claim", payload["error"]["message"])
+
+    def test_runtime_configuration_errors_include_field_details(self):
+        stderr = io.StringIO()
+
+        with mock.patch.dict(os.environ, {"CITEGUARD_SOURCES": "bad"}, clear=False):
+            code = run(["verify", "--title", "GhostCite"], stderr=stderr)
+
+        self.assertEqual(code, 2)
+        payload = json.loads(stderr.getvalue())
+        self.assertFalse(payload["ok"])
+        self.assertEqual(payload["error"]["code"], "invalid_input")
+        self.assertEqual(payload["error"]["details"]["command"], "verify")
+        self.assertEqual(payload["error"]["details"]["field"], "CITEGUARD_SOURCES")
+        self.assertEqual(payload["error"]["details"]["source"], "environment")
+        self.assertEqual(payload["error"]["details"]["invalid_values"], ["bad"])
+        self.assertIn("openalex", payload["error"]["details"]["valid_values"])
+
+    def test_numeric_runtime_configuration_errors_include_expected_details(self):
+        stderr = io.StringIO()
+
+        with mock.patch.dict(os.environ, {"CITEGUARD_HTTP_TIMEOUT": "0"}, clear=False):
+            code = run(["verify", "--title", "GhostCite"], stderr=stderr)
+
+        self.assertEqual(code, 2)
+        payload = json.loads(stderr.getvalue())
+        self.assertFalse(payload["ok"])
+        self.assertEqual(payload["error"]["code"], "invalid_input")
+        self.assertEqual(payload["error"]["details"]["command"], "verify")
+        self.assertEqual(payload["error"]["details"]["field"], "CITEGUARD_HTTP_TIMEOUT")
+        self.assertEqual(payload["error"]["details"]["source"], "environment")
+        self.assertEqual(payload["error"]["details"]["expected"], "positive integer")
+        self.assertEqual(payload["error"]["details"]["received"], "0")
 
     def test_support_audit_reads_claim_citation_pairs(self):
         stdout = io.StringIO()
@@ -915,18 +1210,92 @@ class CLITests(unittest.TestCase):
         self.assertEqual(payload["results"][0]["lang"], "en")
         self.assertEqual(payload["risk_ranking"][0]["evidence_scope"], "none")
         self.assertEqual(payload["risk_ranking"][0]["next_action"], "resolve_citation_identity")
+        self.assertEqual(payload["risk_ranking"][0]["risk_reason"], "citation_identity_unresolved")
+        self.assertEqual(payload["risk_ranking"][0]["suggested_fix"]["kind"], "resolve_citation_identity")
+        self.assertTrue(payload["risk_ranking"][0]["suggested_fix"]["requires_user_confirmation"])
+        self.assertEqual(
+            payload["risk_ranking"][0]["suggested_fix"]["policy"],
+            "resolve_identity_before_judging_support",
+        )
         self.assertEqual(payload["risk_ranking"][0]["support_confidence"], 0.0)
         self.assertEqual(payload["risk_ranking"][0]["support_engine"], "none")
         self.assertEqual(payload["risk_ranking"][0]["resolution_verdict"], "not_found")
         self.assertEqual(payload["risk_ranking"][0]["resolved_title"], "")
         self.assertEqual(payload["risk_ranking"][0]["evidence_source_field"], "none")
+        self.assertEqual(payload["risk_ranking"][0]["evidence_source_name"], "none")
         self.assertEqual(payload["risk_ranking"][1]["support_engine"], "ensemble")
+        self.assertEqual(payload["risk_ranking"][1]["risk_reason"], "available_evidence_supports_claim")
+        self.assertEqual(payload["risk_ranking"][1]["suggested_fix"]["kind"], "keep_claim")
+        self.assertFalse(payload["risk_ranking"][1]["suggested_fix"]["requires_user_confirmation"])
         self.assertEqual(payload["risk_ranking"][1]["resolution_verdict"], "matched")
         self.assertEqual(payload["risk_ranking"][1]["resolved_title"], "GhostCite: A Large-Scale Analysis of Citation Validity")
         self.assertEqual(payload["risk_ranking"][1]["resolved_year"], 2026)
         self.assertEqual(payload["risk_ranking"][1]["evidence_source_field"], "abstract_sentence_1")
+        self.assertEqual(payload["risk_ranking"][1]["evidence_source_name"], "memory")
         self.assertTrue(payload["risk_ranking"][0]["counterevidence_review"])
         self.assertEqual(payload["risk_ranking"][0]["counterevidence_reason"], "unresolved_citation")
+
+    def test_support_audit_exposes_source_metadata_quality(self):
+        stdout = io.StringIO()
+        sparse_record = CitationRecord(
+            citation_id="support-sparse",
+            title="Sparse Source Metadata for Support Audits",
+            authors=["Ada Lovelace"],
+            year=2026,
+            doi="10.5555/support-sparse",
+            abstract="Sparse source metadata improves citation support audits.",
+            source="crossref",
+            metadata={
+                "metadata_quality": {
+                    "schema_version": 1,
+                    "present_fields": ["title", "authors", "year", "identifier", "abstract"],
+                    "missing_fields": ["venue", "url"],
+                    "identifiers": {"doi": True, "arxiv_id": False},
+                    "completeness": 0.7143,
+                    "confidence_effect": "missing_metadata_lowers_confidence_not_fabrication_evidence",
+                }
+            },
+        )
+        with tempfile.NamedTemporaryFile("w", encoding="utf-8", suffix=".json", delete=False) as handle:
+            json.dump(
+                [
+                    {
+                        "claim": "Sparse source metadata improves citation support audits.",
+                        "title": "Sparse Source Metadata for Support Audits",
+                        "year": 2026,
+                    }
+                ],
+                handle,
+            )
+            path = handle.name
+
+        try:
+            code = run(
+                ["support-audit", path],
+                source=InMemoryMetadataSource([sparse_record]),
+                support_backend=EntailingSupportBackend(),
+                stdout=stdout,
+            )
+        finally:
+            os.unlink(path)
+
+        self.assertEqual(code, 0)
+        payload = json.loads(stdout.getvalue())
+        result = payload["results"][0]
+        risk_item = payload["risk_ranking"][0]
+        self.assertEqual(result["verdict"], "supported")
+        self.assertEqual(result["resolution"]["source_metadata_missing_fields"], ["venue", "url"])
+        self.assertEqual(result["source_metadata_missing_fields"], ["venue", "url"])
+        self.assertEqual(
+            result["source_metadata_confidence_effect"],
+            "missing_metadata_lowers_confidence_not_fabrication_evidence",
+        )
+        self.assertEqual(risk_item["source_metadata_missing_fields"], ["venue", "url"])
+        self.assertEqual(
+            risk_item["source_metadata_confidence_effect"],
+            "missing_metadata_lowers_confidence_not_fabrication_evidence",
+        )
+        self.assertTrue(risk_item["canonical_metadata_quality"]["identifiers"]["doi"])
 
     def test_support_audit_accepts_citation_set_items(self):
         stdout = io.StringIO()
@@ -974,11 +1343,29 @@ class CLITests(unittest.TestCase):
         self.assertEqual(payload["results"][0]["input_mode"], "citation_set")
         self.assertEqual(payload["results"][0]["support_mode"], "multiple_strong_support")
         self.assertEqual(payload["results"][0]["lang"], "en")
+        self.assertEqual(payload["results"][0]["evidence_scopes"], ["abstract"])
+        self.assertEqual(payload["results"][0]["evidence_source_names"], ["memory"])
+        self.assertEqual(payload["results"][0]["evidence_source_fields"], ["abstract_sentence_1"])
+        self.assertEqual(
+            payload["results"][0]["support_mode_details"]["decision"],
+            "multiple_strong_citations_support_claim",
+        )
+        self.assertEqual(payload["results"][0]["support_mode_details"]["supported_indexes"], [0, 1])
         self.assertEqual(payload["risk_ranking"][0]["input_mode"], "citation_set")
+        self.assertEqual(payload["risk_ranking"][0]["risk_reason"], "citation_set_has_multiple_strong_support")
+        self.assertEqual(payload["risk_ranking"][0]["suggested_fix"]["kind"], "keep_claim")
+        self.assertEqual(payload["risk_ranking"][0]["suggested_fix"]["support_mode"], "multiple_strong_support")
         self.assertEqual(payload["risk_ranking"][0]["supporting_citation_count"], 2)
         self.assertEqual(payload["risk_ranking"][0]["next_action"], "keep_claim")
         self.assertEqual(payload["risk_ranking"][0]["support_engine"], "citation_set")
         self.assertGreater(payload["risk_ranking"][0]["support_confidence"], 0)
+        self.assertEqual(payload["risk_ranking"][0]["evidence_scopes"], ["abstract"])
+        self.assertEqual(payload["risk_ranking"][0]["evidence_source_names"], ["memory"])
+        self.assertEqual(payload["risk_ranking"][0]["evidence_source_fields"], ["abstract_sentence_1"])
+        self.assertEqual(
+            payload["risk_ranking"][0]["support_mode_details"]["decision"],
+            "multiple_strong_citations_support_claim",
+        )
 
     def test_support_audit_rejects_invalid_citation_set_item_with_nested_index(self):
         stderr = io.StringIO()
@@ -1097,6 +1484,81 @@ class CLITests(unittest.TestCase):
         self.assertEqual(payload["summary"]["supported"], 1)
         self.assertEqual(payload["summary"]["insufficient_evidence"], 1)
 
+    def test_support_audit_can_read_markdown_references_with_one_claim(self):
+        stdout = io.StringIO()
+        with tempfile.NamedTemporaryFile("w", encoding="utf-8", suffix=".md", delete=False) as handle:
+            handle.write(
+                "# References\n\n"
+                "1. Zhe Xu. GhostCite: A Large-Scale Analysis of Citation Validity. 2026.\n"
+                "2. Quantum Teleportation of Citation Hallucinations in Synthetic Benchmarks. "
+                "Journal of Imaginary Methods, 2024.\n"
+            )
+            path = handle.name
+
+        try:
+            code = run(
+                [
+                    "support-audit",
+                    path,
+                    "--claim",
+                    "GhostCite studies citation validity.",
+                ],
+                source=self.source,
+                support_backend=EntailingSupportBackend(),
+                stdout=stdout,
+            )
+        finally:
+            os.unlink(path)
+
+        self.assertEqual(code, 0)
+        payload = json.loads(stdout.getvalue())
+        self.assertEqual(payload["summary"]["supported"], 1)
+        self.assertEqual(payload["summary"]["insufficient_evidence"], 1)
+        self.assertEqual(len(payload["results"]), 2)
+        self.assertEqual(payload["results"][0]["claim"], "GhostCite studies citation validity.")
+        self.assertEqual(payload["results"][0]["input_mode"], "citation")
+        self.assertEqual(payload["results"][0]["resolution"]["input_source_path"], path)
+        self.assertEqual(payload["results"][0]["resolution"]["input_source_format"], "markdown")
+        self.assertEqual(payload["results"][0]["resolution"]["input_source_index"], 1)
+        self.assertEqual(payload["risk_ranking"][0]["input_source_path"], path)
+        self.assertIn(payload["risk_ranking"][0]["input_source_index"], [1, 2])
+        self.assertTrue(str(payload["risk_ranking"][0]["input_source_locator"]).startswith(f"{path}#citation-"))
+        self.assertEqual(payload["review_summary"]["total"], 2)
+        self.assertEqual(payload["review_summary"]["high_risk_count"], 1)
+        traceability = payload["review_summary"]["source_traceability"]
+        self.assertTrue(traceability["has_source_backed_items"])
+        self.assertEqual(traceability["source_backed_count"], 2)
+        self.assertEqual(traceability["source_paths"], [path])
+        self.assertEqual(traceability["source_formats"], ["markdown"])
+        self.assertEqual(traceability["source_indexes"], [1, 2])
+        self.assertEqual(traceability["high_risk_source_indexes"], [2])
+        self.assertTrue(traceability["review_required_source_locators"][0].startswith(f"{path}#citation-"))
+
+    def test_support_audit_reference_file_requires_claim(self):
+        stderr = io.StringIO()
+        with tempfile.NamedTemporaryFile("w", encoding="utf-8", suffix=".md", delete=False) as handle:
+            handle.write("# References\n\n1. GhostCite: A Large-Scale Analysis of Citation Validity. 2026.\n")
+            path = handle.name
+
+        try:
+            code = run(
+                ["support-audit", path],
+                source=self.source,
+                support_backend=EntailingSupportBackend(),
+                stderr=stderr,
+            )
+        finally:
+            os.unlink(path)
+
+        self.assertEqual(code, 2)
+        payload = json.loads(stderr.getvalue())
+        self.assertFalse(payload["ok"])
+        self.assertEqual(payload["error"]["code"], "missing_claim")
+        self.assertIn("BibTeX", payload["error"]["message"])
+        self.assertIn("BBL", payload["error"]["message"])
+        self.assertEqual(payload["error"]["details"]["command"], "support-audit")
+        self.assertEqual(payload["error"]["details"]["field"], "claim")
+
     def test_support_audit_reads_full_text_pdf_file_from_json(self):
         stdout = io.StringIO()
         source = InMemoryMetadataSource(
@@ -1204,6 +1666,44 @@ class CLITests(unittest.TestCase):
         self.assertEqual(payload["error"]["details"]["index"], 1)
         self.assertEqual(payload["error"]["details"]["field"], "full_text_file")
 
+    def test_support_audit_keeps_item_index_when_full_text_precedes_invalid_file(self):
+        stderr = io.StringIO()
+        with tempfile.NamedTemporaryFile("w", encoding="utf-8", suffix=".json", delete=False) as handle:
+            json.dump(
+                [
+                    {
+                        "claim": "GhostCite studies citation validity.",
+                        "title": "GhostCite: A Large-Scale Analysis of Citation Validity",
+                    },
+                    {
+                        "claim": "GhostCite studies citation validity.",
+                        "title": "GhostCite: A Large-Scale Analysis of Citation Validity",
+                        "full_text": ["lawful full-text excerpt before the bad file"],
+                        "full_text_file": {"path": "not-a-string"},
+                    },
+                ],
+                handle,
+            )
+            path = handle.name
+
+        try:
+            code = run(
+                ["support-audit", path],
+                source=self.source,
+                support_backend=EntailingSupportBackend(),
+                stderr=stderr,
+            )
+        finally:
+            os.unlink(path)
+
+        self.assertEqual(code, 2)
+        payload = json.loads(stderr.getvalue())
+        self.assertFalse(payload["ok"])
+        self.assertEqual(payload["error"]["code"], "invalid_input")
+        self.assertEqual(payload["error"]["details"]["command"], "support-audit")
+        self.assertEqual(payload["error"]["details"]["index"], 2)
+        self.assertEqual(payload["error"]["details"]["field"], "full_text_file")
+
     def test_support_audit_reports_missing_full_text_file_with_item_index(self):
         stderr = io.StringIO()
         missing_path = os.path.join(tempfile.gettempdir(), "citeguard-missing-support-audit-evidence.txt")
@@ -1299,6 +1799,16 @@ class CLITests(unittest.TestCase):
         self.assertEqual(payload["review_summary"]["high_risk_count"], 1)
         self.assertEqual(payload["review_summary"]["low_risk_count"], 1)
         self.assertEqual(payload["review_summary"]["top_high_risk_indexes"], [1])
+        self.assertEqual(payload["review_summary"]["recommended_next_steps"]["first_queue"], "identity_resolution_indexes")
+        self.assertEqual(payload["review_summary"]["recommended_next_steps"]["steps"][0]["indexes"], [1])
+        self.assertFalse(payload["review_summary"]["source_traceability"]["has_source_backed_items"])
+        self.assertEqual(
+            payload["filtered"]["omitted_review_summary"]["recommended_next_steps"]["safe_to_keep_indexes"],
+            [0],
+        )
+        self.assertFalse(
+            payload["filtered"]["omitted_review_summary"]["source_traceability"]["has_source_backed_items"]
+        )
         self.assertEqual(payload["results"][0]["resolution"]["verdict"], "not_found")
 
     def test_audit_reads_json_list(self):
@@ -1364,6 +1874,45 @@ class CLITests(unittest.TestCase):
         self.assertEqual(risk_item["canonical_venue"], "arXiv")
         self.assertEqual(risk_item["canonical_doi"], "10.48550/arxiv.2602.06718")
 
+    def test_audit_risk_ranking_exposes_source_metadata_quality(self):
+        stdout = io.StringIO()
+        sparse_record = CitationRecord(
+            citation_id="sparse",
+            title="Sparse Source Metadata for Citation Audits",
+            authors=["Ada Lovelace"],
+            year=2026,
+            doi="10.5555/sparse",
+            source="crossref",
+            metadata={
+                "metadata_quality": {
+                    "schema_version": 1,
+                    "present_fields": ["title", "authors", "year", "identifier"],
+                    "missing_fields": ["venue", "abstract", "url"],
+                    "identifiers": {"doi": True, "arxiv_id": False},
+                    "completeness": 0.5714,
+                    "confidence_effect": "missing_metadata_lowers_confidence_not_fabrication_evidence",
+                }
+            },
+        )
+        with tempfile.NamedTemporaryFile("w", encoding="utf-8", suffix=".json", delete=False) as handle:
+            json.dump([{"title": "Sparse Source Metadata for Citation Audits", "year": 2026}], handle)
+            path = handle.name
+
+        try:
+            code = run(["audit", path], source=InMemoryMetadataSource([sparse_record]), stdout=stdout)
+        finally:
+            os.unlink(path)
+
+        self.assertEqual(code, 0)
+        payload = json.loads(stdout.getvalue())
+        risk_item = payload["risk_ranking"][0]
+        self.assertEqual(risk_item["verdict"], "verified")
+        self.assertEqual(risk_item["source_metadata_missing_fields"], ["venue", "abstract", "url"])
+        self.assertEqual(
+            risk_item["source_metadata_confidence_effect"],
+            "missing_metadata_lowers_confidence_not_fabrication_evidence",
+        )
+
     def test_audit_risk_ranking_includes_structured_source_failure_details(self):
         stdout = io.StringIO()
         with tempfile.NamedTemporaryFile("w", encoding="utf-8", suffix=".json", delete=False) as handle:
@@ -1389,6 +1938,30 @@ class CLITests(unittest.TestCase):
         self.assertTrue(payload["risk_ranking"][0]["outage_limited"])
         self.assertEqual(payload["risk_ranking"][0]["next_action"], "retry_or_check_source_health")
         self.assertIn("inspect source health", payload["risk_ranking"][0]["recommendation"])
+
+    def test_audit_source_failure_details_preserve_retry_after_hint(self):
+        stdout = io.StringIO()
+        with tempfile.NamedTemporaryFile("w", encoding="utf-8", suffix=".json", delete=False) as handle:
+            json.dump([{"title": "Rate Limited Source Paper"}], handle)
+            path = handle.name
+
+        try:
+            code = run(["audit", path], source=RateLimitedMetadataSource(), stdout=stdout)
+        finally:
+            os.unlink(path)
+
+        self.assertEqual(code, 0)
+        payload = json.loads(stdout.getvalue())
+        result_detail = payload["results"][0]["source_failure_details"][0]
+        risk_detail = payload["risk_ranking"][0]["source_failure_details"][0]
+        self.assertEqual(result_detail["kind"], "rate_limited")
+        self.assertEqual(result_detail["attempt_count"], 2)
+        self.assertEqual(result_detail["retry_count"], 1)
+        self.assertEqual(result_detail["retry_after_seconds"], 2.0)
+        self.assertEqual(result_detail["retry_delay_seconds"], 1.5)
+        self.assertEqual(risk_detail["retry_after_seconds"], 2.0)
+        self.assertEqual(risk_detail["retry_delay_seconds"], 1.5)
+        self.assertEqual(payload["risk_ranking"][0]["next_action"], "retry_or_check_source_health")
 
     def test_audit_high_risk_only_filters_results(self):
         stdout = io.StringIO()
@@ -1417,6 +1990,12 @@ class CLITests(unittest.TestCase):
         self.assertEqual(payload["review_summary"]["high_risk_count"], 1)
         self.assertEqual(payload["review_summary"]["low_risk_count"], 1)
         self.assertEqual(payload["review_summary"]["top_high_risk_indexes"], [1])
+        self.assertEqual(payload["review_summary"]["recommended_next_steps"]["first_queue"], "identity_resolution_indexes")
+        self.assertEqual(payload["review_summary"]["recommended_next_steps"]["steps"][0]["indexes"], [1])
+        self.assertEqual(
+            payload["filtered"]["omitted_review_summary"]["recommended_next_steps"]["safe_to_keep_indexes"],
+            [0],
+        )
         self.assertEqual(payload["results"][0]["verdict"], "not_found")
         self.assertTrue(all(item["risk"] == "high" for item in payload["risk_ranking"]))
 
@@ -1642,6 +2221,28 @@ class CLITests(unittest.TestCase):
         self.assertEqual(payload["error"]["details"]["field"], "path")
         self.assertEqual(payload["error"]["details"]["filename"], missing_path)
 
+    def test_extract_malformed_docx_error_is_machine_readable(self):
+        stderr = io.StringIO()
+        with tempfile.NamedTemporaryFile("wb", suffix=".docx", delete=False) as handle:
+            handle.write(b"not a zip")
+            docx_path = handle.name
+
+        try:
+            code = run(["extract", docx_path], stderr=stderr)
+        finally:
+            os.unlink(docx_path)
+
+        self.assertEqual(code, 2)
+        payload = json.loads(stderr.getvalue())
+        self.assertFalse(payload["ok"])
+        self.assertEqual(payload["error"]["code"], "file_error")
+        self.assertEqual(payload["error"]["category"], "input_repair")
+        self.assertFalse(payload["error"]["retryable"])
+        self.assertEqual(payload["error"]["details"]["command"], "extract")
+        self.assertEqual(payload["error"]["details"]["field"], "path")
+        self.assertEqual(payload["error"]["details"]["filename"], docx_path)
+        self.assertIn("Could not read DOCX file", payload["error"]["message"])
+
     def test_counterevidence_search_returns_candidate_leads(self):
         source = InMemoryMetadataSource(
             [
@@ -1670,6 +2271,18 @@ class CLITests(unittest.TestCase):
         self.assertIn("improvement_negation", {item["role"] for item in payload["query_plan"]})
         self.assertEqual(len(payload["query_results"]), len(payload["queries"]))
         self.assertIn("improvement_negation", payload["candidates"][0]["matched_query_roles"])
+        self.assertEqual(payload["review_summary"]["candidate_count"], 1)
+        self.assertEqual(payload["review_summary"]["signal_counts"]["explicit_contradiction_cue"], 1)
+        self.assertEqual(payload["review_summary"]["top_candidate"]["signal"], "explicit_contradiction_cue")
+        self.assertEqual(
+            payload["review_summary"]["recommended_next_steps"]["first_queue"],
+            "explicit_contradiction_candidate_indexes",
+        )
+        self.assertEqual(
+            payload["review_summary"]["recommended_next_steps"]["explicit_contradiction_candidate_indexes"],
+            [0],
+        )
+        self.assertEqual(payload["review_summary"]["policy"], "review_leads_not_contradiction_verdicts")
         self.assertEqual(payload["source_failure_mode"], "none")
         self.assertEqual(payload["next_action"], "review_counterevidence_leads")
 
@@ -1709,6 +2322,10 @@ class CLITests(unittest.TestCase):
         self.assertEqual(payload["candidates"][0]["signal"], "source_outage_safety_cue")
         self.assertIn("source_outage_safety", {item["role"] for item in payload["query_plan"]})
         self.assertIn("source_outage_safety", payload["candidates"][0]["matched_query_roles"])
+        self.assertEqual(
+            payload["review_summary"]["recommended_next_steps"]["first_queue"],
+            "source_outage_safety_candidate_indexes",
+        )
         self.assertEqual(payload["next_action"], "review_counterevidence_leads")
 
     def test_counterevidence_search_flags_chinese_source_outage_safety_leads(self):
@@ -1820,6 +2437,121 @@ class CLITests(unittest.TestCase):
         self.assertIn(
             "improvement_negation",
             payload["risk_ranking"][0]["counterevidence"]["candidates"][0]["matched_query_roles"],
+        )
+
+    def test_support_audit_reference_file_can_attach_counterevidence_leads(self):
+        source = InMemoryMetadataSource(
+            [
+                self.record,
+                CitationRecord(
+                    citation_id="paper-2",
+                    title="GhostCite Does Not Improve Citation Validity",
+                    abstract="GhostCite does not improve citation validity in generated references.",
+                    year=2026,
+                    source="memory",
+                ),
+            ]
+        )
+        stdout = io.StringIO()
+        reference_text = """
+# References
+
+1. Xu, Zhe and Wang, Lin. GhostCite: A Large-Scale Analysis of Citation Validity. arXiv, 2026. doi:10.48550/arxiv.2602.06718.
+2. A Paper That Does Not Exist Anywhere. Journal of Missing Works, 2024.
+"""
+        with tempfile.NamedTemporaryFile("w", encoding="utf-8", suffix=".md", delete=False) as handle:
+            handle.write(reference_text)
+            path = handle.name
+
+        try:
+            code = run(
+                [
+                    "support-audit",
+                    path,
+                    "--claim",
+                    "GhostCite improves citation validity.",
+                    "--with-counterevidence",
+                    "--counterevidence-top-k",
+                    "1",
+                ],
+                stdout=stdout,
+                source=source,
+                support_backend=ContradictingSupportBackend(),
+            )
+        finally:
+            os.unlink(path)
+
+        self.assertEqual(code, 0)
+        payload = json.loads(stdout.getvalue())
+        self.assertTrue(payload["counterevidence_included"])
+        self.assertEqual(len(payload["results"]), 2)
+        self.assertEqual(payload["summary"]["contradicted"], 1)
+        self.assertEqual(payload["summary"]["insufficient_evidence"], 1)
+        self.assertTrue(all(item["counterevidence_review"] for item in payload["results"]))
+        self.assertEqual([row["index"] for row in payload["risk_ranking"]], [0, 1])
+        self.assertEqual(payload["risk_ranking"][0]["counterevidence"]["candidate_count"], 1)
+        self.assertIn(
+            "improvement_negation",
+            payload["risk_ranking"][0]["counterevidence"]["candidates"][0]["matched_query_roles"],
+        )
+
+    def test_support_audit_reference_file_high_risk_only_keeps_counterevidence_traceability(self):
+        source = InMemoryMetadataSource(
+            [
+                self.record,
+                CitationRecord(
+                    citation_id="paper-2",
+                    title="GhostCite Does Not Improve Citation Validity",
+                    abstract="GhostCite does not improve citation validity in generated references.",
+                    year=2026,
+                    source="memory",
+                ),
+            ]
+        )
+        stdout = io.StringIO()
+        reference_text = """
+# References
+
+1. Xu, Zhe and Wang, Lin. GhostCite: A Large-Scale Analysis of Citation Validity. arXiv, 2026. doi:10.48550/arxiv.2602.06718.
+2. A Paper That Does Not Exist Anywhere. Journal of Missing Works, 2024.
+"""
+        with tempfile.NamedTemporaryFile("w", encoding="utf-8", suffix=".md", delete=False) as handle:
+            handle.write(reference_text)
+            path = handle.name
+
+        try:
+            code = run(
+                [
+                    "support-audit",
+                    path,
+                    "--claim",
+                    "GhostCite improves citation validity.",
+                    "--with-counterevidence",
+                    "--counterevidence-top-k",
+                    "1",
+                    "--high-risk-only",
+                ],
+                stdout=stdout,
+                source=source,
+                support_backend=EntailingSupportBackend(),
+            )
+        finally:
+            os.unlink(path)
+
+        self.assertEqual(code, 0)
+        payload = json.loads(stdout.getvalue())
+        self.assertTrue(payload["counterevidence_included"])
+        self.assertEqual(payload["filtered"]["original_results"], 2)
+        self.assertEqual(payload["filtered"]["returned_indexes"], [1])
+        self.assertEqual(payload["filtered"]["omitted_indexes"], [0])
+        self.assertEqual(payload["filtered"]["omitted_review_summary"]["low_risk_count"], 1)
+        self.assertEqual(len(payload["results"]), 1)
+        self.assertTrue(payload["results"][0]["counterevidence_review"])
+        self.assertEqual(payload["risk_ranking"][0]["index"], 1)
+        self.assertEqual(payload["risk_ranking"][0]["counterevidence"]["candidate_count"], 1)
+        self.assertEqual(
+            payload["risk_ranking"][0]["counterevidence"]["candidates"][0]["signal"],
+            "explicit_contradiction_cue",
         )
 
     def test_support_audit_rejects_invalid_counterevidence_top_k(self):

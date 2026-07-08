@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import errno
 import importlib
 import inspect
 import os
@@ -115,6 +116,34 @@ class MCPServerHelperTests(unittest.TestCase):
                 self.assertIn("high_risk_only=true", doc)
                 self.assertIn("filtered.returned_indexes", doc)
                 self.assertIn("filtered.omitted_indexes", doc)
+                self.assertIn("risk_ranking", doc)
+                self.assertIn("risk_reason", doc)
+                self.assertIn("suggested_fix.kind", doc)
+                self.assertIn("suggested_fix.requires_user_confirmation", doc)
+                self.assertIn("review_summary.triage_plan", doc)
+                self.assertIn("review_summary.suggested_fix_summary", doc)
+                self.assertIn("auto_apply_allowed=false", doc)
+                if tool_name == "audit_claim_support_tool":
+                    self.assertIn("full_text_file", doc)
+                    self.assertIn("evidence_scope=full_text", doc)
+                    self.assertIn("will not fetch gated", doc)
+
+    def test_support_tool_metadata_documents_full_text_file(self):
+        for tool_name in ("check_claim_support_tool", "check_claim_support_set_tool"):
+            with self.subTest(tool=tool_name):
+                tool = getattr(self.server, tool_name)
+                signature = inspect.signature(tool)
+                doc = inspect.getdoc(tool) or ""
+
+                if tool_name == "check_claim_support_tool":
+                    self.assertIn("full_text_file", signature.parameters)
+                else:
+                    self.assertIn("citations", signature.parameters)
+                    self.assertIn("support_mode_details", doc)
+                    self.assertIn("no_unstated_multi_hop_or_full_text_support", doc)
+                self.assertIn("full_text_file", doc)
+                self.assertIn("evidence_scope=full_text", doc)
+                self.assertIn("will not fetch gated", doc)
 
     def test_status_tool_reports_default_configuration_without_live_queries(self):
         with mock.patch.dict(os.environ, {}, clear=True):
@@ -127,6 +156,21 @@ class MCPServerHelperTests(unittest.TestCase):
         self.assertIn("python_mcp_compatible", status)
         self.assertFalse(status["mailto_configured"])
         self.assertIn("support_models", status)
+        support_models = status["support_models"]
+        self.assertIn(support_models["engine"], {"heuristic_fallback", "production_ensemble"})
+        self.assertIn(support_models["next_action"], {"continue", "install_or_configure_dependency"})
+        self.assertIsInstance(support_models["deep_models_available"], bool)
+        self.assertIsInstance(support_models["model_dependencies"], dict)
+        self.assertIsInstance(support_models["missing_dependencies"], list)
+        self.assertIn("warmup_support_models.py", support_models["warmup_command"])
+        if support_models["deep_models_available"]:
+            self.assertEqual(support_models["engine"], "production_ensemble")
+            self.assertEqual(support_models["next_action"], "continue")
+            self.assertEqual(support_models["missing_dependencies"], [])
+        else:
+            self.assertEqual(support_models["engine"], "heuristic_fallback")
+            self.assertEqual(support_models["next_action"], "install_or_configure_dependency")
+            self.assertTrue(support_models["missing_dependencies"])
         self.assertIn("warnings", status)
 
     def test_status_tool_can_request_live_source_probe(self):
@@ -213,6 +257,10 @@ class MCPServerHelperTests(unittest.TestCase):
         self.assertEqual(report["review_summary"]["next_actions"]["resolve_identifier_or_replace"], 1)
         self.assertEqual(report["review_summary"]["action_queues"]["safe_to_keep_indexes"], [0])
         self.assertEqual(report["review_summary"]["action_queues"]["identity_resolution_indexes"], [1])
+        fix_summary = report["review_summary"]["suggested_fix_summary"]
+        self.assertFalse(fix_summary["auto_apply_allowed"])
+        self.assertEqual(fix_summary["confirmation_required_indexes"], [1])
+        self.assertEqual(fix_summary["no_confirmation_required_indexes"], [0])
 
     def test_audit_citations_tool_risk_ranking_includes_suggested_metadata_fix(self):
         source = InMemoryMetadataSource(
@@ -321,6 +369,10 @@ class MCPServerHelperTests(unittest.TestCase):
         self.assertEqual(report["review_summary"]["next_actions"]["keep_claim"], 1)
         self.assertEqual(report["review_summary"]["action_queues"]["safe_to_keep_indexes"], [0])
         self.assertEqual(report["review_summary"]["action_queues"]["identity_resolution_indexes"], [1])
+        fix_summary = report["review_summary"]["suggested_fix_summary"]
+        self.assertFalse(fix_summary["auto_apply_allowed"])
+        self.assertEqual(fix_summary["confirmation_required_indexes"], [1])
+        self.assertEqual(fix_summary["no_confirmation_required_indexes"], [0])
         self.assertTrue(report["risk_ranking"][0]["counterevidence_review"])
         self.assertEqual(report["risk_ranking"][0]["counterevidence_reason"], "unresolved_citation")
         self.assertEqual(report["risk_ranking"][0]["next_action"], "resolve_citation_identity")
@@ -329,11 +381,66 @@ class MCPServerHelperTests(unittest.TestCase):
         self.assertEqual(report["risk_ranking"][0]["resolution_verdict"], "not_found")
         self.assertEqual(report["risk_ranking"][0]["resolved_title"], "")
         self.assertEqual(report["risk_ranking"][0]["evidence_source_field"], "none")
+        self.assertEqual(report["risk_ranking"][0]["evidence_source_name"], "none")
         self.assertEqual(report["risk_ranking"][1]["support_engine"], "ensemble")
         self.assertEqual(report["risk_ranking"][1]["resolution_verdict"], "matched")
         self.assertEqual(report["risk_ranking"][1]["resolved_title"], "GhostCite: A Large-Scale Analysis of Citation Validity")
         self.assertEqual(report["risk_ranking"][1]["resolved_year"], 2026)
         self.assertEqual(report["risk_ranking"][1]["evidence_source_field"], "abstract_sentence_1")
+        self.assertEqual(report["risk_ranking"][1]["evidence_source_name"], "memory")
+
+    def test_audit_claim_support_tool_exposes_source_metadata_quality(self):
+        source = InMemoryMetadataSource(
+            [
+                CitationRecord(
+                    citation_id="support-sparse",
+                    title="Sparse Source Metadata for MCP Support Audits",
+                    authors=["Ada Lovelace"],
+                    abstract="Sparse source metadata improves MCP support audits.",
+                    year=2026,
+                    doi="10.5555/mcp-support-sparse",
+                    source="crossref",
+                    metadata={
+                        "metadata_quality": {
+                            "schema_version": 1,
+                            "present_fields": ["title", "authors", "year", "identifier", "abstract"],
+                            "missing_fields": ["venue", "url"],
+                            "identifiers": {"doi": True, "arxiv_id": False},
+                            "completeness": 0.7143,
+                            "confidence_effect": "missing_metadata_lowers_confidence_not_fabrication_evidence",
+                        }
+                    },
+                )
+            ]
+        )
+        with mock.patch.object(self.server, "_source", return_value=source), mock.patch.object(
+            self.server, "_support_backend", return_value=EntailingSupportBackend()
+        ):
+            report = self.server.audit_claim_support_tool(
+                [
+                    {
+                        "claim": "Sparse source metadata improves MCP support audits.",
+                        "title": "Sparse Source Metadata for MCP Support Audits",
+                    }
+                ],
+                lang="en",
+            )
+
+        result = report["results"][0]
+        risk_item = report["risk_ranking"][0]
+        self.assertEqual(result["verdict"], "supported")
+        self.assertEqual(result["resolution"]["source_metadata_missing_fields"], ["venue", "url"])
+        self.assertEqual(result["source_metadata_missing_fields"], ["venue", "url"])
+        self.assertEqual(
+            result["source_metadata_confidence_effect"],
+            "missing_metadata_lowers_confidence_not_fabrication_evidence",
+        )
+        self.assertEqual(risk_item["source_metadata_missing_fields"], ["venue", "url"])
+        self.assertEqual(
+            risk_item["source_metadata_confidence_effect"],
+            "missing_metadata_lowers_confidence_not_fabrication_evidence",
+        )
+        self.assertTrue(risk_item["canonical_metadata_quality"]["identifiers"]["doi"])
 
     def test_audit_claim_support_tool_can_filter_high_risk_only(self):
         source = InMemoryMetadataSource(
@@ -408,6 +515,57 @@ class MCPServerHelperTests(unittest.TestCase):
         self.assertEqual(report["results"][0]["counterevidence"]["candidate_count"], 1)
         self.assertEqual(report["risk_ranking"][0]["counterevidence"]["candidates"][0]["signal"], "explicit_contradiction_cue")
 
+    def test_audit_claim_support_tool_high_risk_only_keeps_counterevidence(self):
+        source = InMemoryMetadataSource(
+            [
+                CitationRecord(
+                    citation_id="paper-1",
+                    title="GhostCite Studies Citation Validity",
+                    abstract="GhostCite studies citation validity in generated references.",
+                    year=2026,
+                    source="memory",
+                ),
+                CitationRecord(
+                    citation_id="paper-2",
+                    title="GhostCite Does Not Improve Citation Validity",
+                    abstract="GhostCite does not improve citation validity in generated references.",
+                    year=2026,
+                    source="memory",
+                ),
+            ]
+        )
+        with mock.patch.object(self.server, "_source", return_value=source), mock.patch.object(
+            self.server, "_support_backend", return_value=EntailingSupportBackend()
+        ):
+            report = self.server.audit_claim_support_tool(
+                [
+                    {
+                        "claim": "GhostCite studies citation validity.",
+                        "title": "GhostCite Studies Citation Validity",
+                    },
+                    {
+                        "claim": "GhostCite improves citation validity.",
+                        "title": "A Paper That Does Not Exist Anywhere",
+                    },
+                ],
+                include_counterevidence=True,
+                counterevidence_top_k=1,
+                high_risk_only=True,
+            )
+
+        self.assertTrue(report["counterevidence_included"])
+        self.assertEqual(report["filtered"]["returned_indexes"], [1])
+        self.assertEqual(report["filtered"]["omitted_indexes"], [0])
+        self.assertEqual(report["filtered"]["omitted_review_summary"]["low_risk_count"], 1)
+        self.assertEqual(len(report["results"]), 1)
+        self.assertTrue(report["results"][0]["counterevidence_review"])
+        self.assertEqual(report["risk_ranking"][0]["index"], 1)
+        self.assertEqual(report["risk_ranking"][0]["counterevidence"]["candidate_count"], 1)
+        self.assertEqual(
+            report["risk_ranking"][0]["counterevidence"]["candidates"][0]["signal"],
+            "explicit_contradiction_cue",
+        )
+
     def test_check_claim_support_set_tool_aggregates_one_claim(self):
         source = InMemoryMetadataSource(
             [
@@ -442,6 +600,42 @@ class MCPServerHelperTests(unittest.TestCase):
         self.assertEqual(report["contradicting_citation_count"], 0)
         self.assertEqual(report["evidence"][0]["index"], 1)
 
+    def test_check_claim_support_set_tool_can_attach_counterevidence(self):
+        source = InMemoryMetadataSource(
+            [
+                CitationRecord(
+                    citation_id="paper-1",
+                    title="GhostCite Does Not Improve Citation Validity",
+                    abstract="GhostCite does not improve citation validity in generated references.",
+                    year=2026,
+                    source="memory",
+                )
+            ]
+        )
+        with mock.patch.object(self.server, "_source", return_value=source), mock.patch.object(
+            self.server, "_support_backend", return_value=EntailingSupportBackend()
+        ):
+            report = self.server.check_claim_support_set_tool(
+                "GhostCite improves citation validity.",
+                [
+                    {"title": "A Paper That Does Not Exist Anywhere"},
+                    {"title": "A Second Missing Citation"},
+                ],
+                include_counterevidence=True,
+                counterevidence_top_k=1,
+            )
+
+        self.assertTrue(report["counterevidence_included"])
+        self.assertTrue(report["counterevidence_review"])
+        self.assertEqual(report["counterevidence_top_k"], 1)
+        self.assertEqual(report["counterevidence"]["candidate_count"], 1)
+        self.assertEqual(report["counterevidence"]["next_action"], "review_counterevidence_leads")
+        self.assertEqual(report["counterevidence"]["candidates"][0]["signal"], "explicit_contradiction_cue")
+        self.assertIn(
+            "improvement_negation",
+            report["counterevidence"]["candidates"][0]["matched_query_roles"],
+        )
+
     def test_check_claim_support_tool_accepts_full_text_excerpt(self):
         source = InMemoryMetadataSource(
             [
@@ -468,6 +662,72 @@ class MCPServerHelperTests(unittest.TestCase):
         self.assertEqual(report["evidence_scope"], "full_text")
         self.assertEqual(report["next_action"], "keep_claim")
         self.assertEqual(report["evidence"]["source_field"], "user_full_text_excerpt_1")
+
+    def test_check_claim_support_tool_accepts_full_text_file(self):
+        source = InMemoryMetadataSource(
+            [
+                CitationRecord(
+                    citation_id="paper-2",
+                    title="Sparse Retrieval for Citation Auditing",
+                    year=2026,
+                    source="memory",
+                )
+            ]
+        )
+        with tempfile.NamedTemporaryFile("w", encoding="utf-8", delete=False) as handle:
+            handle.write("The lawful full-text excerpt shows sparse retrieval improves citation audit recall.")
+            excerpt_path = handle.name
+        try:
+            with mock.patch.object(self.server, "_source", return_value=source), mock.patch.object(
+                self.server, "_support_backend", return_value=FullTextOnlySupportBackend()
+            ):
+                report = self.server.check_claim_support_tool(
+                    "Sparse retrieval improves citation audit recall.",
+                    title="Sparse Retrieval for Citation Auditing",
+                    full_text_file=excerpt_path,
+                )
+        finally:
+            os.unlink(excerpt_path)
+
+        self.assertEqual(report["verdict"], "supported")
+        self.assertEqual(report["evidence_scope"], "full_text")
+        self.assertEqual(report["next_action"], "keep_claim")
+        self.assertEqual(report["evidence"]["source_field"], "user_full_text_file_1")
+
+    def test_audit_claim_support_tool_accepts_full_text_file(self):
+        source = InMemoryMetadataSource(
+            [
+                CitationRecord(
+                    citation_id="paper-2",
+                    title="Sparse Retrieval for Citation Auditing",
+                    year=2026,
+                    source="memory",
+                )
+            ]
+        )
+        with tempfile.NamedTemporaryFile("w", encoding="utf-8", delete=False) as handle:
+            handle.write("The lawful full-text excerpt shows sparse retrieval improves citation audit recall.")
+            excerpt_path = handle.name
+        try:
+            with mock.patch.object(self.server, "_source", return_value=source), mock.patch.object(
+                self.server, "_support_backend", return_value=FullTextOnlySupportBackend()
+            ):
+                report = self.server.audit_claim_support_tool(
+                    [
+                        {
+                            "claim": "Sparse retrieval improves citation audit recall.",
+                            "title": "Sparse Retrieval for Citation Auditing",
+                            "full_text_file": excerpt_path,
+                        }
+                    ]
+                )
+        finally:
+            os.unlink(excerpt_path)
+
+        self.assertEqual(report["results"][0]["verdict"], "supported")
+        self.assertEqual(report["results"][0]["evidence_scope"], "full_text")
+        self.assertEqual(report["results"][0]["evidence"]["source_field"], "user_full_text_file_1")
+        self.assertEqual(report["risk_ranking"][0]["evidence_source_field"], "user_full_text_file_1")
 
     def test_audit_claim_support_tool_accepts_citation_set_items(self):
         source = InMemoryMetadataSource(
@@ -507,6 +767,9 @@ class MCPServerHelperTests(unittest.TestCase):
         self.assertEqual(report["summary"]["supported"], 1)
         self.assertEqual(report["results"][0]["input_mode"], "citation_set")
         self.assertEqual(report["results"][0]["support_mode"], "multiple_strong_support")
+        self.assertEqual(report["results"][0]["evidence_scopes"], ["abstract"])
+        self.assertEqual(report["results"][0]["evidence_source_names"], ["memory"])
+        self.assertEqual(report["results"][0]["evidence_source_fields"], ["abstract_sentence_1"])
         self.assertEqual(report["review_summary"]["total"], 1)
         self.assertEqual(report["review_summary"]["low_risk_count"], 1)
         self.assertEqual(report["review_summary"]["top_risk_indexes"], [0])
@@ -516,6 +779,9 @@ class MCPServerHelperTests(unittest.TestCase):
         self.assertEqual(report["risk_ranking"][0]["next_action"], "keep_claim")
         self.assertEqual(report["risk_ranking"][0]["support_engine"], "citation_set")
         self.assertGreater(report["risk_ranking"][0]["support_confidence"], 0)
+        self.assertEqual(report["risk_ranking"][0]["evidence_scopes"], ["abstract"])
+        self.assertEqual(report["risk_ranking"][0]["evidence_source_names"], ["memory"])
+        self.assertEqual(report["risk_ranking"][0]["evidence_source_fields"], ["abstract_sentence_1"])
 
     def test_search_counterevidence_tool_returns_review_candidates(self):
         source = InMemoryMetadataSource(
@@ -547,6 +813,18 @@ class MCPServerHelperTests(unittest.TestCase):
         self.assertIn("improvement_negation", {item["role"] for item in report["query_plan"]})
         self.assertEqual(len(report["query_results"]), len(report["queries"]))
         self.assertIn("improvement_negation", report["candidates"][0]["matched_query_roles"])
+        self.assertEqual(report["review_summary"]["candidate_count"], 1)
+        self.assertEqual(report["review_summary"]["signal_counts"]["explicit_contradiction_cue"], 1)
+        self.assertEqual(report["review_summary"]["top_candidate"]["signal"], "explicit_contradiction_cue")
+        self.assertEqual(
+            report["review_summary"]["recommended_next_steps"]["first_queue"],
+            "explicit_contradiction_candidate_indexes",
+        )
+        self.assertEqual(
+            report["review_summary"]["recommended_next_steps"]["explicit_contradiction_candidate_indexes"],
+            [0],
+        )
+        self.assertEqual(report["review_summary"]["policy"], "review_leads_not_contradiction_verdicts")
         self.assertIn("review leads", report["interpretation"])
 
     def test_search_counterevidence_tool_returns_source_outage_safety_candidates(self):
@@ -574,6 +852,10 @@ class MCPServerHelperTests(unittest.TestCase):
         self.assertEqual(report["candidates"][0]["signal"], "source_outage_safety_cue")
         self.assertIn("source_outage_safety", {item["role"] for item in report["query_plan"]})
         self.assertIn("source_outage_safety", report["candidates"][0]["matched_query_roles"])
+        self.assertEqual(
+            report["review_summary"]["recommended_next_steps"]["first_queue"],
+            "source_outage_safety_candidate_indexes",
+        )
         self.assertIn("review leads", report["interpretation"])
 
     def test_search_counterevidence_tool_returns_chinese_source_outage_safety_candidates(self):
@@ -644,6 +926,41 @@ class MCPServerHelperTests(unittest.TestCase):
             "counterevidence_top_k",
         )
 
+        invalid_set_counterevidence_top_k = self.server.check_claim_support_set_tool(
+            "A claim.",
+            [{"title": "GhostCite"}],
+            include_counterevidence=True,
+            counterevidence_top_k=-1,
+        )
+        self.assertFalse(invalid_set_counterevidence_top_k["ok"])
+        self.assertEqual(invalid_set_counterevidence_top_k["error"]["code"], "invalid_input")
+        self.assertEqual(
+            invalid_set_counterevidence_top_k["error"]["details"]["tool"],
+            "check_claim_support_set_tool",
+        )
+        self.assertEqual(
+            invalid_set_counterevidence_top_k["error"]["details"]["field"],
+            "counterevidence_top_k",
+        )
+
+        missing_full_text_file = self.server.check_claim_support_tool(
+            claim="A claim.",
+            title="GhostCite",
+            full_text_file="/tmp/citeguard-missing-full-text-file.txt",
+        )
+        self.assertFalse(missing_full_text_file["ok"])
+        self.assertEqual(missing_full_text_file["error"]["code"], "file_error")
+        self.assertEqual(missing_full_text_file["error"]["next_action"], "repair_input")
+        self.assertEqual(missing_full_text_file["error"]["category"], "input_repair")
+        self.assertFalse(missing_full_text_file["error"]["retryable"])
+        self.assertEqual(missing_full_text_file["error"]["details"]["tool"], "check_claim_support_tool")
+        self.assertEqual(missing_full_text_file["error"]["details"]["field"], "full_text_file")
+        self.assertEqual(
+            missing_full_text_file["error"]["details"]["filename"],
+            "/tmp/citeguard-missing-full-text-file.txt",
+        )
+        self.assertEqual(missing_full_text_file["error"]["details"]["errno"], errno.ENOENT)
+
     def test_mcp_tools_return_structured_errors_for_invalid_citation_fields(self):
         invalid_authors = self.server.verify_citation_tool(title="GhostCite", authors="Zhe Xu")
         self.assertFalse(invalid_authors["ok"])
@@ -659,6 +976,29 @@ class MCPServerHelperTests(unittest.TestCase):
         self.assertEqual(invalid_year["error"]["details"]["tool"], "audit_citations_tool")
         self.assertEqual(invalid_year["error"]["details"]["index"], 1)
         self.assertEqual(invalid_year["error"]["details"]["field"], "year")
+
+    def test_mcp_tools_return_structured_errors_for_invalid_runtime_configuration(self):
+        with mock.patch.dict(os.environ, {"CITEGUARD_SOURCES": "bad"}, clear=False):
+            result = self.server.verify_citation_tool(title="GhostCite")
+
+        self.assertFalse(result["ok"])
+        self.assertEqual(result["error"]["code"], "invalid_input")
+        self.assertEqual(result["error"]["details"]["tool"], "verify_citation_tool")
+        self.assertEqual(result["error"]["details"]["field"], "CITEGUARD_SOURCES")
+        self.assertEqual(result["error"]["details"]["source"], "environment")
+        self.assertEqual(result["error"]["details"]["invalid_values"], ["bad"])
+        self.assertIn("openalex", result["error"]["details"]["valid_values"])
+
+        with mock.patch.dict(os.environ, {"CITEGUARD_HTTP_RETRIES": "-1"}, clear=False):
+            retry_result = self.server.verify_citation_tool(title="GhostCite")
+
+        self.assertFalse(retry_result["ok"])
+        self.assertEqual(retry_result["error"]["code"], "invalid_input")
+        self.assertEqual(retry_result["error"]["details"]["tool"], "verify_citation_tool")
+        self.assertEqual(retry_result["error"]["details"]["field"], "CITEGUARD_HTTP_RETRIES")
+        self.assertEqual(retry_result["error"]["details"]["source"], "environment")
+        self.assertEqual(retry_result["error"]["details"]["expected"], "non-negative integer")
+        self.assertEqual(retry_result["error"]["details"]["received"], "-1")
 
     def test_mcp_batch_tools_return_structured_errors_for_invalid_items(self):
         invalid_citations_shape = self.server.audit_citations_tool(citations="not a list")
@@ -731,6 +1071,36 @@ class MCPServerHelperTests(unittest.TestCase):
         self.assertEqual(invalid_audit_set_item["error"]["details"]["index"], 1)
         self.assertEqual(invalid_audit_set_item["error"]["details"]["citation_index"], 2)
         self.assertEqual(invalid_audit_set_item["error"]["details"]["field"], "title")
+
+        nested_missing_full_text = self.server.audit_claim_support_tool(
+            [
+                {
+                    "claim": "A claim.",
+                    "citations": [
+                        {"title": "GhostCite"},
+                        {
+                            "title": "Sparse Retrieval for Citation Auditing",
+                            "full_text": ["lawful full-text excerpt before the missing file"],
+                            "full_text_file": "/tmp/citeguard-missing-nested-full-text-file.txt",
+                        },
+                    ],
+                }
+            ]
+        )
+        self.assertFalse(nested_missing_full_text["ok"])
+        self.assertEqual(nested_missing_full_text["error"]["code"], "file_error")
+        self.assertEqual(nested_missing_full_text["error"]["next_action"], "repair_input")
+        self.assertEqual(nested_missing_full_text["error"]["category"], "input_repair")
+        self.assertFalse(nested_missing_full_text["error"]["retryable"])
+        self.assertEqual(nested_missing_full_text["error"]["details"]["tool"], "audit_claim_support_tool")
+        self.assertEqual(nested_missing_full_text["error"]["details"]["index"], 1)
+        self.assertEqual(nested_missing_full_text["error"]["details"]["citation_index"], 2)
+        self.assertEqual(nested_missing_full_text["error"]["details"]["field"], "full_text_file")
+        self.assertEqual(
+            nested_missing_full_text["error"]["details"]["filename"],
+            "/tmp/citeguard-missing-nested-full-text-file.txt",
+        )
+        self.assertEqual(nested_missing_full_text["error"]["details"]["errno"], errno.ENOENT)
 
 
 if __name__ == "__main__":
