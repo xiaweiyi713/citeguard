@@ -22,8 +22,10 @@ from citeguard.verification.support_eval import (
     filter_support_cases_by_split,
     load_support_label_cases,
     load_support_eval,
+    load_support_set_eval,
     run_support_eval_fixture_report,
     run_support_eval_report,
+    run_support_set_policy_fixture_report,
     validate_support_label_sidecar,
 )
 
@@ -103,13 +105,17 @@ def main(argv: List[str] | None = None) -> int:
     backend_names = args.backend or ["fixture", "heuristic"]
     cases = load_support_eval(args.dataset)
     cases = filter_support_cases_by_split(cases, args.split)
+    set_cases = filter_support_cases_by_split(load_support_set_eval(args.dataset), args.split)
     result: Dict[str, Any] = {
         "dataset": args.dataset,
         "split": args.split,
         "case_count": len(cases),
+        "support_set_case_count": len(set_cases),
         "backends": [],
         "comparison": [],
     }
+
+    result["support_set_policy"] = run_support_set_policy_fixture_report(set_cases)
 
     for backend_name in backend_names:
         report = _run_backend(backend_name, cases)
@@ -196,6 +202,22 @@ def _comparison_row(backend_name: str, report: Dict[str, Any], gate: Dict[str, A
     overall = report.get("overall", {})
     counts = report.get("error_bucket_counts", {})
     false_support_analysis = report.get("false_support_analysis", {})
+    false_support_review_plan = (
+        false_support_analysis.get("review_plan", {}) if isinstance(false_support_analysis, dict) else {}
+    )
+    if not isinstance(false_support_review_plan, dict):
+        false_support_review_plan = {}
+    review_plan_phases = false_support_review_plan.get("phases", [])
+    if not isinstance(review_plan_phases, list):
+        review_plan_phases = []
+    recommended_packets = false_support_review_plan.get("recommended_annotation_packets", [])
+    if not isinstance(recommended_packets, list):
+        recommended_packets = []
+    acceptance_guard = report.get("acceptance_guard", {})
+    if (not isinstance(acceptance_guard, dict) or not acceptance_guard) and isinstance(false_support_analysis, dict):
+        acceptance_guard = false_support_analysis.get("acceptance_guard", {})
+    if not isinstance(acceptance_guard, dict):
+        acceptance_guard = {}
     diagnostics = report.get("diagnostics", {})
     review_queue = list(report.get("review_queue", []))
     review_queue_summary = report.get("review_queue_summary", {})
@@ -203,18 +225,58 @@ def _comparison_row(backend_name: str, report: Dict[str, Any], gate: Dict[str, A
         "backend": backend_name,
         "quality_gate_ok": bool(gate.get("ok")),
         "accuracy": overall.get("accuracy", 0.0),
+        "macro_precision": overall.get("macro_precision", 0.0),
+        "macro_recall": overall.get("macro_recall", 0.0),
+        "macro_f1": overall.get("macro_f1", 0.0),
+        "weighted_precision": overall.get("weighted_precision", 0.0),
+        "weighted_recall": overall.get("weighted_recall", 0.0),
+        "weighted_f1": overall.get("weighted_f1", 0.0),
         "supported_precision": overall.get("supported_precision", 0.0),
         "supported_recall": overall.get("supported_recall", 0.0),
         "supported_f1": overall.get("supported_f1", 0.0),
         "abstention_rate": overall.get("abstention_rate", 0.0),
         "false_support_rate": overall.get("false_support_rate", 0.0),
+        "support_overcall_count": overall.get("support_overcall_count", 0),
+        "support_overcall_rate": overall.get("support_overcall_rate", 0.0),
         "contradiction_recall": overall.get("contradiction_recall", 0.0),
         "false_support_count": counts.get("false_support", 0),
         "weak_false_support_count": counts.get("weak_false_support", 0),
         "total_overcall_count": false_support_analysis.get("total_overcall_count", 0),
-        "high_risk_false_support_case_ids": list(false_support_analysis.get("high_risk_case_ids", [])),
+        "high_risk_false_support_case_ids": list(
+            false_support_analysis.get("false_support_case_ids")
+            or false_support_analysis.get("high_risk_case_ids", [])
+        ),
+        "high_risk_overcall_case_ids": list(false_support_analysis.get("high_risk_overcall_case_ids", [])),
+        "ok_to_accept_supported": acceptance_guard.get("ok_to_accept_supported"),
+        "block_acceptance_case_ids": list(acceptance_guard.get("block_acceptance_case_ids", [])),
+        "review_before_accepting_case_ids": list(
+            acceptance_guard.get("review_before_accepting_case_ids", [])
+        ),
         "false_support_risk_slices": list(false_support_analysis.get("risk_slices", [])),
         "top_false_support_risk_slice": false_support_analysis.get("top_risk_slice"),
+        "false_support_review_plan_status": false_support_review_plan.get("status"),
+        "false_support_review_plan_next_action": false_support_review_plan.get("next_action"),
+        "false_support_review_plan_phase_ids": [
+            phase.get("id") for phase in review_plan_phases if isinstance(phase, dict) and phase.get("id")
+        ],
+        "false_support_review_plan_top_risk_slice_id": false_support_review_plan.get("top_risk_slice_id"),
+        "false_support_review_plan_block_case_ids": list(
+            false_support_review_plan.get("block_acceptance_case_ids", []) or []
+        ),
+        "false_support_review_plan_review_case_ids": list(
+            false_support_review_plan.get("review_before_accepting_case_ids", []) or []
+        ),
+        "false_support_review_plan_packet_ids": [
+            packet.get("packet_id")
+            for packet in recommended_packets
+            if isinstance(packet, dict) and packet.get("packet_id")
+        ],
+        "false_support_review_plan_packet_count": int(
+            false_support_review_plan.get("recommended_annotation_packet_count", len(recommended_packets)) or 0
+        ),
+        "false_support_review_plan_packet_case_ids": list(
+            false_support_review_plan.get("recommended_annotation_case_ids", []) or []
+        ),
         "review_queue_case_ids": [
             str(item.get("case_id", ""))
             for item in review_queue[:10]

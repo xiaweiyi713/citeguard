@@ -25,6 +25,75 @@ ensure_project_root()
 
 from citeguard.version import __version__
 
+_SDIST_RELEASE_FILES = {
+    "pyproject.toml",
+    "setup.py",
+    "MANIFEST.in",
+    "README.md",
+    "CHANGELOG.md",
+    "CITATION.cff",
+    "LICENSE",
+    "citeguard/__init__.py",
+    "citeguard/__main__.py",
+    "citeguard/mcp/server.py",
+    "citeguard/retrieval/scholarly_clients/factory.py",
+    "citeguard/verification/verify.py",
+    "docs/chinaxiv_spike.md",
+    "docs/benchmark_design.md",
+    "docs/benchmark_todo.md",
+    "docs/cli_reference.md",
+    "docs/configuration.md",
+    "docs/mcp_setup.md",
+    "docs/error_codes.md",
+    "docs/github_launch.md",
+    "docs/public_api_migration.md",
+    "docs/release_checklist.md",
+    "docs/releases/v0.1.0.md",
+    "docs/security_compliance.md",
+    "docs/support_labeling_guidelines.md",
+    "examples/citations.json",
+    "examples/citations.jsonl",
+    "examples/claim_citations.json",
+    "examples/claim_citations.jsonl",
+    "examples/claim_citations_full_text.json",
+    "examples/claim_citations_full_text_file.json",
+    "examples/lawful_full_text_excerpt.txt",
+    "examples/references.md",
+    "configs/experiment.yaml",
+    "configs/model.yaml",
+    "configs/retrieval.yaml",
+    "configs/verifier.yaml",
+    "data/eval/support_eval.json",
+    "data/eval/support_eval_label_sidecar.json",
+    "skills/citeguard-verify/SKILL.md",
+    "skills/citeguard-verify/agents/openai.yaml",
+    "skills/citeguard-verify/references/examples.md",
+    "scripts/smoke_mcp.py",
+    "scripts/smoke_package.py",
+    "scripts/smoke_published_package.py",
+    "scripts/release_package_gate.py",
+    "scripts/prepare_support_label_sidecar.py",
+    "scripts/compare_support_baselines.py",
+}
+
+_SDIST_COPY_IGNORE_PATTERNS = (
+    ".git",
+    ".venv",
+    "venv",
+    "__pycache__",
+    "*.pyc",
+    ".pytest_cache",
+    ".mypy_cache",
+    "build",
+    "dist",
+    "*.egg-info",
+    "citeguard-*.tar.gz",
+    "citeguard-*.whl",
+    "experiments",
+    "paper",
+    ".ipynb_checkpoints",
+)
+
 
 def main(argv: Optional[List[str]] = None) -> int:
     parser = argparse.ArgumentParser(description="Install CiteGuard in a fresh venv and run core package smoke checks.")
@@ -53,7 +122,18 @@ def main(argv: Optional[List[str]] = None) -> int:
         action="store_true",
         help="Pass --no-build-isolation to pip install/pip wheel for offline release checks with preinstalled build tools.",
     )
+    parser.add_argument(
+        "--mcp-stdio-smoke",
+        action="store_true",
+        help=(
+            "After installing the MCP extra with dependencies, launch the installed "
+            "citeguard-mcp entry point and run the offline MCP stdio smoke."
+        ),
+    )
     args = parser.parse_args(argv)
+
+    if args.mcp_stdio_smoke and (args.extra != "mcp" or not args.with_deps):
+        raise RuntimeError("--mcp-stdio-smoke requires --extra mcp --with-deps")
 
     if args.extra == "mcp" and args.with_deps:
         python_version = _python_version_tuple(args.python)
@@ -79,7 +159,11 @@ def main(argv: Optional[List[str]] = None) -> int:
 
         _create_venv(args.python, venv_dir)
         python = _venv_python(venv_dir)
+        if args.no_build_isolation and args.install_mode != "wheel":
+            _assert_no_build_isolation_install_prereqs(python)
         bin_dir = python.parent
+        smoke_cwd = venv_dir / "smoke-cwd"
+        smoke_cwd.mkdir(parents=True, exist_ok=True)
         install_cmd = [str(python), "-m", "pip", "install"]
         if args.no_build_isolation:
             install_cmd.append("--no-build-isolation")
@@ -87,10 +171,22 @@ def main(argv: Optional[List[str]] = None) -> int:
             install_cmd.append("--no-deps")
         install_cmd.append(package_spec)
         _run(install_cmd)
-        _run([str(python), "-c", _IMPORT_SMOKE])
-        _run([str(python), "-c", _ENTRY_POINT_SMOKE])
+        _run([str(python), "-c", _IMPORT_SMOKE], cwd=smoke_cwd)
+        _run([str(python), "-c", _LEGACY_NAMESPACE_ABSENT_SMOKE], cwd=smoke_cwd)
+        _run([str(python), "-c", _ENTRY_POINT_SMOKE], cwd=smoke_cwd)
         if args.extra == "mcp" and args.with_deps:
-            _run([str(python), "-c", _MCP_EXTRA_SMOKE])
+            _run([str(python), "-c", _MCP_EXTRA_SMOKE], cwd=smoke_cwd)
+        if args.mcp_stdio_smoke:
+            _run(
+                [
+                    str(python),
+                    str(project_root / "scripts" / "smoke_mcp.py"),
+                    "--require-sdk",
+                    "--command",
+                    str(_console_script(bin_dir, "citeguard-mcp")),
+                ],
+                cwd=project_root,
+            )
         status = _run_json([str(bin_dir / "citeguard"), "status", "--compact"])
         if status.get("service") != "CiteGuard":
             raise RuntimeError(f"unexpected citeguard status payload: {status!r}")
@@ -102,7 +198,8 @@ def main(argv: Optional[List[str]] = None) -> int:
             raise RuntimeError(f"unexpected python -m citeguard payload: {package_status!r}")
         extra_label = f" + {args.extra} extra" if args.extra else ""
         deps_label = "with dependencies" if args.with_deps else "without dependencies"
-        print(f"OK: package smoke passed in {venv_dir} using {args.install_mode} install{extra_label} {deps_label}")
+        stdio_label = " with MCP stdio smoke" if args.mcp_stdio_smoke else ""
+        print(f"OK: package smoke passed in {venv_dir} using {args.install_mode} install{extra_label} {deps_label}{stdio_label}")
         return 0
     finally:
         if created_temp and not args.keep_venv:
@@ -142,20 +239,7 @@ def _build_sdist(python: str, project_root: Path, sdist_dir: Path) -> Path:
     shutil.copytree(
         project_root,
         copied_project,
-        ignore=shutil.ignore_patterns(
-            ".git",
-            ".venv",
-            "venv",
-            "__pycache__",
-            "*.pyc",
-            ".pytest_cache",
-            ".mypy_cache",
-            "build",
-            "dist",
-            "*.egg-info",
-            "citeguard-*.tar.gz",
-            "citeguard-*.whl",
-        ),
+        ignore=shutil.ignore_patterns(*_SDIST_COPY_IGNORE_PATTERNS),
     )
     dist_dir.mkdir(parents=True, exist_ok=True)
     _run([python, "setup.py", "sdist", "--dist-dir", str(dist_dir)], cwd=copied_project)
@@ -178,13 +262,12 @@ def _assert_wheel_contains_core_files(wheel_path: Path) -> None:
         "citeguard/retrieval/__init__.py",
         "citeguard/verification/__init__.py",
         "citeguard/verification/verify.py",
-        "src/__init__.py",
-        "src/verification/verify.py",
     }
     with zipfile.ZipFile(wheel_path) as wheel:
         names = set(wheel.namelist())
 
     _assert_archive_excludes_generated_files(names, archive_label="wheel")
+    _assert_archive_excludes_legacy_src_namespace(names, archive_label="wheel")
     missing = sorted(required - names)
     if missing:
         raise RuntimeError(f"wheel is missing expected package files: {missing}")
@@ -194,48 +277,26 @@ def _assert_wheel_contains_core_files(wheel_path: Path) -> None:
 
 
 def _assert_sdist_contains_release_files(sdist_path: Path) -> None:
-    required = {
-        "pyproject.toml",
-        "setup.py",
-        "MANIFEST.in",
-        "README.md",
-        "CHANGELOG.md",
-        "LICENSE",
-        "citeguard/__init__.py",
-        "citeguard/__main__.py",
-        "citeguard/mcp/server.py",
-        "citeguard/retrieval/scholarly_clients/factory.py",
-        "citeguard/verification/verify.py",
-        "src/__init__.py",
-        "src/verification/verify.py",
-        "docs/cli_reference.md",
-        "docs/mcp_setup.md",
-        "docs/error_codes.md",
-        "docs/release_checklist.md",
-        "docs/security_compliance.md",
-        "examples/citations.json",
-        "examples/claim_citations.json",
-        "examples/claim_citations.jsonl",
-        "data/eval/support_eval.json",
-        "data/eval/support_eval_label_sidecar.json",
-        "skills/citeguard-verify/SKILL.md",
-        "skills/citeguard-verify/agents/openai.yaml",
-        "skills/citeguard-verify/references/examples.md",
-        "scripts/smoke_mcp.py",
-        "scripts/smoke_package.py",
-        "scripts/smoke_published_package.py",
-        "scripts/release_package_gate.py",
-        "scripts/prepare_support_label_sidecar.py",
-        "scripts/compare_support_baselines.py",
-    }
     with tarfile.open(sdist_path, "r:gz") as sdist:
         names = {_strip_archive_root(member.name) for member in sdist.getmembers() if member.isfile()}
 
     _assert_archive_excludes_generated_files(names, archive_label="sdist")
-    missing = sorted(required - names)
+    _assert_archive_excludes_legacy_src_namespace(names, archive_label="sdist")
+    _assert_archive_excludes_legacy_agent_scripts(names, archive_label="sdist")
+    _assert_archive_excludes_historical_planning_docs(names, archive_label="sdist")
+    missing = sorted(_expected_sdist_release_files() - names)
     if missing:
         raise RuntimeError(f"sdist is missing expected release files: {missing}")
     _assert_sdist_metadata_contract(sdist_path)
+
+
+def _expected_sdist_release_files(project_root: Optional[Path] = None) -> set[str]:
+    root = project_root or Path(__file__).resolve().parents[1]
+    release_files = set(_SDIST_RELEASE_FILES)
+    releases_dir = root / "docs" / "releases"
+    if releases_dir.exists():
+        release_files.update(path.relative_to(root).as_posix() for path in releases_dir.glob("*.md"))
+    return release_files
 
 
 def _assert_wheel_metadata_contract(wheel_path: Path) -> None:
@@ -296,6 +357,29 @@ def _assert_distribution_metadata_contract(metadata_text: str, archive_label: st
         errors.append("Summary is missing or placeholder-like")
     if "prototype" in summary.lower():
         errors.append("Summary should describe the product, not a prototype")
+    for required_summary_phrase in ("skeptical citation auditor", "agent writing workflows"):
+        if required_summary_phrase not in summary:
+            errors.append(f"Summary should include {required_summary_phrase!r}")
+    keywords = {
+        item.strip()
+        for value in metadata.get_all("Keywords") or []
+        for item in value.replace(",", " ").split()
+        if item.strip()
+    }
+    required_keywords = {
+        "citation-verification",
+        "skeptical-citation-auditor",
+        "agent-tools",
+        "mcp",
+        "scientific-writing",
+        "claim-support",
+        "research-integrity",
+    }
+    missing_keywords = sorted(required_keywords - keywords)
+    if missing_keywords:
+        errors.append(f"missing package keywords: {missing_keywords}")
+    if "research-agents" in keywords:
+        errors.append("package keywords should use agent-tools, not research-agents")
 
     classifiers = set(metadata.get_all("Classifier") or [])
     required_classifiers = {
@@ -305,6 +389,8 @@ def _assert_distribution_metadata_contract(metadata_text: str, archive_label: st
         "Programming Language :: Python :: 3.10",
         "Topic :: Scientific/Engineering :: Artificial Intelligence",
         "Topic :: Scientific/Engineering :: Information Analysis",
+        "Topic :: Text Processing :: Linguistic",
+        "Typing :: Typed",
     }
     missing_classifiers = sorted(required_classifiers - classifiers)
     if missing_classifiers:
@@ -323,7 +409,7 @@ def _assert_distribution_metadata_contract(metadata_text: str, archive_label: st
             errors.append("missing mcp extra dependency in Requires-Dist")
 
     project_urls = metadata.get_all("Project-URL") or []
-    required_url_labels = {"Homepage", "Repository", "Issues", "Changelog"}
+    required_url_labels = {"Homepage", "Repository", "Issues", "Changelog", "Documentation"}
     actual_url_labels = {item.split(",", 1)[0].strip() for item in project_urls if "," in item}
     missing_url_labels = sorted(required_url_labels - actual_url_labels)
     if missing_url_labels:
@@ -381,6 +467,28 @@ def _assert_archive_excludes_generated_files(names: set[str], archive_label: str
         raise RuntimeError(f"{archive_label} includes generated/local files: {forbidden[:20]}")
 
 
+def _assert_archive_excludes_legacy_src_namespace(names: set[str], archive_label: str) -> None:
+    legacy_files = sorted(name for name in names if name == "src/__init__.py" or name.startswith("src/"))
+    if legacy_files:
+        raise RuntimeError(f"{archive_label} includes legacy src compatibility namespace: {legacy_files[:20]}")
+
+
+def _assert_archive_excludes_legacy_agent_scripts(names: set[str], archive_label: str) -> None:
+    legacy_scripts = sorted({"scripts/run_agent.py", "scripts/evaluate.py"} & names)
+    if legacy_scripts:
+        raise RuntimeError(f"{archive_label} includes legacy writing-agent prototype scripts: {legacy_scripts}")
+
+
+def _assert_archive_excludes_historical_planning_docs(names: set[str], archive_label: str) -> None:
+    historical_docs = sorted(
+        name
+        for name in names
+        if name == "docs/proposal.md" or name.startswith("docs/superpowers/") or name.startswith("docs/issues/")
+    )
+    if historical_docs:
+        raise RuntimeError(f"{archive_label} includes historical planning docs: {historical_docs[:20]}")
+
+
 def _strip_archive_root(name: str) -> str:
     parts = name.split("/")
     return "/".join(parts[1:]) if len(parts) > 1 else name
@@ -398,6 +506,12 @@ def _venv_python(venv_dir: Path) -> Path:
     return venv_dir / "bin" / "python"
 
 
+def _console_script(bin_dir: Path, name: str) -> Path:
+    if os.name == "nt":
+        return bin_dir / f"{name}.exe"
+    return bin_dir / name
+
+
 def _python_version_tuple(python: str) -> tuple[int, int]:
     completed = _run(
         [
@@ -408,6 +522,20 @@ def _python_version_tuple(python: str) -> tuple[int, int]:
     )
     major, minor = completed.stdout.strip().split(".", 1)
     return int(major), int(minor)
+
+
+def _assert_no_build_isolation_install_prereqs(python: Path) -> None:
+    completed = subprocess.run(
+        [str(python), "-c", "import wheel"],
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    if completed.returncode != 0:
+        raise RuntimeError(
+            "--no-build-isolation source/sdist package smoke requires the smoke venv "
+            "to have wheel installed; install wheel in the venv or omit --no-build-isolation."
+        )
 
 
 def _run(cmd: List[str], cwd: Optional[Path] = None) -> subprocess.CompletedProcess:
@@ -427,7 +555,9 @@ def _run_json(cmd: List[str]) -> dict:
 
 
 _IMPORT_SMOKE = r"""
-from citeguard import ERROR_CODE_NEXT_ACTION, STABLE_NEXT_ACTIONS, parse_citation, verify_citation, check_claim_support_set, available_sources, stable_next_action, verification_next_action, verification_recovery_code, Verdict
+import citeguard
+from citeguard import ERROR_CODE_CATEGORY, ERROR_CODE_NEXT_ACTION, ERROR_CODE_RETRYABLE, ERROR_SCHEMA_VERSION, STABLE_NEXT_ACTIONS, error_code_registry, error_payload, parse_citation, verify_citation, check_claim_support_set, available_sources, stable_next_action, verification_next_action, verification_recovery_code, Verdict
+from citeguard.errors import STABLE_ERROR_CODES
 from citeguard.verification import search_counterevidence_candidates
 from citeguard.runtime import environment_status
 assert parse_citation(title="A Paper").title == "A Paper"
@@ -437,6 +567,20 @@ assert available_sources(["openalex", "arxiv"], ["arxiv"]) == ["openalex"]
 assert "rewrite_or_replace_evidence" in STABLE_NEXT_ACTIONS
 assert "review_counterevidence_leads" in STABLE_NEXT_ACTIONS
 assert ERROR_CODE_NEXT_ACTION["missing_claim"] == "provide_missing_input"
+registry = error_code_registry()
+assert registry["schema_version"] == ERROR_SCHEMA_VERSION
+assert set(registry["codes"]) == STABLE_ERROR_CODES
+assert registry["codes"]["missing_citation_input"]["next_action"] == "provide_missing_input"
+assert registry["codes"]["missing_citation_input"]["retryable"] is False
+assert registry["codes"]["missing_citation_input"]["category"] == "missing_input"
+assert "DOI" in registry["codes"]["missing_citation_input"]["recovery"]
+assert error_payload("timeout", "Timed out")["error"]["next_action"] == "retry_or_check_source_health"
+assert error_payload("timeout", "Timed out")["error"]["retryable"] is True
+assert error_payload("timeout", "Timed out")["error"]["category"] == "source_limited"
+assert ERROR_CODE_RETRYABLE["source_unavailable"] is True
+assert ERROR_CODE_CATEGORY["model_unavailable"] == "dependency_limited"
+experimental_exports = {"api", "benchmark", "orchestrator", "planner", "writer"} & set(citeguard.__all__)
+assert not experimental_exports, sorted(experimental_exports)
 assert stable_next_action("keep") == "keep"
 assert stable_next_action("review_counterevidence_leads") == "review_counterevidence_leads"
 assert verification_recovery_code(Verdict.AMBIGUOUS, []) == "ambiguous_citation"
@@ -447,6 +591,18 @@ assert status["service"] == "CiteGuard"
 assert status["cache_status"]["inspect_ok"] is True
 assert "entry_prefixes" in status["cache_status"]
 	"""
+
+
+_LEGACY_NAMESPACE_ABSENT_SMOKE = r"""
+import importlib
+
+try:
+    importlib.import_module("src")
+except ModuleNotFoundError:
+    pass
+else:
+    raise AssertionError("published package must not expose legacy src namespace")
+"""
 
 
 _ENTRY_POINT_SMOKE = r"""
