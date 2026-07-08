@@ -24,22 +24,44 @@ integrity tribunal, or substitute for human review.
 - Publisher or DOI landing-page failures are recorded as
   `metadata.evidence_harvest_failures` with `stage=remote_evidence` when
   metadata resolution succeeds. Treat these as missing snippet/full-text-adjacent
-  evidence, not as proof the citation is unavailable or fabricated.
+  evidence, not as proof the citation is unavailable or fabricated. Rate-limited
+  landing pages preserve `retry_after_seconds` when the source provides a
+  `Retry-After` hint. Non-HTML responses use `kind=non_html_response`, and HTML
+  pages with no extractable paragraph/meta evidence use
+  `kind=no_extractable_evidence`.
 - Configure `CITEGUARD_MAILTO` with a real contact email for polite OpenAlex and
   Crossref usage. Live-source HTTP clients include that contact in the
-  User-Agent as `mailto:<email>` when configured.
+  User-Agent and source API `mailto` parameters when configured; placeholder or
+  empty values are not sent.
 - Respect source rate limits. Prefer cached/offline fixtures for development,
   tests, demos, and repeated eval runs. The HTTP client retries transient
-  `429`/`5xx` failures briefly and respects `Retry-After` with a short cap for
-  interactive use.
+  `429`/`5xx` failures briefly and respects numeric or HTTP-date `Retry-After`
+  with a short cap for interactive use.
 - Live HTTP adapters expose machine-readable diagnostics (`last_error_code`,
-  `last_error_kind`, `last_status_code`, `last_url`, and `last_cache_hit`) so
-  agents can distinguish timeout, rate-limit, HTTP, network, and cached-response
-  states without parsing prose.
+  `last_error_kind`, `last_status_code`, `last_url`, `last_final_url`,
+  `last_redirected`, `last_cache_hit`, `last_attempt_count`,
+  `last_retry_count`, `last_retry_after_seconds`, and
+  `last_retry_delay_seconds`) so agents can distinguish timeout, rate-limit,
+  HTTP, network, malformed JSON, redirects, capped retry waits, and
+  cached-response states without parsing prose. Malformed source JSON is reported as
+  `code=source_unavailable`, `kind=invalid_json`, not as a user input parse
+  error.
 - `citeguard status --check-sources` exposes source-level health for OpenAlex,
   Crossref, arXiv, and Semantic Scholar, including `sources_checked`,
   `sources_responded`, `sources_failed`, failure-kind counts, and Semantic
-  Scholar `SEMANTIC_SCHOLAR_API_KEY` configuration status.
+  Scholar `SEMANTIC_SCHOLAR_API_KEY` configuration status. Summary-level
+  `retry_guidance=wait_before_retry`, `retry_after_seconds`, and
+  `retry_after_sources` preserve rate-limit wait hints, while
+  `retry_delay_seconds` and `retry_delay_sources` preserve the actual capped
+  client waits used during retries without requiring agents to parse every
+  failure detail. The summary-level `confidence_effect` and
+  `interpretation` fields make source limitations explicit;
+  `source_outage_lowers_confidence_not_fabrication_evidence` is the stable
+  reminder that an outage lowers confidence without proving fabrication.
+- Resolved live-source records include `metadata.metadata_quality` for sparse
+  source fields. `missing_fields` should be presented as incomplete metadata;
+  `confidence_effect=missing_metadata_lowers_confidence_not_fabrication_evidence`
+  means missing fields lower confidence without proving fabrication.
 
 ## Interpretation Policy
 

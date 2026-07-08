@@ -4,8 +4,47 @@
 
 - Added public `citeguard.cli` and `citeguard.mcp.server` entry points.
 - Added JSONL support for `citeguard audit` and `citeguard support-audit`.
+- Added `examples/citations.jsonl` plus release-gated audit JSONL smoke coverage.
 - Added `citeguard extract` plus direct `citeguard audit` support for Markdown,
   LaTeX/BibTeX, DOCX, and plain text reference extraction.
+- Added `citeguard support-audit refs.md --claim "..."` so one claim can be
+  checked against citations extracted from Markdown, LaTeX/BibTeX, DOCX, or
+  plain text reference files.
+- Added release-gated `support-audit refs.md --claim "..." --with-counterevidence`
+  coverage so extracted reference-file audits can attach counter-evidence review
+  leads while preserving risk-sorted citation indexes.
+- Added release-gated `support-set --with-counterevidence` coverage so
+  multi-citation claim checks keep aggregate review leads and safe interpretation
+  wording in offline package gates.
+- Added MCP helper and stdio smoke coverage for
+  `check_claim_support_set_tool(include_counterevidence=true)` so agent clients
+  verify one-claim/multiple-citation counter-evidence review leads end to end.
+- Added post-publish smoke `planned_checks` plus public console entry point
+  validation for `citeguard` and `citeguard-mcp` so PyPI/TestPyPI release
+  rehearsals protect the installed command surface.
+- Added optional post-publish MCP stdio smoke coverage that starts the installed
+  `citeguard-mcp` entry point against an offline fixture after installing the
+  `mcp` extra from PyPI/TestPyPI.
+- Extended post-publish MCP stdio smoke coverage to call
+  `check_claim_support_set_tool` and verify `support_mode_details`, including
+  conservative no-unstated-full-text support policy fields, from the installed
+  package.
+- Made post-publish smoke configuration and venv setup failures machine-readable,
+  including `mcp_stdio_smoke_requires_mcp_extra` when
+  `--mcp-stdio-smoke` is used without `--extra mcp`.
+- Made post-publish smoke run installed-package checks from an isolated
+  `smoke-cwd` with `PYTHONPATH` removed so repository-local sources cannot hide
+  a failed PyPI/TestPyPI install.
+- Added post-publish smoke validation for `--require-extra-import`, accepting
+  only dotted Python module names and reporting `invalid_required_extra_import`
+  before any install runs.
+- Added local wheel MCP stdio package smoke coverage so
+  `scripts/smoke_package.py --install-mode wheel --extra mcp --with-deps
+  --mcp-stdio-smoke` installs the built wheel and drives the installed
+  `citeguard-mcp` entry point through an offline MCP client before release.
+- Added an agent-skill example for `audit_claim_support_tool` with both
+  `include_counterevidence=true` and `high_risk_only=true`, including safe
+  wording for omitted-row summaries and review leads.
 - Added batch `risk_ranking`, recommendations, and `--high-risk-only` filtering
   for citation and claim-support audits.
 - Added batch `review_summary.action_queues` so agents can route identity,
@@ -25,6 +64,8 @@
   rate, false-support rate, confusion matrices, high-risk support error buckets,
   optional case-type/evidence-scope breakdown reports, and title/metadata/full-text
   scope examples.
+- Added a hard-negative support seed for real citation-auditing papers that do
+  not support overstrong deployed-agent hallucination-elimination claims.
 - Added offline MCP stdio smoke coverage through `scripts/smoke_mcp.py`.
 - Added `CITEGUARD_FIXTURE_CITATIONS` for deterministic offline citation fixtures.
 - Added cache schema versioning plus `citeguard cache inspect` and `citeguard cache clear`.
@@ -105,6 +146,36 @@
 - Added a release-gate smoke for review-queue annotation packets so release
   summaries prove the blinded packet path works and does not expose hidden
   labels or backend predictions.
+- Added support-set policy coverage to baseline comparison artifacts and release
+  gate manifest checks, keeping citation-set aggregation boundaries visible
+  beside evidence-level false-support triage.
+- Added support-label audit `policy_boundary_unreviewed` output and a
+  release-gated policy-boundary annotation packet smoke for weak citation-set
+  cases that must remain tentative instead of being upgraded to full support.
+- Added support-label audit `full_text_required_unreviewed` output and a
+  release-gated full-text-boundary annotation packet smoke so abstract-level
+  support gaps can be reviewed separately before full-text readiness claims.
+- Added support-label audit gates
+  `--fail-on-full-text-required-unreviewed` and
+  `--fail-on-policy-boundary-unreviewed` so release checks can block premature
+  full-text or multi-citation support readiness claims.
+- Added label-source and source-locator provenance metrics to support sidecar
+  validation and the release gate, keeping synthetic seed coverage distinct
+  from human-reviewed benchmark evidence.
+- Added support-label provenance summaries to experiment `manifest.json`
+  artifacts so release tables can show sidecar maturity without opening the
+  full result payload.
+- Extended the support-baseline release gate to validate those manifest
+  `support_label_*` summaries against `label_sidecar_gate.metrics`.
+- Added agent-skill guidance and release-gate checks for policy-boundary
+  annotation packets, keeping multiple weak citations tentative until reviewed.
+- Added an agent-skill full-text-boundary annotation packet example so agents
+  keep abstract-only support gaps as insufficient evidence until review.
+- Added HTTP attempt/retry diagnostics to live-source failure details and bumped
+  the source-health schema so agents can see when CiteGuard already exhausted
+  its short retry policy.
+- Added a counter-evidence safety release gate so retrieval candidates remain
+  review leads, not contradiction verdicts or silent rewrite permission.
 - Added a release-gate contract that keeps the legacy `src` package limited to
   thin `citeguard.*` compatibility shims.
 - Added a default release-gate public API contract so README, tests, scripts,
@@ -116,6 +187,9 @@
 - Added a default release-gate error-code contract so `citeguard.errors`,
   `docs/error_codes.md`, recovery guidance, `next_action` mappings, and sample
   payload shape stay synchronized for agents.
+- Extended the shared error contract with machine-readable `error.retryable`
+  and `error.category` fields, and updated the agent skill to branch on those
+  fields instead of parsing natural-language error messages.
 - Added a default release-gate CLI error contract smoke that runs real
   `python -m citeguard` failures for missing citation input, missing audit
   files, and invalid JSONL support-audit input, then verifies stable
@@ -149,8 +223,13 @@
   metadata corrections directly from the risk-sorted review queue.
 - Added support-audit `risk_ranking` provenance fields (`support_confidence`,
   `support_engine`, `resolution_verdict`, resolved title/year, and evidence
-  source fields) so claim-support batch rows can be displayed without expanding
-  full result payloads.
+  source name/field/URL) so claim-support batch rows can be displayed without
+  expanding full result payloads or inferring the source from field-name
+  prefixes.
+- Added citation-set aggregate provenance fields (`evidence_scopes`,
+  `evidence_source_names`, and `evidence_source_fields`) so support-set and
+  support-audit rows can show set-level evidence provenance without expanding
+  every child citation result.
 - Added a default release-gate benchmark claim safety contract so
   release-facing docs cannot describe the synthetic support seed set as a
   human-reviewed benchmark while label provenance still reports
@@ -181,10 +260,17 @@
   `case_count_by_review_status`, for review-batch provenance.
 - Added support-label audit `recommended_packets` so maintainers and agents can
   turn review-readiness gaps into reviewer-packet commands without parsing prose.
+- Added a release-gate smoke that generates the balanced support-label
+  `recommended_packets` annotation packet and checks review-status provenance
+  without leaking hidden gold, adjudicated, or prediction fields.
+- Added `review_phase` and `packet_purpose` metadata to support-label
+  annotation packets generated from recommended review-plan commands.
 - Added deterministic annotation-packet `packet_id` values for reproducible
   reviewer-batch archives.
 - Added `merge_report.source_packet_ids` to preserve reviewer-batch provenance
   after annotation-packet merges.
+- Added `source_packet_metadata` to annotation-packet merge and adjudication
+  reports so review phase and packet purpose survive conflict resolution.
 - Added `merge_report.adjudication_queue` with reviewer rationales and blank
   adjudication templates for unresolved annotation disagreements.
 - Added source packet ids and packet case indexes to annotation conflict
@@ -194,17 +280,21 @@
 - Added high-risk case-count-by-language metrics to support-label gates so
   release checks can report reviewed and unreviewed language coverage in one
   place.
+- Added high-risk support-label review cross tables by language and case type
+  so manifests and release reports can assign contradiction, hard-negative, and
+  full-text-boundary review gaps without re-parsing sidecar rows.
 - Added language-specific high-risk audit failures for support-label sidecar
   readiness checks, so reviewer assignment can block on unreviewed Chinese or
   other language-specific high-risk cases.
-- Expanded the synthetic support eval seed set to 44 evidence-level cases with
+- Expanded the synthetic support eval seed set to 48 evidence-level cases with
   additional high-risk hard-negative, contradiction, and full-text-required
   boundaries for benchmark-provenance overclaims, source-outage fabrication
   inferences, abstract-only eligibility claims, simulated-review causal
   overclaims, reviewer-replacement overclaims, multi-paper weak-evidence
   over-synthesis, model-availability-as-support overclaims, supplemental-material
   full-text boundaries, and Semantic Scholar rate-limit non-existence
-  overclaims.
+  overclaims. The latest contradiction case keeps counter-evidence search leads
+  as review signals rather than final contradiction verdicts.
 - Expanded citation-set support policy coverage to 6 citation-set policy cases,
   including a Chinese citation-set weak aggregation boundary and a
   source-limited citation-set fabrication boundary.

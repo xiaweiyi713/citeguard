@@ -370,7 +370,9 @@ flowchart TD
 
 ## 7. 项目技术目录设计
 
-建议采用以下代码结构：
+建议采用以下代码结构。产品接口以 `citeguard.*` 为稳定边界；
+历史 `src.*` 兼容层只用于旧代码迁移，不作为 README、脚本、测试、
+Skill 或用户代码的目标 API。
 
 ```text
 falsification-first-agent/
@@ -396,48 +398,34 @@ falsification-first-agent/
 │   ├── build_index.py
 │   ├── run_agent.py
 │   └── evaluate.py
-├── src/
-│   ├── orchestrator/
-│   │   ├── graph.py
-│   │   ├── states.py
-│   │   └── policies.py
-│   ├── planner/
-│   │   ├── outline_planner.py
-│   │   └── claim_decomposer.py
+├── citeguard/
+│   ├── runtime.py
+│   ├── cli.py
+│   ├── errors.py
+│   ├── mcp/
+│   │   └── server.py
 │   ├── retrieval/
 │   │   ├── bm25_retriever.py
 │   │   ├── dense_retriever.py
 │   │   ├── hybrid_retriever.py
 │   │   └── scholarly_clients/
-│   ├── citation/
-│   │   ├── proposer.py
-│   │   ├── normalizer.py
-│   │   └── formatter.py
-│   ├── verifiers/
-│   │   ├── existence_verifier.py
-│   │   ├── metadata_verifier.py
-│   │   ├── support_verifier.py
-│   │   ├── contradiction_verifier.py
-│   │   ├── uncertainty_gate.py
-│   │   └── risk_fusion.py
-│   ├── graph/
-│   │   ├── cceg.py
-│   │   └── graph_store.py
-│   ├── writer/
-│   │   ├── constrained_writer.py
-│   │   ├── reviser.py
-│   │   └── abstention_controller.py
-│   ├── audit/
-│   │   ├── provenance.py
-│   │   ├── report_builder.py
-│   │   └── visualization.py
+│   ├── verification/
+│   │   ├── audit.py
+│   │   ├── cache.py
+│   │   ├── eval.py
+│   │   ├── extract.py
+│   │   ├── models.py
+│   │   ├── parse.py
+│   │   ├── resolve.py
+│   │   ├── support.py
+│   │   ├── support_eval.py
+│   │   └── verify.py
 │   ├── benchmark/
-│   │   ├── dataset_builder.py
-│   │   ├── metrics.py
-│   │   └── baselines.py
-│   └── api/
-│       ├── app.py
-│       └── schemas.py
+│   │   ├── experiments.py
+│   │   └── support_calibration.py
+│   ├── orchestrator/
+│   ├── planner/
+│   └── writer/
 ├── experiments/
 │   ├── exp01_baselines/
 │   ├── exp02_ablation/

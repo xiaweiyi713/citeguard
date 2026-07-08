@@ -1,6 +1,6 @@
 # GitHub Launch Pack
 
-This document collects the repository naming, topics, profile copy, and pinned-project wording needed for a clean public launch.
+This document collects repository naming, topics, profile copy, pinned-project wording, and first-release copy for a clean public launch of CiteGuard as an agent-facing skeptical citation auditor.
 
 ## Recommended Repository Name
 
@@ -18,35 +18,40 @@ Why this is the best default:
 Strong alternatives:
 
 - `citeguard-agent`
-- `citeguard-research`
-- `falsification-first-agent`
+- `citeguard-auditor`
+- `citeguard-mcp`
 
 Recommendation:
 
 - If the repository is the canonical home of the project, use `citeguard`
-- If your GitHub already has multiple similarly named research repos, use `citeguard-research`
+- If your GitHub already has multiple similarly named tooling repos, use `citeguard-agent`
 
 ## Suggested GitHub Repository Description
 
 Primary short description:
 
-> Falsification-first research agent for trustworthy scientific writing.
+> Skeptical citation auditing for agent writing workflows.
 
 Alternative short description:
 
-> Claim-citation-evidence verification for trustworthy scientific writing.
+> Agent-ready citation, metadata, and claim-support auditing.
 
 Longer one-sentence description:
 
-> CiteGuard verifies claim-citation-evidence links before allowing citations into generated academic text, with multi-source scholarly retrieval, support verification, and audit-friendly outputs.
+> CiteGuard checks whether cited papers exist, whether supplied metadata matches scholarly records, and whether available evidence supports the claim, with conservative CLI, batch, cache-replay, and MCP workflows for writing agents.
+
+Conservative safety wording:
+
+> A `not_found` result, source outage, sparse metadata record, or counter-evidence lead is not proof that a citation is fabricated. CiteGuard lowers confidence, records the source state, and recommends human review when evidence is incomplete.
 
 ## Suggested GitHub Topics
 
 Primary topic set:
 
-- `research-agents`
-- `scientific-writing`
 - `citation-verification`
+- `scientific-writing`
+- `mcp`
+- `agent-tools`
 - `hallucination-mitigation`
 - `retrieval-augmented-generation`
 - `nli`
@@ -54,22 +59,24 @@ Primary topic set:
 - `openalex`
 - `crossref`
 - `arxiv`
+- `semantic-scholar`
 
 If you want a slightly more academic emphasis, swap in:
 
 - `scholarly-search`
 - `benchmarking`
 - `trustworthy-ai`
+- `research-integrity`
 
 ## Suggested Social Preview Text
 
 Short version:
 
-> A falsification-first research agent prototype that verifies citations before they enter generated academic text.
+> An agent-facing skeptical citation auditor for checking existence, metadata, and claim support before references enter generated text.
 
 Alternative:
 
-> Trustworthy scientific writing starts with verifying claim-citation-evidence links, not trusting fluent text.
+> Trustworthy agent writing starts with checking claim-citation-evidence links, not trusting fluent text.
 
 ## Pinned Project Copy
 
@@ -79,30 +86,43 @@ Alternative:
 
 ### Recommended pinned repository description
 
-> A falsification-first research agent for trustworthy scientific writing. CiteGuard verifies claim-citation-evidence links before allowing citations into generated text.
+> An agent-facing skeptical citation auditor for trustworthy writing. CiteGuard verifies citation existence, metadata fit, and claim support with conservative outputs.
 
-### Slightly more research-oriented pinned description
+### Slightly more workflow-oriented pinned description
 
-> Early-stage research prototype for citation-safe scientific writing, with multi-source scholarly retrieval, support verification, and evidence-aware audit outputs.
+> CiteGuard ships a public `citeguard.*` Python package, `citeguard` CLI, `citeguard-mcp` stdio server, JSON/JSONL batch audits, cache replay, and source-health aware outputs.
 
 ### Chinese pinned description option
 
-> 面向科研写作的证伪优先 Agent 原型，在引用进入正文前先验证 claim、citation 与 evidence 的支撑关系。
+> 面向 agent 写作流程的审慎引用审计器，在引用进入正文前检查论文是否存在、元数据是否匹配、证据是否支撑 claim，并把不可达来源视为不确定性而不是伪造证据。
 
 ## Suggested Profile Pinned Project Blurb
 
 Short blurb:
 
-> Building falsification-first infrastructure for trustworthy scientific writing.
+> Building conservative citation-auditing infrastructure for trustworthy agent writing.
 
 Longer blurb:
 
-> CiteGuard is an open research prototype for claim-level citation verification. It treats academic writing as a `claim -> citation -> evidence` problem and prefers abstention over unsupported confidence.
+> CiteGuard treats academic writing as a `claim -> citation -> evidence` problem. It prefers abstention, source-state reporting, and review recommendations over unsupported confidence.
 
 ## Suggested First Release Title
 
-- `v0.1.0: First public research prototype`
+- `v0.1.0: Alpha agent-facing citation auditor`
 
 ## Suggested First Release Tagline
 
-> Public alpha for falsification-first citation verification in scientific writing.
+> Public alpha for skeptical citation auditing in agent writing workflows.
+
+## Suggested First Release Notes Link
+
+Use `docs/releases/v0.1.0.md` for the full launch note. The release note should call out:
+
+- public `citeguard.*` package structure
+- `citeguard` CLI and `citeguard-mcp` stdio server
+- JSON and JSONL batch audits
+- MCP stdio smoke coverage
+- source-health/status contracts
+- cache inspect, clear, export, and offline replay
+- support-eval provenance and false-support risk tracking
+- security/compliance boundaries, including no gated-source crawling or paywall bypassing

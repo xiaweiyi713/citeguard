@@ -37,13 +37,13 @@ ChinaXiv does not expose a confirmed, open, machine-readable metadata endpoint t
 
 We will **not** integrate ChinaXiv as a metadata source at this time.
 
-- CiteGuard retains its pluggable `MetadataSource` interface (`src/retrieval/scholarly_clients/base.py`) and the `build_live_metadata_source` factory (`src/retrieval/scholarly_clients/factory.py`). A `ChinaxivMetadataSource` adapter can be added later **without architectural changes** once an open, documented endpoint is confirmed.
+- CiteGuard retains its pluggable `MetadataSource` interface (`citeguard/retrieval/scholarly_clients/base.py`) and the `build_live_metadata_source` factory (`citeguard/retrieval/scholarly_clients/factory.py`). A `ChinaxivMetadataSource` adapter can be added later **without architectural changes** once an open, documented endpoint is confirmed.
 - We will **not** scrape login-gated, paywalled, or otherwise restricted ChinaXiv content. A future revisit should re-probe `/oai/OAIHandler` for an open OAI-PMH response, or look for an officially documented open API / data-dump program.
 
 ### If this ever flips to GO (follow-up, not part of this task)
 
 If an open endpoint is later confirmed:
 
-1. Implement `ChinaxivMetadataSource` following the pattern of `src/retrieval/scholarly_clients/crossref.py` and `src/retrieval/scholarly_clients/openalex.py` (injected HTTP client, normalize results into the shared metadata record shape).
+1. Implement `ChinaxivMetadataSource` following the pattern of `citeguard/retrieval/scholarly_clients/crossref.py` and `citeguard/retrieval/scholarly_clients/openalex.py` (injected HTTP client, normalize results into the shared metadata record shape).
 2. Add a unit test using a Fake HTTP client (no live network in tests), mirroring the existing client tests.
-3. Register the source in `build_live_metadata_source` (`src/retrieval/scholarly_clients/factory.py`) under a `chinaxiv` name.
+3. Register the source in `build_live_metadata_source` (`citeguard/retrieval/scholarly_clients/factory.py`) under a `chinaxiv` name.

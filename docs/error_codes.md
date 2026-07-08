@@ -5,7 +5,10 @@ agents do not need to parse prose.
 
 The stable code registry is also exported from `citeguard.errors` as
 `ERROR_SCHEMA_VERSION`, `STABLE_ERROR_CODES`, `ERROR_CODE_RECOVERY`,
-`ERROR_CODE_NEXT_ACTION`, and `is_stable_error_code()`.
+`ERROR_CODE_NEXT_ACTION`, `ERROR_CODE_RETRYABLE`, `ERROR_CODE_CATEGORY`,
+`error_code_registry()`,
+`runtime_config_error_details()`, and
+`is_stable_error_code()`.
 
 ```json
 {
@@ -16,7 +19,9 @@ The stable code registry is also exported from `citeguard.errors` as
     "message": "Provide --raw-text, --title, --doi, or --arxiv-id.",
     "details": {},
     "recovery": "Ask for a DOI, arXiv id, title, or pasted reference.",
-    "next_action": "provide_missing_input"
+    "next_action": "provide_missing_input",
+    "retryable": false,
+    "category": "missing_input"
   },
   "exit_code": 2
 }
@@ -28,6 +33,27 @@ exception. `schema_version` versions the error payload contract. `error.code`
 is the stable branch key, while `error.recovery` mirrors the public recovery
 registry and `error.next_action` mirrors the public error-to-action registry, so
 agents can choose the next step without parsing prose.
+`error.retryable` is true only for transient retry candidates such as source
+outages or timeouts;
+`error.category` gives a compact stable class such as `missing_input`,
+`input_repair`, `source_limited`, `dependency_limited`, or `disambiguation`.
+
+For programmatic checks, `error_code_registry()` returns the same stable
+registry as JSON-serializable data:
+
+```json
+{
+  "schema_version": 1,
+  "codes": {
+    "missing_citation_input": {
+      "recovery": "Ask for a DOI, arXiv id, title, or pasted reference.",
+      "next_action": "provide_missing_input",
+      "retryable": false,
+      "category": "missing_input"
+    }
+  }
+}
+```
 
 Non-error verification/support results may also include `recovery_code` using
 the same registry. For example, an `ambiguous` verification result uses
@@ -67,23 +93,26 @@ preserve `recovery_code` as the stable reason/error-code hint when present.
 
 ## Stable Codes
 
-| code | meaning | typical recovery |
-|---|---|---|
-| `missing_citation_input` | No usable citation identifier, title, or raw text was provided. | Ask for a DOI, arXiv id, title, or pasted reference. |
-| `missing_claim` | A support check was requested without a non-empty claim. | Ask for the sentence that the citation is supposed to support. |
-| `invalid_input` | The request shape is valid JSON but does not match CiteGuard's contract. | Fix the field type, object shape, or required item. |
-| `invalid_json` | A JSON/JSONL input file could not be parsed. | Repair the JSON; `details.line` and `details.column` point to the parse location when available. |
-| `argument_parse_error` | CLI flags are missing or malformed. | Show the command help or fix the CLI invocation. |
-| `file_error` | The CLI could not read an input file or prepare a filesystem path. | Check the path and permissions. |
-| `source_unavailable` | A scholarly source could not be reached or responded unreliably. | Retry later, inspect source health, and avoid treating `not_found` as fabricated. |
-| `model_unavailable` | Deep support models are not installed or failed to load. | Install the `models` extra or treat support output as heuristic/weak. |
-| `ambiguous_citation` | Multiple plausible records match the citation. | Ask for a DOI/arXiv id or more metadata. |
-| `timeout` | A source or model operation exceeded its configured timeout. | Retry, raise the timeout, or continue with reduced confidence. |
-| `unsupported_command` | The CLI parser accepted a command name that has no handler. | Upgrade CiteGuard or fix the invocation. |
+| code | category | retryable | meaning | typical recovery |
+|---|---|---:|---|---|
+| `missing_citation_input` | missing_input | false | No usable citation identifier, title, or raw text was provided. | Ask for a DOI, arXiv id, title, or pasted reference. |
+| `missing_claim` | missing_input | false | A support check was requested without a non-empty claim. | Ask for the sentence that the citation is supposed to support. |
+| `invalid_input` | input_repair | false | The request shape is valid JSON but does not match CiteGuard's contract. | Fix the field type, object shape, or required item. |
+| `invalid_json` | input_repair | false | A JSON/JSONL input file could not be parsed. | Repair the JSON or JSONL input. |
+| `argument_parse_error` | input_repair | false | CLI flags are missing or malformed. | Show command help or fix the CLI invocation. |
+| `file_error` | input_repair | false | The CLI or MCP tool could not read an input file or prepare a filesystem path. | Check the path and permissions. |
+| `source_unavailable` | source_limited | true | A scholarly source could not be reached or responded unreliably. | Retry later, inspect source health, and avoid treating not_found as fabricated. |
+| `model_unavailable` | dependency_limited | false | Deep support models are not installed or failed to load. | Install the models extra or treat support output as heuristic or weak. |
+| `ambiguous_citation` | disambiguation | false | Multiple plausible records match the citation. | Ask for a DOI, arXiv id, or more metadata. |
+| `timeout` | source_limited | true | A source or model operation exceeded its configured timeout. | Retry, raise the timeout, or continue with reduced confidence. |
+| `unsupported_command` | input_repair | false | The CLI parser accepted a command name that has no handler. | Upgrade CiteGuard or fix the invocation. |
 
 ## Details Contract
 
 - CLI errors include `details.command` when the failed command is known.
+- CLI argument parser errors include `details.prog`, `details.command` when a
+  subcommand is known, and `details.arguments` for parsed flag names such as
+  missing `--claim`.
 - MCP tool errors include `details.tool`.
 - Batch input errors include 1-based `details.index` for the failing item.
 - Batch file shape errors include `details.command`, `details.expected`, and
@@ -100,15 +129,26 @@ preserve `recovery_code` as the stable reason/error-code hint when present.
   In batch commands, they also include 1-based `details.index` and
   `details.command` so agents can identify the broken item.
 - Missing or unreadable CLI input files return `file_error` with
-  `details.field=path`, `details.command`, `details.filename`, and
-  `details.errno`.
+  `details.field=path`, `details.command`, and `details.filename`; OS-level
+  failures also include `details.errno`. Malformed DOCX input uses this same
+  contract instead of emitting a traceback.
 - CLI output file failures, such as `citeguard cache export --output`, return
   `file_error` with `details.field=output`, `details.command`,
   `details.filename`, and `details.errno`; cache export also includes
   `details.cache_command=export`.
+- Runtime configuration validation errors, such as invalid `CITEGUARD_SOURCES`,
+  return `invalid_input` with `details.source=environment`,
+  `details.field`, and any parsed `details.invalid_values` /
+  `details.valid_values`. CLI and MCP surfaces both derive these fields through
+  `runtime_config_error_details()`. Numeric environment validation errors, such
+  as invalid timeouts or retry counts, also include stable `details.expected`
+  and `details.received` fields when the active environment is available.
 - Missing or unreadable full-text evidence files return `file_error` with
-  `details.field=full_text_file`, `details.filename`, and the same batch
-  `details.index` / `details.command` context.
+  `details.field=full_text_file` and `details.filename`. CLI batch commands add
+  `details.index` / `details.command` context; MCP tools add `details.tool` and
+  nested citation-set failures also add `details.citation_index`. OS-level
+  missing-file and permission failures also include `details.errno`; dependency
+  or parser failures such as missing PDF extractors may not have an errno.
 - Missing fields use specific codes (`missing_claim` or
   `missing_citation_input`) instead of generic `invalid_input`, so agents can
   ask only for the missing data.
@@ -117,6 +157,10 @@ preserve `recovery_code` as the stable reason/error-code hint when present.
 - `error.next_action` is present on every error payload. It is non-empty for
   stable documented codes and empty for unknown/private codes. The mapping is
   exported as `ERROR_CODE_NEXT_ACTION`.
+- `error.retryable` is present on every error payload. It is true only when an
+  immediate or later retry can plausibly succeed without changing user input.
+- `error.category` is present on every error payload. It is non-empty for stable
+  documented codes and empty for unknown/private codes.
 
 ## Agent Policy
 
@@ -139,6 +183,8 @@ preserve `recovery_code` as the stable reason/error-code hint when present.
   on it.
 - Prefer `error.next_action` for workflow branching on expected errors, just as
   you would for non-error verification/support results.
+- Prefer `error.retryable` and `error.category` for retry scheduling and compact
+  UI grouping instead of parsing `error.message` or `error.recovery`.
 - Prefer `error.recovery` for concise next-step copy when displaying expected
   errors to users.
 - Preserve `schema_version` with the payload when storing or forwarding errors.

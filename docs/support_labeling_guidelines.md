@@ -119,6 +119,13 @@ the compact benchmark cases. Each sidecar entry should include:
 - `source_locator`: DOI, URL, corpus id, or blank for synthetic examples.
 - `notes`: provenance or disagreement details.
 
+Seed sidecar entries also copy read-only dataset context fields
+(`label_source`, `case_type`, `evidence_scope`, `split`, and `lang`) so review
+packets and release gates can verify provenance without rejoining by `case_id`.
+Validation reports this as `sidecar_case_provenance`, including
+`missing_count` and `missing_case_ids` so maintainers can distinguish incomplete
+sidecar coverage from missing per-field provenance on otherwise present cases.
+
 `not_human_reviewed` is allowed for synthetic seed examples, but do not describe
 such examples as a human-reviewed benchmark. Use `dual_annotator_adjudicated`
 for high-stakes final benchmark cases with resolved reviewer disagreement.
@@ -136,6 +143,12 @@ malformed rows: `not_human_reviewed` must have zero annotators and no labels,
 `dual_annotator_agreed` must contain matching annotator labels,
 `dual_annotator_adjudicated` must contain a resolved disagreement with an
 adjudicator, and `published_benchmark` rows must include a source locator.
+Validation also summarizes provenance with `label_source_counts`,
+`reviewed_by_label_source`, `unreviewed_by_label_source`,
+`reviewed_source_locator_count`, and
+`published_benchmark_source_locator_count`, so maintainers can distinguish
+synthetic seed coverage from human-reviewed labels and see whether published
+benchmark rows have traceable source locators.
 For release or paper-grade benchmark evidence, validate the completed sidecar
 with explicit maturity gates, for example:
 
@@ -168,7 +181,14 @@ a `supported` label, forcing explicit adjudication before the benchmark can be
 described as mature.
 The corresponding `label_sidecar_gate.metrics` block includes
 `high_risk_case_count_by_language`, `high_risk_reviewed_by_language`, and
-`high_risk_unreviewed_by_language` for release triage.
+`high_risk_unreviewed_by_language` for release triage, plus the corresponding
+`*_by_language_case_type` cross tables for assigning language-specific
+contradiction, hard-negative, contradiction-set, and full-text-boundary review, plus
+`dual_annotated`, `raw_dual_agreement_rate`, unresolved/supported disagreement
+counts and case ids, and the label-source and source-locator provenance counts
+needed to keep benchmark readiness claims auditable. Experiment manifests copy
+these maturity fields into `result_summary` so archived support-eval artifacts
+remain interpretable without reopening the sidecar.
 
 Generate a complete sidecar template before an annotation pass:
 
@@ -207,13 +227,27 @@ python3 scripts/prepare_support_label_sidecar.py \
 
 The annotation packet includes claim/evidence context, evidence scope, case
 type, split, language, priority, source locator, a non-gold `review_focus`
-boundary hint, and blank annotation fields. It omits `gold`, `adjudicated_label`,
-`annotator_labels`, and `label_notes` so reviewers can label independently
-before adjudication. `review_focus` tells reviewers what support boundary to
-inspect, for example full-text gaps or topical overclaims, but it is not a
-label hint. Each JSON packet also carries a deterministic `packet_id` and
-`packet_summary` with `case_count_by_review_status` so maintainers can tell
-whether the batch is for first review, second review, or adjudication follow-up.
+boundary hint, and blank annotation fields. Reviewers can fill
+`annotation.evidence_scope_assessed` and `annotation.full_text_needed` to record
+whether the shown evidence scope was enough or lawful full-text inspection is
+still required. It omits `gold`, `adjudicated_label`, `annotator_labels`, and
+`label_notes` as case keys so reviewers can label
+independently before adjudication. The top-level `hidden_fields` list records
+those deliberately hidden keys for audit/release checks; it is a blindness
+contract, not label data. `review_focus` tells reviewers what support boundary
+to inspect, for example full-text gaps or topical overclaims, but it is not a
+label hint. Each JSON packet also carries `review_protocol`, which records
+`packet_role`, `independent_labeling_required`,
+`packet_target_annotator_count`, `benchmark_target_annotator_count`,
+`second_review_required_after_first_review`, and
+`adjudication_required_on_disagreement`. Treat this as reviewer-assignment
+protocol, not label evidence. Each JSON packet also carries a deterministic `packet_id`,
+`packet_digest`, and `packet_summary` with `case_count_by_review_status` so
+maintainers can tell whether the batch is for first review, second review, or
+adjudication follow-up and verify the exact archived packet content. The digest
+is a `sha256:` content fingerprint over packet fields excluding digest metadata;
+JSONL packets include the same digest and `review_protocol` on each row so spreadsheet workflows keep
+the provenance anchor.
 Use `--packet-format jsonl` when you want one case per line for
 spreadsheets or lightweight annotation tools. Use repeated `--lang` values to
 prepare language-specific review batches, such as Chinese high-risk cases.
@@ -221,7 +255,11 @@ Use `--instructions-output` to write a reviewer-facing Markdown instruction
 sheet with the allowed labels, conservative labeling rule, required annotation
 fields, and fields that must not be modified.
 Reviewers must fill `annotation.annotator_id`; merge rejects missing annotator
-identity, and the same annotator cannot count twice for one case.
+identity, and the same annotator cannot count twice for one case. When
+reviewers return `annotation.evidence_scope_assessed` or
+`annotation.full_text_needed`, merge preserves those scope notes in sidecar
+provenance notes so abstract-only and full-text-needed judgments remain
+auditable.
 If a support backend fails the quality gate, convert its `review_queue` into a
 blinded packet before changing thresholds:
 
@@ -258,9 +296,11 @@ the current dataset gold is reported in `merge_report.conflicts`, exits non-zero
 and is not silently applied. Those conflicts also populate
 `merge_report.adjudication_queue` with annotator ids, labels, rationales,
 confidence notes, source packet ids, packet case indexes, and a blank
-adjudication template with `source_packet_ids` so the disagreement can be
-reviewed without losing provenance. `--apply-adjudications` records those packet
-ids in `adjudication_report.source_packet_ids` and sidecar notes. Resolve those
+adjudication template with `source_packet_ids` and `source_packet_metadata`
+so the disagreement can be reviewed without losing packet digest, review phase,
+or packet purpose provenance. `--apply-adjudications` records those packet ids and
+metadata in `adjudication_report.source_packet_ids`,
+`adjudication_report.source_packet_metadata`, and sidecar notes. Resolve those
 cases by adjudication before raising human-review
 gates or making benchmark claims. Missing annotator ids are reported in
 `merge_report.skipped`; duplicate annotator ids for the same case are reported
@@ -293,13 +333,37 @@ python3 scripts/prepare_support_label_sidecar.py \
 ```
 
 The audit reports coverage, human-reviewed count, unreviewed cases by split,
-language, and case type, plus a risk-sorted `high_risk_unreviewed` list and
-`high_risk_unreviewed_by_language`. It also emits machine-readable
+language, and case type, plus a risk-sorted `high_risk_unreviewed` list,
+`high_risk_unreviewed_by_language`, and
+`high_risk_unreviewed_by_language_case_type`. It also reports
+`policy_boundary_unreviewed` for citation-set weak aggregation cases that are
+medium priority but safety-sensitive because reviewers must keep multiple weak
+citations tentative instead of upgrading them to full support. It also reports
+`full_text_required_unreviewed` so abstract/full-text boundary cases can be
+assigned without mixing them into broader contradiction triage. It emits machine-readable
 `recommended_packets` entries with ready-to-run annotation-packet commands for
-balanced high-risk first review, language-specific high-risk review, and
-second-reviewer batches when `single_annotator` cases exist. Use
+balanced high-risk first review, language-specific high-risk review,
+language-and-case-type high-risk slices, full-text-boundary first review, and
+policy-boundary first review, plus
+second-reviewer batches when
+`single_annotator` cases exist. The audit also emits a machine-readable
+`review_plan` with phased statuses for first review, second review,
+adjudication, and release-gate tightening. Agents should use
+`review_plan.next_phase` and the phase `command_template`/`recommended_packet_ids`
+instead of inventing their own benchmark-readiness sequence. The
+`first_review_high_risk` phase repeats
+`candidate_case_count_by_language_case_type` so annotation coordinators can
+split the first pass by language and risk category without recomputing the
+unreviewed list. The package release
+gate smoke-generates the balanced first-review recommendation and verifies that
+the blinded packet includes `review_phase`, `packet_purpose`, and
+`case_count_by_review_status` plus `review_protocol` while omitting hidden gold, adjudicated, and
+prediction fields. Use
 `--fail-on-high-risk-unreviewed-language LANG` when a language-specific review
 batch, such as Chinese high-risk cases, must block release readiness. Use
+`--fail-on-full-text-required-unreviewed` before claiming full-text boundary
+readiness, and `--fail-on-policy-boundary-unreviewed` before claiming
+multi-citation support readiness. Use
 `--unreviewed-only` when assigning reviewer packets from a sidecar that already
 contains human-reviewed cases. Use `--review-status single_annotator` to assign
 second-reviewer packets without exposing prior labels. Use `--limit-per-language`,
@@ -307,11 +371,12 @@ second-reviewer packets without exposing prior labels. Use `--limit-per-language
 `--annotation-packet` when assigning small reviewer batches that should cover
 multiple languages, high-risk case families, and evidence scopes instead of only
 the earliest filtered rows. Archive the
-packet's deterministic `packet_id` and `packet_summary` with review evidence so
-release notes can show exactly which case ids, languages, case types, and
-evidence scopes were assigned. After `--merge-annotation-packet`, keep
-`merge_report.source_packet_ids` with the merged sidecar so adjudication records
-can be traced back to reviewer batches. Review
+packet's deterministic `packet_id`, `packet_digest`, `review_protocol`, and `packet_summary` with
+review evidence so release notes can show exactly which packet content, case ids,
+languages, case types, and evidence scopes were assigned. After
+`--merge-annotation-packet`, keep `merge_report.source_packet_ids` and
+`merge_report.source_packet_metadata` with the merged sidecar so adjudication
+records can be traced back to reviewer batches and their packet digests. Review
 contradiction, hard-negative, and full-text-required cases first because those
 most directly test false support and overclaiming.
 

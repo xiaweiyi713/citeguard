@@ -27,6 +27,9 @@ Implemented foundations:
   timeout/rate-limit/network failure summaries, and conservative outage
   handling.
 - SQLite cache schema/version inspection, clear/export workflows, deterministic offline replay fixtures, and cache provenance.
+- Support calibration artifacts with false-support case ids, confusion-bucket
+  score summaries, and decision-path diagnostics for NLI/reranker threshold
+  tuning.
 - Agent skill instructions that define triggers, forbidden behaviors, MCP client
   setup notes, compact risk-first presentation, and cautious wording for
   not-found, outage, ambiguous, metadata-mismatch, and support results.
@@ -73,7 +76,8 @@ Status: planned
 - Improve lawful live evidence harvesting beyond title and abstract fallbacks
 - Add more robust source-aware chunk filtering and provenance metadata
 - Investigate contradiction-aware retrieval and stronger negative evidence handling
-- Add better calibration diagnostics for NLI neutral vs entailment behavior
+- Continue improving calibration diagnostics for NLI neutral vs entailment
+  behavior on larger, human-reviewed slices
 - Keep full-text evidence opt-in through lawful user-provided excerpts/files or
   open-source adapters; do not bypass paywalls or gated sources
 

@@ -9,12 +9,19 @@ authors:
   - family-names: "Xu"
     given-names: "Wenyao"
 abstract: >-
-  CiteGuard is a falsification-first research agent prototype for trustworthy
-  scientific writing. It verifies claim-citation-evidence links before allowing
-  citations into generated text.
+  CiteGuard is a skeptical citation auditor for agent writing workflows. It
+  checks whether cited papers exist, whether supplied metadata matches
+  scholarly records, and whether available evidence supports the claim, with
+  conservative CLI, batch, cache-replay, and MCP workflows.
+repository-code: "https://github.com/xiaweiyi713/citeguard"
+url: "https://github.com/xiaweiyi713/citeguard#readme"
 keywords:
-  - scientific writing
   - citation verification
+  - skeptical citation auditor
+  - agent tools
+  - mcp
+  - scientific writing
+  - claim support
+  - research integrity
   - hallucination mitigation
-  - research agents
   - evidence attribution
