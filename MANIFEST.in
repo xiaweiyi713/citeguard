@@ -4,8 +4,13 @@ include CHANGELOG.md
 include CITATION.cff
 include requirements-optional.txt
 recursive-include docs *.md *.svg *.csv *.yml
-recursive-include examples *.json *.jsonl *.md
+recursive-include examples *.json *.jsonl *.md *.txt
 recursive-include data/eval *.json
 recursive-include skills *.md *.yaml
 recursive-include scripts *.py
 recursive-include configs *.yaml
+prune docs/superpowers
+prune docs/issues
+exclude docs/proposal.md
+exclude scripts/run_agent.py
+exclude scripts/evaluate.py

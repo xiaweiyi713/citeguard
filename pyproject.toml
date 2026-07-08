@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "citeguard"
 version = "0.1.0"
-description = "A falsification-first toolkit for trustworthy citation verification."
+description = "A skeptical citation auditor for agent writing workflows."
 readme = "README.md"
 requires-python = ">=3.9"
 license = { file = "LICENSE" }
@@ -13,9 +13,13 @@ authors = [
   { name = "Wenyao Xu" }
 ]
 keywords = [
-  "scientific-writing",
   "citation-verification",
-  "research-agents",
+  "skeptical-citation-auditor",
+  "agent-tools",
+  "mcp",
+  "scientific-writing",
+  "claim-support",
+  "research-integrity",
   "hallucination-mitigation",
   "evidence-attribution",
 ]
@@ -48,10 +52,10 @@ api = [
   "uvicorn>=0.30,<1.0",
 ]
 models = [
-  "sentence-transformers==3.1.1",
-  "transformers==4.45.2",
-  "torch==2.3.1",
-  "safetensors==0.7.0",
+  "sentence-transformers>=3.1,<6.0",
+  "transformers>=4.45,<5.0",
+  "torch>=2.3,<3.0",
+  "safetensors>=0.4",
 ]
 mcp = [
   "mcp>=1.2",
@@ -64,8 +68,21 @@ pdf = [
 citeguard = "citeguard.cli:main"
 citeguard-mcp = "citeguard.mcp.server:main"
 
+[tool.ruff]
+target-version = "py39"
+line-length = 120
+extend-exclude = ["build/", "src/"]
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F"]
+
+[tool.ruff.lint.per-file-ignores]
+# scripts/ bootstrap sys.path before importing citeguard from a source checkout.
+"scripts/*.py" = ["E402"]
+"tests/*.py" = ["E402"]
+
 [tool.setuptools.packages.find]
-include = ["citeguard", "citeguard.*", "src", "src.*"]
+include = ["citeguard", "citeguard.*"]
 
 [tool.setuptools]
 include-package-data = true
