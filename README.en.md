@@ -85,6 +85,8 @@ Two guardrails keep it honest: a source being **unreachable is never escalated t
 
 The **core library has zero third-party dependencies** and runs on Python ≥ 3.9.
 
+> ⚠️ **Important:** the existing `citeguard` package on PyPI is an unrelated project by another organization — **it is not this repository**. This project has not been published to PyPI yet (it will ship under a new package name); until then, please use the **source checkout** install below.
+
 For an installed or published package:
 
 ```bash
@@ -286,7 +288,6 @@ citeguard/
   verifiers/      # existence/metadata + the reranker+NLI support ensemble
   citation/ graph/ audit/                 # shared models and helpers
   orchestrator/ planner/ writer/ benchmark/ api/   # source-checkout experiments and benchmark/API utilities
-src/                       # legacy compatibility shims for older imports
 skills/citeguard-verify/   # reusable Codex/Claude/Cursor agent skill
 scripts/                   # demo + eval + corpus/model utilities
 data/eval/                 # offline benchmarks
@@ -294,9 +295,9 @@ docs/                      # release docs, architecture, benchmark notes, spike 
 tests/                     # unittest suite
 ```
 
-New user code should import from `citeguard` or `citeguard.*`. Source checkouts
-keep legacy compatibility shims for older notebooks/scripts and emit a
-`DeprecationWarning`, while published packages expose the `citeguard.*` product
+New user code should import from `citeguard` or `citeguard.*`. The historical
+root-package compatibility bridge has been removed; both source checkouts and
+published packages expose the `citeguard.*` product
 surface; see [`docs/public_api_migration.md`](docs/public_api_migration.md).
 
 ---
