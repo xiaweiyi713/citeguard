@@ -87,8 +87,8 @@ _SDIST_COPY_IGNORE_PATTERNS = (
     "build",
     "dist",
     "*.egg-info",
-    "citeguard-*.tar.gz",
-    "citeguard-*.whl",
+    "citationguard-*.tar.gz",
+    "citationguard-*.whl",
     "experiments",
     "paper",
     ".ipynb_checkpoints",
@@ -227,7 +227,7 @@ def _build_wheel(python: str, project_root: Path, wheel_dir: Path, no_build_isol
     cmd.append(str(project_root))
     _run(cmd)
 
-    wheels = sorted(wheel_dir.glob("citeguard-*.whl"))
+    wheels = sorted(wheel_dir.glob("citationguard-*.whl"))
     if len(wheels) != 1:
         raise RuntimeError(f"expected exactly one CiteGuard wheel in {wheel_dir}, found: {wheels}")
     return wheels[0]
@@ -250,7 +250,7 @@ def _build_sdist(python: str, project_root: Path, sdist_dir: Path) -> Path:
         ) from exc
     _run([python, "-m", "build", "--sdist", "--no-isolation", "--outdir", str(dist_dir)], cwd=copied_project)
 
-    sdists = sorted(dist_dir.glob("citeguard-*.tar.gz"))
+    sdists = sorted(dist_dir.glob("citationguard-*.tar.gz"))
     if len(sdists) != 1:
         raise RuntimeError(f"expected exactly one CiteGuard sdist in {dist_dir}, found: {sdists}")
     return sdists[0]
@@ -332,7 +332,7 @@ def _assert_sdist_metadata_contract(sdist_path: Path) -> None:
         requires_members = [
             member
             for member in sdist.getmembers()
-            if member.isfile() and member.name.endswith("/citeguard.egg-info/requires.txt")
+            if member.isfile() and member.name.endswith("/citationguard.egg-info/requires.txt")
         ]
         if len(requires_members) != 1:
             raise RuntimeError(f"sdist should contain exactly one egg-info requires.txt file, found: {[member.name for member in requires_members]}")
@@ -349,7 +349,7 @@ def _assert_distribution_metadata_contract(metadata_text: str, archive_label: st
     errors = []
 
     expected_single_values = {
-        "Name": "citeguard",
+        "Name": "citationguard",
         "Version": __version__,
         "Requires-Python": ">=3.9",
     }
@@ -622,7 +622,7 @@ scripts = {
 }
 assert scripts["citeguard"] == "citeguard.cli:main"
 assert scripts["citeguard-mcp"] == "citeguard.mcp.server:main"
-metadata = distribution("citeguard").metadata
+metadata = distribution("citationguard").metadata
 extras = set(metadata.get_all("Provides-Extra") or [])
 assert {"mcp", "models", "api", "pdf"}.issubset(extras)
 requires_dist = metadata.get_all("Requires-Dist") or []
@@ -638,7 +638,7 @@ from importlib.metadata import distribution
 assert importlib.util.find_spec("mcp") is not None
 import citeguard.mcp.server as server
 assert callable(server.main)
-metadata = distribution("citeguard").metadata
+metadata = distribution("citationguard").metadata
 requires_dist = metadata.get_all("Requires-Dist") or []
 assert any("mcp" in item and "extra ==" in item and "mcp" in item for item in requires_dist)
 """

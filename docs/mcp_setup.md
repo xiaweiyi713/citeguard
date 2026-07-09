@@ -7,7 +7,7 @@ CiteGuard exposes citation verification through a stdio MCP server.
 For an installed or published package:
 
 ```bash
-python -m pip install "citeguard[mcp]"
+python -m pip install "citationguard[mcp]"
 ```
 
 For a local source checkout:

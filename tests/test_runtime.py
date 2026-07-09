@@ -179,20 +179,20 @@ class RuntimeConfigTests(unittest.TestCase):
         self.assertEqual(support_models["engine"], "heuristic_fallback")
         self.assertEqual(support_models["next_action"], "install_or_configure_dependency")
         self.assertIn("sentence_transformers", support_models["missing_dependencies"])
-        self.assertIn('python -m pip install "citeguard[models]"', support_models["install_hint"])
+        self.assertIn('python -m pip install "citationguard[models]"', support_models["install_hint"])
         self.assertIn('python -m pip install -e ".[models]"', support_models["install_hint"])
         self.assertLess(
-            support_models["install_hint"].index('python -m pip install "citeguard[models]"'),
+            support_models["install_hint"].index('python -m pip install "citationguard[models]"'),
             support_models["install_hint"].index('python -m pip install -e ".[models]"'),
         )
         self.assertEqual(support_models["warmup_command"], "python3 scripts/warmup_support_models.py")
         self.assertFalse(support_models["model_weights_loaded"])
         self.assertTrue(any("Remote landing-page evidence" in warning for warning in status["warnings"]))
         mcp_warning = next(warning for warning in status["warnings"] if "MCP SDK is not installed" in warning)
-        self.assertIn('python -m pip install "citeguard[mcp]"', mcp_warning)
+        self.assertIn('python -m pip install "citationguard[mcp]"', mcp_warning)
         self.assertIn('python -m pip install -e ".[mcp]"', mcp_warning)
         self.assertLess(
-            mcp_warning.index('python -m pip install "citeguard[mcp]"'),
+            mcp_warning.index('python -m pip install "citationguard[mcp]"'),
             mcp_warning.index('python -m pip install -e ".[mcp]"'),
         )
 

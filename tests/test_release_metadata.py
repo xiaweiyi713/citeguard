@@ -1032,7 +1032,7 @@ class ReleaseMetadataTests(unittest.TestCase):
         self.assertIn("_assert_archive_excludes_historical_planning_docs", smoke)
         self.assertIn('"-m", "citeguard"', smoke)
         _assert_archive_excludes_generated_files(
-            {"citeguard/__init__.py", "citeguard.egg-info/SOURCES.txt"},
+            {"citeguard/__init__.py", "citationguard.egg-info/SOURCES.txt"},
             archive_label="unit",
         )
         with self.assertRaisesRegex(RuntimeError, "generated/local files"):
@@ -1114,7 +1114,7 @@ class ReleaseMetadataTests(unittest.TestCase):
 
     def test_package_smoke_validates_distribution_metadata_contract(self):
         good_metadata = f"""Metadata-Version: 2.1
-Name: citeguard
+Name: citationguard
 Version: {__version__}
 Summary: A skeptical citation auditor for agent writing workflows.
 Keywords: citation-verification skeptical-citation-auditor agent-tools mcp scientific-writing claim-support research-integrity hallucination-mitigation evidence-attribution
@@ -1263,12 +1263,12 @@ License-File: LICENSE
 
         for label, text in {"README.md": readme_mcp_section, "docs/mcp_setup.md": mcp_setup}.items():
             with self.subTest(label=label):
-                self.assertIn('python -m pip install "citeguard[mcp]"', text)
+                self.assertIn('python -m pip install "citationguard[mcp]"', text)
                 self.assertIn('python -m pip install -e ".[mcp]"', text)
                 self.assertIn("For an installed or published package", text)
                 self.assertIn("For a local source checkout", text)
                 self.assertLess(
-                    text.index('python -m pip install "citeguard[mcp]"'),
+                    text.index('python -m pip install "citationguard[mcp]"'),
                     text.index('python -m pip install -e ".[mcp]"'),
                 )
 
@@ -1278,10 +1278,10 @@ License-File: LICENSE
 
         self.assertIn("For an installed or published package", quickstart)
         self.assertIn("From a local source checkout", quickstart)
-        self.assertIn("python -m pip install citeguard", quickstart)
+        self.assertIn("python -m pip install citationguard", quickstart)
         self.assertIn("python -m pip install -e .", quickstart)
         self.assertLess(
-            quickstart.index("python -m pip install citeguard"),
+            quickstart.index("python -m pip install citationguard"),
             quickstart.index("python -m pip install -e ."),
         )
 
@@ -1289,16 +1289,16 @@ License-File: LICENSE
         notes = (ROOT / "docs" / "releases" / "v0.1.0.md").read_text(encoding="utf-8")
         recommended = notes.split("## Recommended First Commands", 1)[1].split("## Release Verification", 1)[0]
 
-        self.assertIn("python -m pip install citeguard", recommended)
+        self.assertIn("python -m pip install citationguard", recommended)
         self.assertIn("For source checkout release rehearsal", recommended)
-        self.assertIn('python -m pip install "citeguard[mcp]"', recommended)
+        self.assertIn('python -m pip install "citationguard[mcp]"', recommended)
         self.assertIn('python -m pip install -e ".[mcp]"', recommended)
         self.assertLess(
-            recommended.index("python -m pip install citeguard"),
+            recommended.index("python -m pip install citationguard"),
             recommended.index("python -m pip install -e ."),
         )
         self.assertLess(
-            recommended.index('python -m pip install "citeguard[mcp]"'),
+            recommended.index('python -m pip install "citationguard[mcp]"'),
             recommended.index('python -m pip install -e ".[mcp]"'),
         )
 
@@ -1879,9 +1879,9 @@ License-File: LICENSE
         self.assertTrue(missing_sdk["ok"])
         self.assertEqual(missing_sdk["steps"][0]["status"], "skipped")
         self.assertIn("MCP SDK is not installed", missing_sdk["steps"][0]["message"])
-        self.assertIn('python -m pip install "citeguard[mcp]"', missing_sdk["steps"][0]["message"])
+        self.assertIn('python -m pip install "citationguard[mcp]"', missing_sdk["steps"][0]["message"])
         self.assertLess(
-            missing_sdk["steps"][0]["message"].index('python -m pip install "citeguard[mcp]"'),
+            missing_sdk["steps"][0]["message"].index('python -m pip install "citationguard[mcp]"'),
             missing_sdk["steps"][0]["message"].index('python -m pip install -e ".[mcp]"'),
         )
 
@@ -2037,8 +2037,8 @@ License-File: LICENSE
                 {
                     "ok": True,
                     "dry_run": True,
-                    "package_spec": "citeguard==0.1.0",
-                    "install_command": ["python", "-m", "pip", "install", "citeguard==0.1.0"],
+                    "package_spec": "citationguard==0.1.0",
+                    "install_command": ["python", "-m", "pip", "install", "citationguard==0.1.0"],
                     "planned_checks": [
                         "pip_install",
                         "import_citeguard",
@@ -2079,7 +2079,7 @@ License-File: LICENSE
         self.assertTrue(summary["ok"])
         self.assertEqual(summary["steps"][0]["name"], "published_package_smoke_plan")
         self.assertEqual(summary["steps"][0]["status"], "passed")
-        self.assertEqual(summary["steps"][0]["package_spec"], "citeguard==0.1.0")
+        self.assertEqual(summary["steps"][0]["package_spec"], "citationguard==0.1.0")
         self.assertEqual(summary["steps"][0]["config_errors"], [])
         self.assertIn("version_contract", summary["steps"][0]["planned_checks"])
         self.assertIn("public_package_files", summary["steps"][0]["planned_checks"])
@@ -2109,8 +2109,8 @@ License-File: LICENSE
                 {
                     "ok": True,
                     "dry_run": False,
-                    "package_spec": "citeguard==0.1.0",
-                    "install_command": ["python", "-m", "pip", "install", "citeguard==0.1.0"],
+                    "package_spec": "citationguard==0.1.0",
+                    "install_command": ["python", "-m", "pip", "install", "citationguard==0.1.0"],
                     "planned_checks": core_planned_checks,
                     "checks": [{"name": name, "status": "passed"} for name in core_planned_checks],
                     "config_errors": [],
@@ -2391,8 +2391,8 @@ License-File: LICENSE
                 {
                     "ok": False,
                     "dry_run": False,
-                    "package_spec": "citeguard==0.1.0",
-                    "install_command": ["python", "-m", "pip", "install", "citeguard==0.1.0"],
+                    "package_spec": "citationguard==0.1.0",
+                    "install_command": ["python", "-m", "pip", "install", "citationguard==0.1.0"],
                     "planned_checks": core_planned_checks,
                     "checks": [
                         {"name": name, "status": "failed" if name == "pip_install" else "passed"}
@@ -2422,8 +2422,8 @@ License-File: LICENSE
                 {
                     "ok": False,
                     "dry_run": True,
-                    "package_spec": "citeguard==0.1.0",
-                    "install_command": ["python", "-m", "pip", "install", "citeguard==0.1.0"],
+                    "package_spec": "citationguard==0.1.0",
+                    "install_command": ["python", "-m", "pip", "install", "citationguard==0.1.0"],
                     "planned_checks": [
                         "pip_install",
                         "import_citeguard",
@@ -3112,10 +3112,10 @@ License-File: LICENSE
         self.assertEqual(summary["steps"][0]["support_models"]["next_action"], "install_or_configure_dependency")
         self.assertIn("sentence_transformers", summary["steps"][0]["support_models"]["missing_dependencies"])
         model_install_hint = summary["steps"][0]["support_models"]["install_hint"]
-        self.assertIn('python -m pip install "citeguard[models]"', model_install_hint)
+        self.assertIn('python -m pip install "citationguard[models]"', model_install_hint)
         self.assertIn('python -m pip install -e ".[models]"', model_install_hint)
         self.assertLess(
-            model_install_hint.index('python -m pip install "citeguard[models]"'),
+            model_install_hint.index('python -m pip install "citationguard[models]"'),
             model_install_hint.index('python -m pip install -e ".[models]"'),
         )
         self.assertIn("configuration docs", summary["steps"][0]["policy"])
@@ -5690,10 +5690,10 @@ License-File: LICENSE
         self.assertIn("package archive cleanliness", checklist)
         self.assertIn("__pycache__", checklist)
         self.assertIn("baseline comparison table", benchmark_design)
-        self.assertIn('python -m pip install "citeguard[pdf]"', checklist)
+        self.assertIn('python -m pip install "citationguard[pdf]"', checklist)
         self.assertIn('python -m pip install -e ".[pdf]"', checklist)
         self.assertLess(
-            checklist.index('python -m pip install "citeguard[pdf]"'),
+            checklist.index('python -m pip install "citationguard[pdf]"'),
             checklist.index('python -m pip install -e ".[pdf]"'),
         )
         self.assertIn("local PDF full-text evidence support", checklist)
@@ -5841,7 +5841,7 @@ License-File: LICENSE
             "Do not claim full-text support from an abstract-level support result",
             "local lawful text/PDF file",
             "citeguard[pdf]",
-            'python -m pip install "citeguard[mcp]"',
+            'python -m pip install "citationguard[mcp]"',
             'python -m pip install -e ".[mcp]"',
             "Codex:",
             "Claude Code:",
@@ -6067,7 +6067,7 @@ License-File: LICENSE
             with self.subTest(phrase=phrase):
                 self.assertIn(phrase, combined)
         self.assertLess(
-            skill.index('python -m pip install "citeguard[mcp]"'),
+            skill.index('python -m pip install "citationguard[mcp]"'),
             skill.index('python -m pip install -e ".[mcp]"'),
         )
         self.assertLess(
@@ -6084,10 +6084,10 @@ License-File: LICENSE
         for path in checked_files:
             with self.subTest(path=str(path.relative_to(ROOT))):
                 text = path.read_text(encoding="utf-8")
-                self.assertIn('python -m pip install "citeguard[mcp]"', text)
+                self.assertIn('python -m pip install "citationguard[mcp]"', text)
                 self.assertIn('python -m pip install -e ".[mcp]"', text)
                 self.assertLess(
-                    text.index('python -m pip install "citeguard[mcp]"'),
+                    text.index('python -m pip install "citationguard[mcp]"'),
                     text.index('python -m pip install -e ".[mcp]"'),
                 )
 
@@ -6095,18 +6095,18 @@ License-File: LICENSE
         missing_sdk_message = release_gate.split("MCP SDK is not installed. Install published packages", 1)[1].split(
             "from a source checkout", 1
         )[0]
-        self.assertIn('python -m pip install "citeguard[mcp]"', missing_sdk_message)
+        self.assertIn('python -m pip install "citationguard[mcp]"', missing_sdk_message)
         self.assertIn('python -m pip install -e ".[mcp]"', missing_sdk_message)
         self.assertLess(
-            missing_sdk_message.index('python -m pip install "citeguard[mcp]"'),
+            missing_sdk_message.index('python -m pip install "citationguard[mcp]"'),
             missing_sdk_message.index('python -m pip install -e ".[mcp]"'),
         )
 
         runtime = (ROOT / "citeguard" / "runtime.py").read_text(encoding="utf-8")
-        self.assertIn('python -m pip install "citeguard[models]"', runtime)
+        self.assertIn('python -m pip install "citationguard[models]"', runtime)
         self.assertIn('python -m pip install -e ".[models]"', runtime)
         self.assertLess(
-            runtime.index('python -m pip install "citeguard[models]"'),
+            runtime.index('python -m pip install "citationguard[models]"'),
             runtime.index('python -m pip install -e ".[models]"'),
         )
 

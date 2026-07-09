@@ -26,7 +26,7 @@ except ImportError as exc:  # pragma: no cover - exercised when the optional ext
         def run(self) -> None:
             raise RuntimeError(
                 "The MCP server requires the optional MCP dependency. "
-                'Install published packages with `python -m pip install "citeguard[mcp]"` '
+                'Install published packages with `python -m pip install "citationguard[mcp]"` '
                 'using Python 3.10 or newer. From a source checkout, use '
                 '`python -m pip install -e ".[mcp]"`.'
             )
@@ -957,7 +957,7 @@ def main() -> None:
     if _MCP_IMPORT_ERROR is not None:
         raise RuntimeError(
             "The MCP server requires the optional MCP dependency. "
-            'Install published packages with `python -m pip install "citeguard[mcp]"` '
+            'Install published packages with `python -m pip install "citationguard[mcp]"` '
             'using Python 3.10 or newer. From a source checkout, use '
             '`python -m pip install -e ".[mcp]"`.'
         ) from _MCP_IMPORT_ERROR

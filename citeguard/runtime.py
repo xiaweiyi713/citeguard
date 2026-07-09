@@ -890,7 +890,7 @@ def environment_status(
     if not sdk_available:
         warnings.append(
             'The MCP SDK is not installed; install published packages with '
-            '`python -m pip install "citeguard[mcp]"`, or use '
+            '`python -m pip install "citationguard[mcp]"`, or use '
             '`python -m pip install -e ".[mcp]"` from a source checkout.'
         )
     if not contact_email_configured(active_env) and any(name in CONTACT_REQUIRED_SOURCES for name in canonical_sources):
@@ -965,7 +965,7 @@ def _support_model_status(
         "install_hint": (
             ""
             if deep_available
-            else 'Install published packages with `python -m pip install "citeguard[models]"`, '
+            else 'Install published packages with `python -m pip install "citationguard[models]"`, '
             'or use `python -m pip install -e ".[models]"` from a source checkout.'
         ),
         "warmup_command": "python3 scripts/warmup_support_models.py",

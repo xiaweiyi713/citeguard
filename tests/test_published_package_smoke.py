@@ -23,7 +23,7 @@ class PublishedPackageSmokeTests(unittest.TestCase):
 
     def test_pip_install_command_can_target_testpypi(self):
         command = smoke_published_package._pip_install_command(
-            "citeguard[mcp]==0.1.0",
+            "citationguard[mcp]==0.1.0",
             index_url="https://test.pypi.org/simple/",
             extra_index_urls=["https://pypi.org/simple"],
         )
@@ -39,7 +39,7 @@ class PublishedPackageSmokeTests(unittest.TestCase):
                 "https://test.pypi.org/simple/",
                 "--extra-index-url",
                 "https://pypi.org/simple",
-                "citeguard[mcp]==0.1.0",
+                "citationguard[mcp]==0.1.0",
             ],
         )
 
@@ -66,7 +66,7 @@ class PublishedPackageSmokeTests(unittest.TestCase):
         payload = json.loads(stdout.getvalue())
         self.assertTrue(payload["ok"])
         self.assertTrue(payload["dry_run"])
-        self.assertEqual(payload["package_spec"], "citeguard[mcp]==0.1.0")
+        self.assertEqual(payload["package_spec"], "citationguard[mcp]==0.1.0")
         self.assertEqual(payload["checks"], [])
         self.assertIn("version_contract", payload["planned_checks"])
         self.assertIn("public_package_files", payload["planned_checks"])
@@ -118,7 +118,7 @@ class PublishedPackageSmokeTests(unittest.TestCase):
         payload = json.loads(stdout.getvalue())
         self.assertFalse(payload["ok"])
         self.assertTrue(payload["dry_run"])
-        self.assertEqual(payload["package_spec"], "citeguard==0.1.0")
+        self.assertEqual(payload["package_spec"], "citationguard==0.1.0")
         self.assertEqual(payload["checks"], [])
         self.assertEqual(
             payload["config_errors"][0]["code"],

@@ -64,7 +64,7 @@ CiteGuard 对照 **OpenAlex、Crossref、arXiv、Semantic Scholar** 回答两个
 | `insufficient_evidence` | 摘要未涉及该论点——**弃权**,不等于"不支持" |
 | `contradicted` | 摘要与论点相矛盾 |
 
-支撑性结果带机器可读的 `evidence_scope` 字段,agent 不会把摘要级证据当成全文结论。全文级支撑为可选:调用方可通过 CLI/MCP/JSON 提供合法摘录或本地 text/PDF 文件(PDF 解析需 `pip install "citeguard[pdf]"`);CiteGuard 不抓取受限源、不下载远程全文、不绕过付费墙。
+支撑性结果带机器可读的 `evidence_scope` 字段,agent 不会把摘要级证据当成全文结论。全文级支撑为可选:调用方可通过 CLI/MCP/JSON 提供合法摘录或本地 text/PDF 文件(PDF 解析需 `pip install "citationguard[pdf]"`);CiteGuard 不抓取受限源、不下载远程全文、不绕过付费墙。
 
 两条守护原则保证它"诚实":**源不可达永远不会升级成"伪造"**(只降低置信度,设置 `outage_limited=true` 并上报 `sources_available` / `sources_failed` / `source_failure_mode`);`insufficient_evidence` / `not_found` 一律表述为"无法确认",最终裁决留给人或宿主 agent。
 
@@ -74,15 +74,15 @@ CiteGuard 对照 **OpenAlex、Crossref、arXiv、Semantic Scholar** 回答两个
 
 **核心库零第三方依赖**,运行于 Python ≥ 3.9。
 
-> ⚠️ **重要**:PyPI 上现有的 `citeguard` 包是另一个组织的同名项目,**不是本仓库**。本项目尚未发布到 PyPI(将以新包名发布,见 issue 跟踪);在此之前请使用下方的**源码安装**方式。
+> ⚠️ **重要**:PyPI 上的 `citeguard` 包是另一个组织的无关项目,**不是本仓库**。本项目的发布名是 **`citationguard`**——安装用 `pip install citationguard`,代码里仍然 `import citeguard`,命令行入口也仍是 `citeguard` / `citeguard-mcp`。`citationguard` 正式发布前,请使用下方的**源码安装**方式。
 
 已发布包安装:
 
 ```bash
-python -m pip install citeguard
-python -m pip install "citeguard[mcp]"     # + MCP server(需要 Python >= 3.10)
-python -m pip install "citeguard[models]"  # + 支撑性深度模式的 reranker/NLI 模型栈(较重)
-python -m pip install "citeguard[api]"     # + FastAPI 接口
+python -m pip install citationguard
+python -m pip install "citationguard[mcp]"     # + MCP server(需要 Python >= 3.10)
+python -m pip install "citationguard[models]"  # + 支撑性深度模式的 reranker/NLI 模型栈(较重)
+python -m pip install "citationguard[api]"     # + FastAPI 接口
 ```
 
 源码签出场景:`python -m pip install -e .`(extras 同上)。
@@ -124,7 +124,7 @@ citeguard counterevidence --claim "The Transformer relies entirely on attention.
 已发布包:
 
 ```bash
-python -m pip install "citeguard[mcp]"   # 需要 Python >= 3.10
+python -m pip install "citationguard[mcp]"   # 需要 Python >= 3.10
 citeguard-mcp                            # stdio 传输
 ```
 

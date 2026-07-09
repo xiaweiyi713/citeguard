@@ -392,7 +392,7 @@ agent skill bundle.
   rehearsal path:
 
   ```bash
-  python -m pip install "citeguard[pdf]"
+  python -m pip install "citationguard[pdf]"
   python -m pip install -e ".[pdf]"
   citeguard support --help
   ```
@@ -404,7 +404,7 @@ agent skill bundle.
   ```bash
   python3.11 -m venv .venv-mcp-smoke  # or any Python 3.10+ interpreter
   . .venv-mcp-smoke/bin/activate
-  python -m pip install "citeguard[mcp]"
+  python -m pip install "citationguard[mcp]"
   python -m pip install -e ".[mcp]"
   python scripts/smoke_mcp.py --require-sdk
   ```

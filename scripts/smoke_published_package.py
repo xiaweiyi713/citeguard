@@ -24,7 +24,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument("--python", default=sys.executable, help="Python executable used to create the smoke venv.")
     parser.add_argument("--venv-dir", default="", help="Optional venv directory; defaults to a temporary directory.")
     parser.add_argument("--keep-venv", action="store_true", help="Do not delete the smoke venv after the run.")
-    parser.add_argument("--package", default="citeguard", help="Published package name to install.")
+    parser.add_argument("--package", default="citationguard", help="Published package name to install.")
     parser.add_argument("--version", default="", help="Exact package version to install, for example 0.1.0.")
     parser.add_argument("--extra", action="append", default=[], help="Optional extra to install; can be repeated.")
     parser.add_argument("--index-url", default="", help="Optional package index URL, e.g. TestPyPI.")

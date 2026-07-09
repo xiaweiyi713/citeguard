@@ -346,7 +346,7 @@ metadata and any caller-provided evidence snippets. Use `--full-text` or
 `--full-text-file` only for files or short excerpts you are allowed to provide;
 CiteGuard does not bypass paywalls or scrape gated content. UTF-8 text files are
 read directly. Local PDF files are supported when `pypdf` or `PyPDF2` is
-installed; use `python -m pip install "citeguard[pdf]"` to install the packaged
+installed; use `python -m pip install "citationguard[pdf]"` to install the packaged
 PDF extra. If no PDF extractor is available, CiteGuard returns a structured
 `invalid_input` error with `details.field=full_text_file` and
 `details.dependency=pypdf`. Invalid `full_text_file` values in batch commands

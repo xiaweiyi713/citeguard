@@ -129,7 +129,7 @@ async def _run_smoke(command: str, server_args: List[str], require_sdk: bool = F
     if mcp_client is None:
         message = (
             'MCP SDK is not installed. Install published packages with '
-            '`python -m pip install "citeguard[mcp]"`, or use '
+            '`python -m pip install "citationguard[mcp]"`, or use '
             '`python -m pip install -e ".[mcp]"` from a source checkout.'
         )
         if require_sdk:

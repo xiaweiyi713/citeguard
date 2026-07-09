@@ -73,7 +73,7 @@ CiteGuard answers two questions, against **OpenAlex, Crossref, arXiv, and Semant
 
 Support results carry a machine-readable `evidence_scope` so agents never present
 abstract-level evidence as a full-text conclusion. Full-text support is opt-in via
-caller-provided lawful excerpts or local text/PDF files (`pip install "citeguard[pdf]"`
+caller-provided lawful excerpts or local text/PDF files (`pip install "citationguard[pdf]"`
 for PDF extraction); CiteGuard does not scrape gated sources, download remote full
 text, or bypass paywalls.
 
@@ -85,15 +85,15 @@ Two guardrails keep it honest: a source being **unreachable is never escalated t
 
 The **core library has zero third-party dependencies** and runs on Python ≥ 3.9.
 
-> ⚠️ **Important:** the existing `citeguard` package on PyPI is an unrelated project by another organization — **it is not this repository**. This project has not been published to PyPI yet (it will ship under a new package name); until then, please use the **source checkout** install below.
+> ⚠️ **Important:** the `citeguard` package on PyPI is an unrelated project by another organization — **it is not this repository**. This project publishes under the distribution name **`citationguard`**: install with `pip install citationguard`, then `import citeguard` as usual (the `citeguard` / `citeguard-mcp` console commands are unchanged). Until `citationguard` is published, please use the **source checkout** install below.
 
 For an installed or published package:
 
 ```bash
-python -m pip install citeguard
-python -m pip install "citeguard[mcp]"     # + MCP server (requires Python >= 3.10)
-python -m pip install "citeguard[models]"  # + reranker/NLI stack for support deep mode (heavy)
-python -m pip install "citeguard[api]"     # + FastAPI surface
+python -m pip install citationguard
+python -m pip install "citationguard[mcp]"     # + MCP server (requires Python >= 3.10)
+python -m pip install "citationguard[models]"  # + reranker/NLI stack for support deep mode (heavy)
+python -m pip install "citationguard[api]"     # + FastAPI surface
 ```
 
 From a local source checkout: `python -m pip install -e .` (plus the same extras).
@@ -143,7 +143,7 @@ contract is in [docs/agent_output_contract.md](docs/agent_output_contract.md).
 For an installed or published package:
 
 ```bash
-python -m pip install "citeguard[mcp]"   # requires Python >= 3.10
+python -m pip install "citationguard[mcp]"   # requires Python >= 3.10
 citeguard-mcp                            # stdio transport
 ```
 

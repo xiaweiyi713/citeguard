@@ -119,7 +119,7 @@ Support results include a machine-readable `evidence_scope` (`title`,
 evidence as a full-text conclusion. Full-text support is opt-in: callers can
 provide short lawful excerpts via CLI/MCP/JSON inputs or local text/PDF
 `--full-text-file` / JSON `full_text_file` paths. PDF extraction uses optional
-`pypdf`/`PyPDF2` when installed (`pip install "citeguard[pdf]"`); CiteGuard
+`pypdf`/`PyPDF2` when installed (`pip install "citationguard[pdf]"`); CiteGuard
 still does not scrape gated sources, download remote full text, or bypass
 paywalls. If deep support models are installed
 but fail to load or time out, support outputs include `model_failure_details`

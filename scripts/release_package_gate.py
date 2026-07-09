@@ -1449,14 +1449,14 @@ def _check_configuration_contract_gate(*, project_root: Path) -> Dict[str, Any]:
     if "missing_dependencies" not in support_models:
         errors.append("support_models should expose missing dependency names")
     install_hint = str(support_models.get("install_hint", ""))
-    if 'python -m pip install "citeguard[models]"' not in install_hint:
+    if 'python -m pip install "citationguard[models]"' not in install_hint:
         errors.append("support_models.install_hint should prefer the published citeguard[models] extra")
     if 'python -m pip install -e ".[models]"' not in install_hint:
         errors.append("support_models.install_hint should still document the source-checkout models fallback")
     if (
-        'python -m pip install "citeguard[models]"' in install_hint
+        'python -m pip install "citationguard[models]"' in install_hint
         and 'python -m pip install -e ".[models]"' in install_hint
-        and install_hint.index('python -m pip install "citeguard[models]"')
+        and install_hint.index('python -m pip install "citationguard[models]"')
         > install_hint.index('python -m pip install -e ".[models]"')
     ):
         errors.append("support_models.install_hint should put the published package command before editable fallback")
@@ -5719,7 +5719,7 @@ def _check_project_metadata_contract(project_root: Path) -> Dict[str, Any]:
             errors.append(f"project description should include {required_description_phrase!r}")
 
     required_snippets = {
-        "pyproject project name": 'name = "citeguard"',
+        "pyproject project name": 'name = "citationguard"',
         "pyproject version": f'version = "{__version__}"',
         "pyproject readme": 'readme = "README.md"',
         "pyproject requires-python": 'requires-python = ">=3.9"',
@@ -5968,7 +5968,7 @@ def _record_official_build_and_twine_check(
         dist_dir = Path(tmpdir) / "dist"
         build_cmd = [python, "-m", "build", "--outdir", str(dist_dir), str(project_root)]
         build = _run(build_cmd, cwd=project_root)
-        artifacts = sorted(dist_dir.glob("citeguard-*"))
+        artifacts = sorted(dist_dir.glob("citationguard-*"))
         wheels = [path for path in artifacts if path.suffix == ".whl"]
         sdists = [path for path in artifacts if path.name.endswith(".tar.gz")]
         if len(wheels) != 1 or len(sdists) != 1:
@@ -8804,7 +8804,7 @@ def _record_mcp_stdio_smoke(
                 "status": status,
                 "message": (
                     'MCP SDK is not installed. Install published packages with '
-                    '`python -m pip install "citeguard[mcp]"`, or use '
+                    '`python -m pip install "citationguard[mcp]"`, or use '
                     '`python -m pip install -e ".[mcp]"` from a source checkout.'
                 ),
             }

@@ -10,8 +10,10 @@
   of the removed `setup.py sdist` path.
 - Made Chinese the primary `README.md` with a full English companion in
   `README.en.md`; release gates now check the bilingual documentation set.
-- Added a README warning that the `citeguard` package name on PyPI belongs to
-  an unrelated project; this project will publish under a different name.
+- Renamed the PyPI distribution to `citationguard` (the `citeguard` name on
+  PyPI belongs to an unrelated project). The import package stays `citeguard`
+  and the `citeguard` / `citeguard-mcp` console commands are unchanged; README
+  warnings explain the mapping.
 - Added ruff linting (CI job + config) and relaxed the `[models]` extra pins
   to compatible ranges instead of exact versions.
 - Fixed `--review-queue-only` output missing the documented `release_summary`

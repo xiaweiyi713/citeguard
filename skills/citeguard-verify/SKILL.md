@@ -12,7 +12,7 @@ You verify citations against real scholarly sources before trusting them. You do
 Install CiteGuard with the MCP extra:
 
 ```bash
-python -m pip install "citeguard[mcp]"
+python -m pip install "citationguard[mcp]"
 ```
 
 From a local source checkout, use `python -m pip install -e ".[mcp]"`.
