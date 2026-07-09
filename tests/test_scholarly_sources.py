@@ -657,6 +657,77 @@ class ScholarlySourceTests(unittest.TestCase):
         self.assertEqual(http_client.json_calls[0]["params"]["search"], "phantom references fabricated metadata")
         self.assertNotIn("mailto", http_client.json_calls[0]["params"])
 
+    def test_doi_registry_probe_reports_registered_doi_with_resolution_url(self):
+        class HandleHTTPClient(FakeHTTPClient):
+            def get_json(self, url, params=None, headers=None, use_cache=True, timeout=None):
+                self.last_error = ""
+                return {
+                    "responseCode": 1,
+                    "handle": "10.1360/ssi-2020-0204",
+                    "values": [
+                        {"index": 1, "type": "URL", "data": {"format": "string", "value": "https://www.sciengine.com/SSI/doi/10.1360/SSI-2020-0204"}}
+                    ],
+                }
+
+        from citeguard.retrieval.scholarly_clients.doi_registry import DoiRegistryProbe
+
+        probe = DoiRegistryProbe(http_client=HandleHTTPClient())
+        result = probe.check("https://doi.org/10.1360/SSI-2020-0204")
+
+        self.assertTrue(result["checked"])
+        self.assertTrue(result["registered"])
+        self.assertEqual(result["status"], "registered")
+        self.assertEqual(result["doi"], "10.1360/ssi-2020-0204")
+        self.assertIn("sciengine.com", result["resolution_url"])
+        self.assertIn("not_full_verification", result["interpretation"])
+
+    def test_doi_registry_probe_reports_unregistered_doi_conservatively(self):
+        class MissingHandleHTTPClient(FakeHTTPClient):
+            def get_json(self, url, params=None, headers=None, use_cache=True, timeout=None):
+                self.last_error = ""
+                return {"responseCode": 100, "handle": "10.9999/fake"}
+
+        from citeguard.retrieval.scholarly_clients.doi_registry import DoiRegistryProbe
+
+        probe = DoiRegistryProbe(http_client=MissingHandleHTTPClient())
+        result = probe.check("10.9999/fake")
+
+        self.assertTrue(result["checked"])
+        self.assertFalse(result["registered"])
+        self.assertIn("not_fabrication_proof", result["interpretation"])
+
+    def test_doi_registry_probe_maps_http_404_to_not_registered(self):
+        class NotFoundHTTPClient(FakeHTTPClient):
+            def get_json(self, url, params=None, headers=None, use_cache=True, timeout=None):
+                self.last_error = "http_404"
+                self.last_status_code = 404
+                return {}
+
+        from citeguard.retrieval.scholarly_clients.doi_registry import DoiRegistryProbe
+
+        probe = DoiRegistryProbe(http_client=NotFoundHTTPClient())
+        result = probe.check("10.9999/fake-2099")
+
+        self.assertTrue(result["checked"])
+        self.assertFalse(result["registered"])
+        self.assertEqual(result["status"], "not_registered")
+
+    def test_doi_registry_probe_treats_outage_as_no_conclusion(self):
+        class FailingHTTPClient(FakeHTTPClient):
+            def get_json(self, url, params=None, headers=None, use_cache=True, timeout=None):
+                self.last_error = "timeout"
+                return {}
+
+        from citeguard.retrieval.scholarly_clients.doi_registry import DoiRegistryProbe
+
+        probe = DoiRegistryProbe(http_client=FailingHTTPClient())
+        result = probe.check("10.1360/ssi-2020-0204")
+
+        self.assertFalse(result["checked"])
+        self.assertIsNone(result["registered"])
+        self.assertEqual(result["status"], "unavailable")
+        self.assertEqual(result["detail"], "timeout")
+
     def test_crossref_skips_mostly_cjk_search_queries_without_http_calls(self):
         http_client = CapturingHTTPClient()
         source = CrossrefMetadataSource(http_client=http_client, harvest_evidence=False)

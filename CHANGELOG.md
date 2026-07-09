@@ -7,6 +7,11 @@
   free-text parsing and file extraction, making Chinese bibliographies verifiable.
 - Crossref search now skips predominantly-CJK queries (its bibliographic search
   cannot match them); DOI lookups are unaffected.
+- Added a registrar-agnostic DOI existence probe: `not_found` results with a
+  DOI now include `doi_registration` from the global doi.org Handle registry,
+  so papers whose DOIs live outside open sources (e.g. China DOI/ISTIC) can be
+  confirmed as real without ever escalating missing metadata to fabrication.
+  Disable with `CITEGUARD_DOI_REGISTRY=0`; skipped in offline fixture mode.
 - Removed the legacy root-package compatibility shims and `setup.py`; the
   project now builds exclusively from `pyproject.toml` (PEP 517) and both
   source checkouts and release artifacts expose only the `citeguard.*`

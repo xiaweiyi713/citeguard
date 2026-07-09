@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import List
+from typing import Any, List, Optional
 
 from citeguard.citation import CitationFormatter
 from citeguard.graph import CitationRecord
@@ -12,9 +12,13 @@ from .models import AuditReport, Verdict, verification_risk_item
 from .verify import verify_citation
 
 
-def audit_citations(candidates: List[CitationRecord], source: MetadataSource) -> AuditReport:
+def audit_citations(
+    candidates: List[CitationRecord],
+    source: MetadataSource,
+    doi_registry: Optional[Any] = None,
+) -> AuditReport:
     formatter = CitationFormatter()
-    results = [verify_citation(candidate, source, formatter) for candidate in candidates]
+    results = [verify_citation(candidate, source, formatter, doi_registry=doi_registry) for candidate in candidates]
     summary = {verdict.value: 0 for verdict in Verdict}
     for result in results:
         summary[result.verdict.value] += 1

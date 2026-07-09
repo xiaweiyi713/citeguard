@@ -202,7 +202,7 @@ print(support.verdict.value, support.engine)
 
 文本匹配对 CJK 友好(中文字符保留并按字符 bigram 分词,**零额外依赖**);**GB/T 7714 中文参考文献**(`作者. 标题[J]. 期刊, 年, 卷(期): 页` 等)可被自动解析为结构化字段后核验。判定中文论点的支撑性时,请将 `CITEGUARD_RERANKER_MODEL` / `CITEGUARD_NLI_MODEL` 指向多语模型。
 
-**中文论文的现实边界**:中国学者的英文论文(SCI/EI/arXiv)覆盖完整;中文核心期刊多数不在 OpenAlex/Crossref 体系内(其 DOI 注册于中国 DOI/ISTIC),按标题核验通常返回 `not_found`——这表示"开放源查不到",不构成伪造指控。Crossref 对纯中文标题检索无效,CiteGuard 会自动跳过该查询以省去无效请求;**提供 DOI 时的直查路径不受影响**。
+**中文论文的现实边界**:中国学者的英文论文(SCI/EI/arXiv)覆盖完整;中文核心期刊多数不在 OpenAlex/Crossref 体系内(其 DOI 注册于中国 DOI/ISTIC),按标题核验通常返回 `not_found`——这表示"开放源查不到",不构成伪造指控。Crossref 对纯中文标题检索无效,CiteGuard 会自动跳过该查询以省去无效请求。**带 DOI 的中文引用有兜底**:开放源查不到时,CiteGuard 会查询全球 DOI 注册表(doi.org Handle 系统,覆盖中国 DOI/ISTIC 等所有注册机构),在结果的 `doi_registration` 字段报告该 DOI 是否真实注册及其官方解析地址——已注册说明"元数据未开放"而非"论文不存在";未注册会进一步降低可信度,但同样不构成伪造证明。可用 `CITEGUARD_DOI_REGISTRY=0` 关闭。
 
 知网(CNKI)与万方**未**接入:两者没有开放/免费 API,我们不爬取受限内容。ChinaXiv 可行性调研结论为 NO-GO(其 OAI 端点受访问限制)——见 [`docs/chinaxiv_spike.md`](docs/chinaxiv_spike.md);可插拔的源接口保留,一旦出现开放端点即可添加适配器。
 

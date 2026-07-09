@@ -34,7 +34,7 @@ else:
     _MCP_IMPORT_ERROR = None
 
 from citeguard.errors import error_payload, runtime_config_error_details
-from citeguard.runtime import build_configured_source, build_configured_support_backend, environment_status
+from citeguard.runtime import build_configured_source, build_configured_support_backend, build_doi_registry_probe, environment_status
 from citeguard.verification import (
     ClaimSupportAuditItem,
     audit_citations,
@@ -183,7 +183,7 @@ def verify_citation_tool(
     active_source = _source_or_error("verify_citation_tool")
     if isinstance(active_source, dict):
         return active_source
-    return verify_citation(candidate, active_source).to_dict()
+    return verify_citation(candidate, active_source, doi_registry=build_doi_registry_probe()).to_dict()
 
 
 @mcp.tool()
@@ -246,7 +246,7 @@ def audit_citations_tool(citations: Any, high_risk_only: bool = False) -> dict:
     active_source = _source_or_error("audit_citations_tool")
     if isinstance(active_source, dict):
         return active_source
-    result = audit_citations(candidates, active_source).to_dict()
+    result = audit_citations(candidates, active_source, doi_registry=build_doi_registry_probe()).to_dict()
     if high_risk_only:
         result = filter_high_risk_payload(result)
     return result

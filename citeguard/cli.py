@@ -11,7 +11,7 @@ import sys
 from typing import Any, Iterable, Optional, TextIO
 
 from citeguard.errors import error_payload, runtime_config_error_details
-from citeguard.runtime import build_configured_source, build_configured_support_backend, cache_path, environment_status
+from citeguard.runtime import build_configured_source, build_configured_support_backend, build_doi_registry_probe, cache_path, environment_status
 from citeguard.verification import (
     ClaimSupportAuditItem,
     ClaimSupportRequest,
@@ -403,7 +403,7 @@ def run(
                 )
             candidate = _parse_args_citation(args)
             active_source = source or build_configured_source()
-            _print_json(verify_citation(candidate, active_source).to_dict(), out, compact=args.compact)
+            _print_json(verify_citation(candidate, active_source, doi_registry=build_doi_registry_probe()).to_dict(), out, compact=args.compact)
             return 0
         if args.command == "support":
             if not str(args.claim).strip():
@@ -523,7 +523,7 @@ def run(
                 for index, item in enumerate(citations, start=1)
             ]
             active_source = source or build_configured_source()
-            payload = audit_citations(candidates, active_source).to_dict()
+            payload = audit_citations(candidates, active_source, doi_registry=build_doi_registry_probe()).to_dict()
             if args.high_risk_only:
                 payload = filter_high_risk_payload(payload)
             _print_json(payload, out, compact=args.compact)

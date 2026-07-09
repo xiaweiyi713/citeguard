@@ -700,6 +700,25 @@ def build_configured_source(env: Optional[Mapping[str, str]] = None):
     return CachingMetadataSource(live, db_path=db_path)
 
 
+def build_doi_registry_probe(env: Optional[Mapping[str, str]] = None):
+    """Build the doi.org handle-registry probe, or None when disabled.
+
+    The probe confirms DOI existence across all registrars (including
+    China DOI/ISTIC) for not_found results. It is skipped in offline fixture
+    mode and can be disabled with CITEGUARD_DOI_REGISTRY=0.
+    """
+
+    from citeguard.retrieval.scholarly_clients.doi_registry import DoiRegistryProbe
+    from citeguard.retrieval.scholarly_clients.http import HTTPClient
+
+    active_env = env or os.environ
+    if fixture_citations_path(active_env):
+        return None
+    if str(active_env.get("CITEGUARD_DOI_REGISTRY", "1")).strip().lower() in {"0", "false", "no", "off"}:
+        return None
+    return DoiRegistryProbe(http_client=HTTPClient(timeout=http_timeout(active_env)))
+
+
 def load_fixture_records(path: str) -> List[CitationRecord]:
     """Load CitationRecord objects from a JSON list, JSONL, or manifest fixture."""
 

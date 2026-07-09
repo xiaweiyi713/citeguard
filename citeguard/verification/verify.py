@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import List, Optional
+from typing import Any, List, Optional
 
 from citeguard.citation import CitationFormatter, author_coverage, sequence_similarity, year_matches
 from citeguard.graph import CitationRecord
@@ -44,6 +44,7 @@ def verify_citation(
     candidate: CitationRecord,
     source: MetadataSource,
     formatter: Optional[CitationFormatter] = None,
+    doi_registry: Optional[Any] = None,
 ) -> VerificationResult:
     formatter = formatter or CitationFormatter()
     outcome = resolve_citation(candidate, source)
@@ -66,6 +67,21 @@ def verify_citation(
             outage = f" Source failures limited this check: {', '.join(failed)}."
         elif not responded:
             outage = " No source returned a matching record."
+        doi_registration = None
+        registry_note = ""
+        if doi_registry is not None and candidate.doi:
+            doi_registration = doi_registry.check(candidate.doi)
+            if doi_registration.get("registered") is True:
+                registry_note = (
+                    " The DOI is registered in the global DOI system (possibly with a registrar whose"
+                    " metadata is not in open sources, e.g. China DOI); treat this as unverifiable"
+                    " metadata, not a fabricated citation."
+                )
+            elif doi_registration.get("registered") is False:
+                registry_note = (
+                    " The DOI was not found in the global DOI registry either, which lowers confidence"
+                    " further but is still not proof of fabrication."
+                )
         return VerificationResult(
             verdict=Verdict.NOT_FOUND,
             confidence=round(confidence, 4),
@@ -73,7 +89,7 @@ def verify_citation(
             canonical_record=None,
             field_diffs=[],
             suggested_citation="",
-            explanation=f"Could not be verified in {', '.join(checked)}.{outage}",
+            explanation=f"Could not be verified in {', '.join(checked)}.{outage}{registry_note}",
             sources_checked=checked,
             sources_responded=responded,
             sources_failed=failed,
@@ -81,6 +97,7 @@ def verify_citation(
             source_failure_mode=failure_mode,
             outage_limited=outage_limited,
             alternatives=outcome.alternatives,
+            doi_registration=doi_registration,
         )
 
     if outcome.ambiguous:

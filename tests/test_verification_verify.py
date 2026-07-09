@@ -203,6 +203,55 @@ class RateLimitedMetadataSource(InMemoryMetadataSource):
     def lookup(self, candidate):
         raise TimeoutError("source timed out")
 
+    def test_not_found_with_registered_doi_reports_registration_not_fabrication(self):
+        class RegisteredProbe:
+            def check(self, doi):
+                return {
+                    "checked": True,
+                    "registry": "doi_org",
+                    "doi": doi,
+                    "status": "registered",
+                    "registered": True,
+                    "interpretation": "doi_registered_metadata_may_be_closed_access_not_full_verification",
+                    "resolution_url": "https://example.org/zh-paper",
+                }
+
+        source = InMemoryMetadataSource([])
+        candidate = parse_citation(title="迈向第三代人工智能", doi="10.1360/SSI-2020-0204", year=2020)
+        result = verify_citation(candidate, source, doi_registry=RegisteredProbe())
+
+        self.assertEqual(result.verdict, Verdict.NOT_FOUND)
+        self.assertTrue(result.doi_registration["registered"])
+        self.assertIn("registered in the global DOI system", result.explanation)
+        self.assertIn("not a fabricated citation", result.explanation)
+        self.assertEqual(result.to_dict()["doi_registration"]["status"], "registered")
+
+    def test_not_found_with_unregistered_doi_still_avoids_fabrication_claims(self):
+        class UnregisteredProbe:
+            def check(self, doi):
+                return {"checked": True, "registered": False, "status": "not_registered", "doi": doi}
+
+        source = InMemoryMetadataSource([])
+        candidate = parse_citation(title="Phantom paper", doi="10.9999/fake", year=2099)
+        result = verify_citation(candidate, source, doi_registry=UnregisteredProbe())
+
+        self.assertEqual(result.verdict, Verdict.NOT_FOUND)
+        self.assertFalse(result.doi_registration["registered"])
+        self.assertIn("still not proof of fabrication", result.explanation)
+
+    def test_not_found_without_doi_skips_registry_probe(self):
+        class ExplodingProbe:
+            def check(self, doi):
+                raise AssertionError("probe must not be called without a DOI")
+
+        source = InMemoryMetadataSource([])
+        candidate = parse_citation(title="Some unfindable title")
+        result = verify_citation(candidate, source, doi_registry=ExplodingProbe())
+
+        self.assertEqual(result.verdict, Verdict.NOT_FOUND)
+        self.assertIsNone(result.doi_registration)
+        self.assertIsNone(result.to_dict()["doi_registration"])
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -186,6 +186,7 @@ class VerificationResult:
     source_failure_mode: str = "none"
     outage_limited: bool = False
     alternatives: List[CitationRecord] = field(default_factory=list)
+    doi_registration: Optional[Dict[str, Any]] = None
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -204,6 +205,7 @@ class VerificationResult:
             "source_failure_details": [dict(item) for item in self.source_failure_details],
             "source_failure_mode": self.source_failure_mode,
             "outage_limited": self.outage_limited,
+            "doi_registration": self.doi_registration,
             "recovery_code": verification_recovery_code(self.verdict, self.source_failure_details),
             "next_action": verification_next_action(self.verdict, self.source_failure_mode, self.sources_failed),
             "alternatives": [asdict(record) for record in self.alternatives],
