@@ -68,6 +68,25 @@ pdf = [
 citeguard = "citeguard.cli:main"
 citeguard-mcp = "citeguard.mcp.server:main"
 
+[tool.mypy]
+ignore_missing_imports = true
+
+# Typed debt: these modules still fail mypy. Clean them up one at a time and
+# remove them from this list; do not add new modules here.
+[[tool.mypy.overrides]]
+module = [
+  "citeguard.audit.report_builder",
+  "citeguard.benchmark.support_calibration",
+  "citeguard.cli",
+  "citeguard.mcp.server",
+  "citeguard.orchestrator.graph",
+  "citeguard.verification.cache",
+  "citeguard.verification.extract",
+  "citeguard.verification.support_eval",
+  "citeguard.verifiers.support_backends",
+]
+ignore_errors = true
+
 [tool.ruff]
 target-version = "py39"
 line-length = 120

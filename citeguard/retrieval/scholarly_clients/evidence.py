@@ -84,7 +84,10 @@ class _HTMLChunkParser(HTMLParser):
 def attach_evidence_chunks(metadata: Dict[str, object], chunks: Iterable[dict]) -> Dict[str, object]:
     """Attach structured evidence chunks and a backward-compatible string list."""
 
-    merged_chunks = merge_evidence_chunks(metadata.get("evidence_chunks", []), chunks)
+    existing_chunks = metadata.get("evidence_chunks", [])
+    if not isinstance(existing_chunks, list):
+        existing_chunks = []
+    merged_chunks = merge_evidence_chunks(existing_chunks, chunks)
     if not merged_chunks:
         return metadata
     enriched = dict(metadata)

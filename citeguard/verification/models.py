@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, cast
 
 from citeguard.graph import CitationRecord
 
@@ -457,7 +457,7 @@ def _recommended_next_steps(action_queues: Dict[str, List[int]]) -> Dict[str, An
             continue
         steps.append(
             {
-                "priority": int(spec["priority"]),
+                "priority": cast(int, spec["priority"]),
                 "action": str(spec["action"]),
                 "queue": queue,
                 "count": len(indexes),

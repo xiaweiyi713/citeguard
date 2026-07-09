@@ -16,6 +16,9 @@
   warnings explain the mapping.
 - Added ruff linting (CI job + config) and relaxed the `[models]` extra pins
   to compatible ranges instead of exact versions.
+- Added incremental mypy type checking to CI: four core modules were cleaned
+  up and the remaining typed debt is tracked as an explicit override list in
+  `pyproject.toml`.
 - Fixed `--review-queue-only` output missing the documented `release_summary`
   block.
 - Added public `citeguard.cli` and `citeguard.mcp.server` entry points.

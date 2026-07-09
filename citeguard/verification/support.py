@@ -1323,7 +1323,7 @@ def check_claim_support_set(
     evidence = []
     result_indexes = {id(result): index for index, result in enumerate(results)}
     for result in evidence_results:
-        item = dict(result.evidence)
+        item: Dict[str, Any] = dict(result.evidence)
         item["index"] = result_indexes.get(id(result), -1)
         item["verdict"] = result.verdict.value
         item["confidence"] = round(result.confidence, 4)

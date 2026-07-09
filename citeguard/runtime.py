@@ -9,7 +9,7 @@ import platform
 import socket
 import sys
 import time
-from typing import Callable, Mapping, List, Optional
+from typing import Any, Callable, Dict, Mapping, List, Optional
 
 from citeguard.graph import CitationRecord
 from citeguard.retrieval.scholarly_clients import build_live_metadata_source
@@ -206,7 +206,7 @@ def source_health_status(
         configured_evidence_timeout = None
 
     if fixture_path:
-        sources = [
+        sources: List[Dict[str, Any]] = [
             {
                 "name": "fixture",
                 "status": "offline_fixture",
@@ -241,7 +241,7 @@ def source_health_status(
         if canonical in seen:
             continue
         seen.add(canonical)
-        item = {
+        item: Dict[str, Any] = {
             "name": canonical,
             "status": "configured_not_checked",
             "live_check_performed": False,
@@ -575,7 +575,7 @@ def _probe_source_health(
     started = time.monotonic()
     factory = source_factory or build_live_metadata_source
     try:
-        source = factory(
+        source: Any = factory(
             [source_name],
             mailto=env.get("CITEGUARD_MAILTO", DEFAULT_MAILTO),
             semantic_scholar_api_key=env.get("SEMANTIC_SCHOLAR_API_KEY", ""),
