@@ -182,6 +182,8 @@ cache status, and model readiness without live queries; see
 [docs/mcp_setup.md](docs/mcp_setup.md) and
 [docs/agent_output_contract.md](docs/agent_output_contract.md).
 
+<sub>mcp-name: io.github.xiaweiyi713/citeguard</sub>
+
 For agent clients that support skills, [`skills/citeguard-verify/SKILL.md`](skills/citeguard-verify/SKILL.md) makes CiteGuard **proactively** verify citations while you write (and present results without silently editing your text). It is written for MCP-compatible agents such as Codex, Claude Code, Cursor, and similar clients.
 
 ### As a Python library

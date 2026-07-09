@@ -158,6 +158,8 @@ citeguard-mcp
 
 连接后先调一次 `citeguard_status_tool`——它在不发起实时查询的前提下报告源健康、缓存与模型就绪状态;详见 [docs/mcp_setup.md](docs/mcp_setup.md) 与 [docs/agent_output_contract.md](docs/agent_output_contract.md)。
 
+<sub>mcp-name: io.github.xiaweiyi713/citeguard</sub>
+
 支持 skill 的 agent 客户端可使用 [`skills/citeguard-verify/SKILL.md`](skills/citeguard-verify/SKILL.md),让 CiteGuard 在你写作时**主动**核验引用(呈现结果而不静默改动你的文本),适用于 Codex、Claude Code、Cursor 等 MCP 客户端。
 
 ### 作为 Python 库

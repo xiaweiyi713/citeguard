@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Nothing yet.
+
+## 0.1.1 - 2026-07-09
+
 - Added GB/T 7714 (Chinese national standard) reference parsing: `[J]/[M]/[C]/[D]`
   style references are now parsed into structured title/authors/venue fields in
   free-text parsing and file extraction, making Chinese bibliographies verifiable.

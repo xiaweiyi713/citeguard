@@ -5832,7 +5832,7 @@ def _check_project_metadata_contract(project_root: Path) -> Dict[str, Any]:
     required_citation_snippets = [
         'title: "CiteGuard"',
         'type: software',
-        'version: "0.1.0"',
+        f'version: "{__version__}"',
         "skeptical citation auditor for agent writing workflows",
         'repository-code: "https://github.com/xiaweiyi713/citeguard"',
         'url: "https://github.com/xiaweiyi713/citeguard#readme"',

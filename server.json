@@ -1,0 +1,33 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-09-29/server.schema.json",
+  "name": "io.github.xiaweiyi713/citeguard",
+  "description": "Falsification-first citation auditor: verifies that cited papers exist, metadata is correct, and papers support claims, against OpenAlex/Crossref/arXiv/Semantic Scholar.",
+  "repository": {
+    "url": "https://github.com/xiaweiyi713/citeguard",
+    "source": "github"
+  },
+  "version": "0.1.1",
+  "packages": [
+    {
+      "registryType": "pypi",
+      "identifier": "citationguard",
+      "version": "0.1.1",
+      "transport": {
+        "type": "stdio"
+      },
+      "packageArguments": [],
+      "environmentVariables": [
+        {
+          "name": "CITEGUARD_SOURCES",
+          "description": "Comma-separated scholarly sources (default: openalex,crossref,arxiv).",
+          "isRequired": false
+        },
+        {
+          "name": "CITEGUARD_MAILTO",
+          "description": "Contact email for polite OpenAlex/Crossref access.",
+          "isRequired": false
+        }
+      ]
+    }
+  ]
+}

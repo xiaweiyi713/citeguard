@@ -1072,7 +1072,7 @@ class ReleaseMetadataTests(unittest.TestCase):
         required_phrases = [
             'title: "CiteGuard"',
             'type: software',
-            'version: "0.1.0"',
+            f'version: "{__version__}"',
             "skeptical citation auditor for agent writing workflows",
             'repository-code: "https://github.com/xiaweiyi713/citeguard"',
             'url: "https://github.com/xiaweiyi713/citeguard#readme"',
