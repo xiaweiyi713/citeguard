@@ -11,7 +11,7 @@
 
 LLM 写作助手会幻觉参考文献:编造不存在的论文、拼错真实论文的元数据、引用与论点无关的真论文。CiteGuard 扮演那个"多疑的审稿人":它把每条引用当作 `论点 → 引用 → 证据` 问题去**证伪**;拿不准的时候明确说"查不准",而不是猜一个答案。
 
-> **状态:** Alpha(`v0.1.0`)。当前积极开发的产品面是 `citeguard.*` 审计包、CLI、MCP server、批量工作流、缓存回放与发布门禁;历史遗留的写作 agent 实验仅保留在源码签出中,不属于发布包。
+> **状态:** Alpha(`v0.1.1`,已发布至 [PyPI](https://pypi.org/project/citationguard/) 与 [MCP 官方 registry](https://registry.modelcontextprotocol.io))。当前积极开发的产品面是 `citeguard.*` 审计包、CLI、MCP server、批量工作流、缓存回放与发布门禁;历史遗留的写作 agent 实验仅保留在源码签出中,不属于发布包。
 
 ---
 
@@ -121,6 +121,8 @@ citeguard counterevidence --claim "The Transformer relies entirely on attention.
 所有命令输出 JSON,带稳定的 `next_action` 枚举、风险排序和机器可读错误。完整 CLI 说明(含 `cache` 检查/导出/清理与离线 fixture 回放)见 [docs/cli_reference.md](docs/cli_reference.md);agent 侧完整字段契约见 [docs/agent_output_contract.md](docs/agent_output_contract.md)。
 
 ### 作为 agent 工具接入(MCP)——推荐路径
+
+CiteGuard 已收录进 [MCP 官方 registry](https://registry.modelcontextprotocol.io)(`io.github.xiaweiyi713/citeguard`),支持 registry 浏览的客户端可直接搜索安装。手动安装:
 
 已发布包:
 

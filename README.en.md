@@ -11,7 +11,7 @@
 
 LLM writing assistants hallucinate references: they invent papers, stitch together wrong metadata, and cite real papers that don't support the claim. CiteGuard is the skeptical reviewer that catches this — the check an agent can't reliably do on its own. It treats every citation as a `claim → citation → evidence` problem and tries to *disprove* it; when it can't be sure, it says so instead of guessing.
 
-> **Status:** Alpha (`v0.1.0`). The actively developed product surface is the `citeguard.*` auditor package, CLI, MCP server, batch workflows, cache replay, and release gates. Historical writing-agent experiments remain in source checkouts for context, but they are not part of the published package surface.
+> **Status:** Alpha (`v0.1.1`, published on [PyPI](https://pypi.org/project/citationguard/) and the [official MCP registry](https://registry.modelcontextprotocol.io)). The actively developed product surface is the `citeguard.*` auditor package, CLI, MCP server, batch workflows, cache replay, and release gates. Historical writing-agent experiments remain in source checkouts for context, but they are not part of the published package surface.
 
 ---
 
@@ -142,6 +142,8 @@ inspect/export/clear and offline fixture replay) is in
 contract is in [docs/agent_output_contract.md](docs/agent_output_contract.md).
 
 ### As an agent tool (MCP) — the primary path
+
+CiteGuard is listed in the [official MCP registry](https://registry.modelcontextprotocol.io) as `io.github.xiaweiyi713/citeguard`, so registry-aware clients can discover and install it directly. To install manually:
 
 For an installed or published package:
 
