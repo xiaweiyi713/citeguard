@@ -1,9 +1,10 @@
 # Public API Migration
 
-CiteGuard's stable user-facing package is `citeguard`. Source checkouts keep
-the older root package named `src` only as a temporary compatibility bridge for
-historical scripts and notebooks; published packages expose the `citeguard.*`
-surface as the product contract.
+CiteGuard's stable user-facing package is `citeguard`. Earlier source checkouts
+kept an older root package as a temporary compatibility bridge for historical
+scripts and notebooks; that bridge has been removed, and both source checkouts
+and published packages expose the `citeguard.*` surface as the product
+contract.
 
 ## Use These Imports
 
@@ -37,34 +38,27 @@ auditor package surface listed above: `citeguard.verification`,
 
 - Prefer `citeguard` and `citeguard.*` in README snippets, tests, scripts,
   examples, agent skills, and user code.
-- Treat the legacy root package as deprecated even when it is present in a
-  source checkout for compatibility.
-- Do not add new product behavior under the legacy root package; implement it
-  under `citeguard.*` and keep any compatibility shim thin.
+- The legacy root package has been removed; migrate any remaining private
+  scripts or notebooks that still import it to `citeguard.*`.
+- Do not reintroduce a legacy root package; implement new behavior under
+  `citeguard.*`.
 - Avoid branching on legacy import errors. Feature detection should use the
   public package, console scripts, or `citeguard status`.
 
 ## Compatibility Policy
 
-In source checkouts, existing legacy imports continue to work for now and emit a
-`DeprecationWarning` when the compatibility package is imported. Deprecation
-warnings are hidden by default in normal Python runs, so older users are not
-interrupted, while test suites and release checks can opt into seeing the
-migration signal with:
+Historically, source checkouts shipped legacy imports that emitted a
+`DeprecationWarning` when the compatibility package was imported, and legacy
+package entrypoints were thin public facades that re-exported the
+same public `__all__` lists as `citeguard.retrieval` and
+`citeguard.verification`. That compatibility layer has now been removed
+entirely: there is no legacy namespace in source checkouts or release
+artifacts, and release gates verify that distributions do not include it. Do
+not add local export lists, lazy loaders, or compatibility entrypoints back.
 
-```bash
-python -Wd -c "import src"
-```
-
-Legacy package entrypoints are thin public facades: compatibility imports for
-retrieval and verification re-export the same public `__all__` lists as
-`citeguard.retrieval` and `citeguard.verification`. Do not add local export
-lists, lazy loaders, or new behavior under compatibility entrypoints.
-
-The eventual release target is a package whose public documentation, tests,
-scripts, examples, and agent skills all point to the `citeguard.*` interfaces.
-Current release artifacts are checked so they do not include the legacy
-compatibility namespace; migrate installed-package user code to `citeguard.*`.
+Public documentation, tests, scripts, examples, and agent skills all point to
+the `citeguard.*` interfaces; migrate installed-package user code to
+`citeguard.*`.
 
 The root package facade (`import citeguard`) re-exports only stable auditor
 helpers such as `verify_citation`, `audit_citations`,

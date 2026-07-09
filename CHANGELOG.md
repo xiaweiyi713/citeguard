@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+- Removed the legacy root-package compatibility shims and `setup.py`; the
+  project now builds exclusively from `pyproject.toml` (PEP 517) and both
+  source checkouts and release artifacts expose only the `citeguard.*`
+  surface.
+- Modernized the sdist install smoke to build with `python -m build` instead
+  of the removed `setup.py sdist` path.
+- Made Chinese the primary `README.md` with a full English companion in
+  `README.en.md`; release gates now check the bilingual documentation set.
+- Added a README warning that the `citeguard` package name on PyPI belongs to
+  an unrelated project; this project will publish under a different name.
+- Added ruff linting (CI job + config) and relaxed the `[models]` extra pins
+  to compatible ranges instead of exact versions.
+- Fixed `--review-queue-only` output missing the documented `release_summary`
+  block.
 - Added public `citeguard.cli` and `citeguard.mcp.server` entry points.
 - Added JSONL support for `citeguard audit` and `citeguard support-audit`.
 - Added `examples/citations.jsonl` plus release-gated audit JSONL smoke coverage.

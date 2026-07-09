@@ -27,9 +27,9 @@ from citeguard.version import __version__
 
 _SDIST_RELEASE_FILES = {
     "pyproject.toml",
-    "setup.py",
     "MANIFEST.in",
     "README.md",
+    "README.en.md",
     "CHANGELOG.md",
     "CITATION.cff",
     "LICENSE",
@@ -242,7 +242,13 @@ def _build_sdist(python: str, project_root: Path, sdist_dir: Path) -> Path:
         ignore=shutil.ignore_patterns(*_SDIST_COPY_IGNORE_PATTERNS),
     )
     dist_dir.mkdir(parents=True, exist_ok=True)
-    _run([python, "setup.py", "sdist", "--dist-dir", str(dist_dir)], cwd=copied_project)
+    try:
+        _run([python, "-c", "import build"], cwd=copied_project)
+    except subprocess.CalledProcessError as exc:
+        raise RuntimeError(
+            "sdist smoke requires the `build` package; install it with `python -m pip install build`."
+        ) from exc
+    _run([python, "-m", "build", "--sdist", "--no-isolation", "--outdir", str(dist_dir)], cwd=copied_project)
 
     sdists = sorted(dist_dir.glob("citeguard-*.tar.gz"))
     if len(sdists) != 1:

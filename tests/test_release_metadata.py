@@ -35,7 +35,6 @@ from scripts.release_package_gate import (
     _record_counterevidence_safety_contract_gate,
     _record_error_codes_contract_gate,
     _record_full_text_evidence_boundary_contract_gate,
-    _record_legacy_src_shim_contract,
     _record_live_source_health_contract_gate,
     _record_mcp_error_contract_gate,
     _record_mcp_extra_smoke,
@@ -920,30 +919,6 @@ class ReleaseMetadataTests(unittest.TestCase):
         self.assertIn('Documentation = "https://github.com/xiaweiyi713/citeguard#readme"', pyproject)
         self.assertIn('citeguard = ["py.typed"]', pyproject)
 
-    def test_legacy_setup_matches_public_console_scripts(self):
-        setup = (ROOT / "setup.py").read_text(encoding="utf-8")
-
-        self.assertIn(f'version="{__version__}"', setup)
-        self.assertIn('description="A skeptical citation auditor for agent writing workflows."', setup)
-        self.assertIn('keywords=[', setup)
-        self.assertIn('"skeptical-citation-auditor"', setup)
-        self.assertIn('"agent-tools"', setup)
-        self.assertIn('"mcp"', setup)
-        self.assertIn('"research-integrity"', setup)
-        self.assertNotIn('"research-agents"', setup)
-        self.assertIn('"citeguard=citeguard.cli:main"', setup)
-        self.assertIn('"citeguard-mcp=citeguard.mcp.server:main"', setup)
-        self.assertIn('find_packages(include=["citeguard", "citeguard.*"])', setup)
-        self.assertNotIn(f'"{INTERNAL_PACKAGE}"', setup)
-        self.assertNotIn(f'"{INTERNAL_PACKAGE}.*"', setup)
-        self.assertIn('"mcp": [', setup)
-        self.assertIn('"pdf": [', setup)
-        self.assertIn('"pypdf>=4,<6"', setup)
-        self.assertIn('"Topic :: Text Processing :: Linguistic"', setup)
-        self.assertIn('"Typing :: Typed"', setup)
-        self.assertIn('"Documentation": "https://github.com/xiaweiyi713/citeguard#readme"', setup)
-        self.assertIn('package_data={"citeguard": ["py.typed"]}', setup)
-
     def test_release_gate_records_public_only_package_discovery(self):
         summary = {"ok": True, "steps": []}
 
@@ -969,7 +944,6 @@ class ReleaseMetadataTests(unittest.TestCase):
         self.assertIn("research-integrity", summary["steps"][0]["package_keywords"])
         discovery = summary["steps"][0]["public_package_discovery"]
         self.assertEqual(discovery["pyproject_include"], ["citeguard", "citeguard.*"])
-        self.assertEqual(discovery["setup_find_packages_include"], ["citeguard", "citeguard.*"])
         self.assertFalse(discovery["legacy_namespace_included"])
         self.assertTrue(discovery["published_artifacts_exclude_legacy_src"])
         self.assertTrue(summary["steps"][0]["typed_package"])
@@ -1133,14 +1107,10 @@ class ReleaseMetadataTests(unittest.TestCase):
 
     def test_published_package_config_only_discovers_citeguard_packages(self):
         pyproject = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
-        setup_py = (ROOT / "setup.py").read_text(encoding="utf-8")
 
         self.assertIn('include = ["citeguard", "citeguard.*"]', pyproject)
         self.assertNotIn(f'"{INTERNAL_PACKAGE}"', pyproject)
         self.assertNotIn(f'"{INTERNAL_PACKAGE}.*"', pyproject)
-        self.assertIn('find_packages(include=["citeguard", "citeguard.*"])', setup_py)
-        self.assertNotIn(f'"{INTERNAL_PACKAGE}"', setup_py)
-        self.assertNotIn(f'"{INTERNAL_PACKAGE}.*"', setup_py)
 
     def test_package_smoke_validates_distribution_metadata_contract(self):
         good_metadata = f"""Metadata-Version: 2.1
@@ -1185,7 +1155,6 @@ License-File: LICENSE
             ROOT / "CHANGELOG.md",
             ROOT / "ROADMAP.md",
             ROOT / "pyproject.toml",
-            ROOT / "setup.py",
             ROOT / "docs" / "architecture.md",
             ROOT / "docs" / "benchmark_design.md",
             ROOT / "docs" / "benchmark_todo.md",
@@ -1224,7 +1193,6 @@ License-File: LICENSE
             "README.md",
             "ROADMAP.md",
             "pyproject.toml",
-            "setup.py",
             "docs/chinaxiv_spike.md",
             "docs/configuration.md",
             "docs/releases/v0.1.0.md",
@@ -1259,7 +1227,6 @@ License-File: LICENSE
         self.assertIn("`citeguard.*` auditor package", readme)
         self.assertIn("not part of the published package surface", readme)
         self.assertIn("source-checkout experiments and benchmark/API utilities", readme)
-        self.assertIn("src/                       # legacy compatibility shims", readme)
         self.assertIn("docs/public_api_migration.md", readme)
         self.assertNotIn("docs/superpowers/", readme)
         self.assertNotIn("docs/proposal.md", readme)
@@ -1380,9 +1347,6 @@ License-File: LICENSE
 
     def test_public_api_migration_documents_legacy_deprecation(self):
         migration = (ROOT / "docs" / "public_api_migration.md").read_text(encoding="utf-8")
-        legacy_init = (ROOT / INTERNAL_PACKAGE / "__init__.py").read_text(encoding="utf-8")
-        legacy_retrieval_init = (ROOT / INTERNAL_PACKAGE / "retrieval" / "__init__.py").read_text(encoding="utf-8")
-        legacy_verification_init = (ROOT / INTERNAL_PACKAGE / "verification" / "__init__.py").read_text(encoding="utf-8")
 
         for public_package in [
             "citeguard.verification",
@@ -1412,12 +1376,6 @@ License-File: LICENSE
         self.assertIn("does not export the experimental source-checkout modules", migration)
         self.assertIn("citeguard.__all__", migration)
         self.assertIn("local export", migration)
-        self.assertIn("compatibility package is deprecated", legacy_init)
-        self.assertIn("from citeguard.version import __version__", legacy_init)
-        self.assertIn("from citeguard.retrieval import *", legacy_retrieval_init)
-        self.assertIn("from citeguard.retrieval import __all__", legacy_retrieval_init)
-        self.assertIn("from citeguard.verification import *", legacy_verification_init)
-        self.assertIn("from citeguard.verification import __all__", legacy_verification_init)
 
     def test_historical_superpowers_docs_do_not_look_like_current_api_guidance(self):
         docs_root = ROOT / "docs" / "superpowers"
@@ -1678,9 +1636,6 @@ License-File: LICENSE
             "_record_benchmark_claim_safety_gate",
             "unsafe_human_reviewed_benchmark_claims",
             "do not describe the synthetic seed set as a human-reviewed benchmark",
-            "legacy_src_shim_contract",
-            "_record_legacy_src_shim_contract",
-            "legacy shims only; new code imports citeguard.*",
             "public_api_contract",
             "_record_public_api_contract_gate",
             "README, tests, scripts, user-facing docs, and citeguard.* code stay on public citeguard.* imports",
@@ -2958,19 +2913,6 @@ License-File: LICENSE
         self.assertEqual(len(unsafe_large_claims), 1)
         self.assertFalse(unsafe_large_claims[0]["qualified_as_not_ready"])
         self.assertIn("synthetic seed set", summary["steps"][0]["policy"])
-
-    def test_release_gate_records_legacy_src_shim_contract(self):
-        summary = {"ok": True, "steps": []}
-
-        _record_legacy_src_shim_contract(summary, ROOT)
-
-        self.assertTrue(summary["ok"])
-        self.assertEqual(summary["steps"][0]["name"], "legacy_src_shim_contract")
-        self.assertEqual(summary["steps"][0]["status"], "passed")
-        self.assertGreater(summary["steps"][0]["file_count"], 0)
-        self.assertLessEqual(summary["steps"][0]["max_lines"], 25)
-        self.assertEqual(summary["steps"][0]["checked_root"], "src")
-        self.assertEqual(summary["steps"][0]["policy"], "legacy shims only; new code imports citeguard.*")
 
     def test_release_gate_records_public_api_contract(self):
         summary = {"ok": True, "steps": []}

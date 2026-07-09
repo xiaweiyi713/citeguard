@@ -163,7 +163,6 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     _record_project_metadata_contract(summary, project_root)
     _record_release_artifact_contract_gate(summary, project_root)
-    _record_legacy_src_shim_contract(summary, project_root)
     _record_public_api_contract_gate(summary, project_root)
     _record_cache_replay_fixture_gate(summary, python=args.python, project_root=project_root)
     _record_error_codes_contract_gate(summary, project_root=project_root)
@@ -481,63 +480,6 @@ def _check_release_artifact_contract(project_root: Path) -> Dict[str, Any]:
     }
 
 
-def _record_legacy_src_shim_contract(summary: Dict[str, Any], project_root: Path) -> None:
-    try:
-        details = _check_legacy_src_shim_contract(project_root)
-    except Exception as exc:
-        summary["steps"].append(
-            {
-                "name": "legacy_src_shim_contract",
-                "status": "failed",
-                "message": str(exc),
-            }
-        )
-        summary["ok"] = False
-        return
-
-    summary["steps"].append(
-        {
-            "name": "legacy_src_shim_contract",
-            "status": "passed",
-            **details,
-        }
-    )
-
-
-def _check_legacy_src_shim_contract(project_root: Path) -> Dict[str, Any]:
-    legacy_root = project_root / "src"
-    if not legacy_root.exists():
-        raise RuntimeError("legacy src compatibility package is missing")
-
-    errors: List[str] = []
-    files = sorted(legacy_root.rglob("*.py"))
-    for path in files:
-        relative = path.relative_to(project_root).as_posix()
-        text = path.read_text(encoding="utf-8")
-        line_count = len(text.splitlines())
-        if line_count > 25:
-            errors.append(f"{relative} has {line_count} lines; legacy shims should stay thin")
-        if re.search(r"^\s*(from\s+src\b|import\s+src\b)", text, flags=re.MULTILINE):
-            errors.append(f"{relative} imports from the legacy src namespace")
-        if relative != "src/__init__.py" and "citeguard" not in text:
-            errors.append(f"{relative} does not forward to citeguard.*")
-        if relative != "src/__init__.py" and not re.search(
-            r"(Backward-compatible|Compatibility shim|compatibility shim)",
-            text,
-        ):
-            errors.append(f"{relative} does not identify itself as a compatibility shim")
-
-    if errors:
-        raise RuntimeError("; ".join(errors))
-
-    return {
-        "file_count": len(files),
-        "max_lines": max((len(path.read_text(encoding="utf-8").splitlines()) for path in files), default=0),
-        "checked_root": "src",
-        "policy": "legacy shims only; new code imports citeguard.*",
-    }
-
-
 def _record_public_api_contract_gate(summary: Dict[str, Any], project_root: Path) -> None:
     try:
         details = _check_public_api_contract(project_root)
@@ -684,7 +626,6 @@ def _public_api_contract_paths(project_root: Path) -> List[Path]:
         project_root / "CHANGELOG.md",
         project_root / "ROADMAP.md",
         project_root / "pyproject.toml",
-        project_root / "setup.py",
         project_root / "docs" / "architecture.md",
         project_root / "docs" / "benchmark_design.md",
         project_root / "docs" / "benchmark_todo.md",
@@ -5761,7 +5702,6 @@ def _run_json_command(cmd: List[str], *, cwd: Path, env_overrides: Dict[str, str
 
 def _check_project_metadata_contract(project_root: Path) -> Dict[str, Any]:
     pyproject = _read_required_text(project_root / "pyproject.toml")
-    setup = _read_required_text(project_root / "setup.py")
     readme = (_read_required_text(project_root / "README.md") + "\n" + _read_required_text(project_root / "README.en.md"))
     changelog = _read_required_text(project_root / "CHANGELOG.md")
     citation = _read_required_text(project_root / "CITATION.cff")
@@ -5770,9 +5710,6 @@ def _check_project_metadata_contract(project_root: Path) -> Dict[str, Any]:
 
     errors = []
     pyproject_description = _extract_toml_string(pyproject, "description")
-    setup_description = _extract_python_string_kwarg(setup, "description")
-    if pyproject_description != setup_description:
-        errors.append("pyproject.toml and setup.py descriptions must match")
     if not pyproject_description or _has_placeholder_text(pyproject_description):
         errors.append("project description is missing or placeholder-like")
     if "prototype" in pyproject_description.lower():
@@ -5792,40 +5729,25 @@ def _check_project_metadata_contract(project_root: Path) -> Dict[str, Any]:
         "pyproject issues": 'Issues = "https://github.com/xiaweiyi713/citeguard/issues"',
         "pyproject changelog": 'Changelog = "https://github.com/xiaweiyi713/citeguard/blob/main/CHANGELOG.md"',
         "pyproject documentation": 'Documentation = "https://github.com/xiaweiyi713/citeguard#readme"',
-        "setup name": 'name="citeguard"',
-        "setup version": f'version="{__version__}"',
-        "setup readme content type": 'long_description_content_type="text/markdown"',
-        "setup python requires": 'python_requires=">=3.9"',
-        "setup license file": 'license_files=["LICENSE"]',
-        "setup homepage": '"Homepage": "https://github.com/xiaweiyi713/citeguard"',
-        "setup repository": '"Repository": "https://github.com/xiaweiyi713/citeguard"',
-        "setup issues": '"Issues": "https://github.com/xiaweiyi713/citeguard/issues"',
-        "setup changelog": '"Changelog": "https://github.com/xiaweiyi713/citeguard/blob/main/CHANGELOG.md"',
-        "setup documentation": '"Documentation": "https://github.com/xiaweiyi713/citeguard#readme"',
         "citeguard script": 'citeguard = "citeguard.cli:main"',
         "citeguard-mcp script": 'citeguard-mcp = "citeguard.mcp.server:main"',
     }
-    combined_metadata_files = f"{pyproject}\n{setup}"
+    combined_metadata_files = pyproject
     for label, snippet in required_snippets.items():
         if snippet not in combined_metadata_files:
             errors.append(f"missing {label}")
 
     public_package_discovery = {
         "pyproject_include": ["citeguard", "citeguard.*"],
-        "setup_find_packages_include": ["citeguard", "citeguard.*"],
         "legacy_namespace_included": False,
         "published_artifacts_exclude_legacy_src": True,
     }
     if 'include = ["citeguard", "citeguard.*"]' not in pyproject:
         errors.append("pyproject.toml package discovery must include only citeguard and citeguard.*")
-    if 'find_packages(include=["citeguard", "citeguard.*"])' not in setup:
-        errors.append("setup.py package discovery must include only citeguard and citeguard.*")
     legacy_namespace = "s" + "rc"
     for legacy_snippet in (f'"{legacy_namespace}"', f'"{legacy_namespace}.*"'):
         if legacy_snippet in pyproject:
             errors.append(f"pyproject.toml package discovery includes legacy namespace {legacy_snippet}")
-        if legacy_snippet in setup:
-            errors.append(f"setup.py package discovery includes legacy namespace {legacy_snippet}")
 
     required_classifiers = [
         "Intended Audience :: Science/Research",
@@ -5838,10 +5760,10 @@ def _check_project_metadata_contract(project_root: Path) -> Dict[str, Any]:
         "Typing :: Typed",
     ]
     for classifier in required_classifiers:
-        if classifier not in pyproject or classifier not in setup:
-            errors.append(f"classifier not mirrored in pyproject.toml and setup.py: {classifier}")
+        if classifier not in pyproject:
+            errors.append(f"classifier missing from pyproject.toml: {classifier}")
 
-    required_extras = ['"api"', '"mcp"', '"models"', '"pdf"', "api = [", "mcp = [", "models = [", "pdf = ["]
+    required_extras = ["api = [", "mcp = [", "models = [", "pdf = ["]
     for extra in required_extras:
         if extra not in combined_metadata_files:
             errors.append(f"missing optional dependency metadata: {extra}")
@@ -5859,12 +5781,12 @@ def _check_project_metadata_contract(project_root: Path) -> Dict[str, Any]:
     ]
     for keyword in required_keywords:
         quoted = f'"{keyword}"'
-        if quoted not in pyproject or quoted not in setup:
-            errors.append(f"keyword not mirrored in pyproject.toml and setup.py: {keyword}")
-    if '"research-agents"' in pyproject or '"research-agents"' in setup:
+        if quoted not in pyproject:
+            errors.append(f"keyword missing from pyproject.toml: {keyword}")
+    if '"research-agents"' in pyproject:
         errors.append("package keywords should use agent-tools, not research-agents")
 
-    for path_label, text in (("pyproject.toml", pyproject), ("setup.py", setup)):
+    for path_label, text in (("pyproject.toml", pyproject),):
         metadata_lines = "\n".join(line for line in text.splitlines() if "github.com" in line or "description" in line)
         if _has_placeholder_text(metadata_lines):
             errors.append(f"{path_label} contains placeholder release metadata")
@@ -5965,7 +5887,6 @@ def _check_project_metadata_contract(project_root: Path) -> Dict[str, Any]:
         "description": pyproject_description,
         "checked_files": [
             "pyproject.toml",
-            "setup.py",
             "README.md",
             "CHANGELOG.md",
             "CITATION.cff",
