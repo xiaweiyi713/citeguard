@@ -93,7 +93,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         smoke_cwd = venv_dir / "smoke-cwd"
         smoke_cwd.mkdir(parents=True, exist_ok=True)
         summary["smoke_cwd"] = str(smoke_cwd)
-        resolved_install_cmd = [str(python), "-m", "pip", "install", *install_cmd[3:]]
+        resolved_install_cmd = [str(python), "-m", "pip", "install", *install_cmd[4:]]
         _record_subprocess(summary, "pip_install", resolved_install_cmd, cwd=smoke_cwd)
         _record_subprocess(summary, "import_citeguard", [str(python), "-c", _IMPORT_CITEGUARD], cwd=smoke_cwd)
         if args.version:
@@ -460,7 +460,7 @@ import citeguard
 from citeguard.version import __version__
 
 expected = sys.argv[1]
-installed = version("citeguard")
+installed = version("citationguard")
 assert installed == expected, (installed, expected)
 assert __version__ == expected, (__version__, expected)
 assert citeguard.__version__ == expected, (citeguard.__version__, expected)
@@ -475,7 +475,7 @@ import citeguard.mcp.server
 _PUBLIC_PACKAGE_FILES_SMOKE = """
 from importlib.metadata import distribution
 
-files = [str(path) for path in (distribution("citeguard").files or [])]
+files = [str(path) for path in (distribution("citationguard").files or [])]
 legacy_files = [path for path in files if path == "src/__init__.py" or path.startswith("src/")]
 assert not legacy_files, legacy_files
 assert any(path == "citeguard/__init__.py" for path in files)
@@ -504,7 +504,7 @@ assert not experimental_exports, sorted(experimental_exports)
 _DISTRIBUTION_METADATA_SMOKE = """
 from importlib.metadata import distribution
 
-metadata = distribution("citeguard").metadata
+metadata = distribution("citationguard").metadata
 summary = metadata.get("Summary", "")
 assert "skeptical citation auditor" in summary, summary
 assert "agent writing workflows" in summary, summary
@@ -568,7 +568,7 @@ scripts = {
 }
 assert scripts["citeguard"] == "citeguard.cli:main"
 assert scripts["citeguard-mcp"] == "citeguard.mcp.server:main"
-metadata = distribution("citeguard").metadata
+metadata = distribution("citationguard").metadata
 extras = set(metadata.get_all("Provides-Extra") or [])
 assert {"mcp", "models", "api", "pdf"}.issubset(extras)
 """

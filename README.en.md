@@ -3,6 +3,7 @@
 [![CI](https://github.com/xiaweiyi713/citeguard/actions/workflows/ci.yml/badge.svg)](https://github.com/xiaweiyi713/citeguard/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.9%2B-blue.svg)](pyproject.toml)
+[![PyPI](https://img.shields.io/pypi/v/citationguard.svg)](https://pypi.org/project/citationguard/)
 
 [中文(默认)](README.md) · English
 
@@ -85,7 +86,7 @@ Two guardrails keep it honest: a source being **unreachable is never escalated t
 
 The **core library has zero third-party dependencies** and runs on Python ≥ 3.9.
 
-> ⚠️ **Important:** the `citeguard` package on PyPI is an unrelated project by another organization — **it is not this repository**. This project publishes under the distribution name **`citationguard`**: install with `pip install citationguard`, then `import citeguard` as usual (the `citeguard` / `citeguard-mcp` console commands are unchanged). Until `citationguard` is published, please use the **source checkout** install below.
+> ℹ️ **Package naming:** this project publishes on PyPI as **[`citationguard`](https://pypi.org/project/citationguard/)** — install with `pip install citationguard`, then `import citeguard` as usual (the `citeguard` / `citeguard-mcp` console commands are unchanged). The `citeguard` package on PyPI is an unrelated project by another organization.
 
 For an installed or published package:
 

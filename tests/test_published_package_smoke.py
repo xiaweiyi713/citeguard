@@ -305,7 +305,7 @@ class PublishedPackageSmokeTests(unittest.TestCase):
         self.assertNotIn(legacy_namespace, smoke_published_package._ENTRY_POINT_SMOKE)
 
     def test_post_publish_smoke_rejects_legacy_namespace_files(self):
-        self.assertIn("distribution(\"citeguard\").files", smoke_published_package._PUBLIC_PACKAGE_FILES_SMOKE)
+        self.assertIn("distribution(\"citationguard\").files", smoke_published_package._PUBLIC_PACKAGE_FILES_SMOKE)
         self.assertIn("citeguard/mcp/server.py", smoke_published_package._PUBLIC_PACKAGE_FILES_SMOKE)
         self.assertIn("legacy_files", smoke_published_package._PUBLIC_PACKAGE_FILES_SMOKE)
 
@@ -325,7 +325,7 @@ class PublishedPackageSmokeTests(unittest.TestCase):
     def test_post_publish_smoke_validates_distribution_metadata(self):
         smoke = smoke_published_package._DISTRIBUTION_METADATA_SMOKE
 
-        self.assertIn('distribution("citeguard").metadata', smoke)
+        self.assertIn('distribution("citationguard").metadata', smoke)
         self.assertIn("skeptical citation auditor", smoke)
         self.assertIn("agent writing workflows", smoke)
         self.assertIn("citation-verification", smoke)
@@ -427,7 +427,7 @@ class PublishedPackageSmokeTests(unittest.TestCase):
     def test_post_publish_smoke_validates_installed_version_contract(self):
         smoke = smoke_published_package._VERSION_CONTRACT_SMOKE
 
-        self.assertIn('version("citeguard")', smoke)
+        self.assertIn('version("citationguard")', smoke)
         self.assertIn("citeguard.__version__", smoke)
         self.assertIn("__version__ == expected", smoke)
 

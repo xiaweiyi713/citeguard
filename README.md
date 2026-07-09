@@ -3,6 +3,7 @@
 [![CI](https://github.com/xiaweiyi713/citeguard/actions/workflows/ci.yml/badge.svg)](https://github.com/xiaweiyi713/citeguard/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.9%2B-blue.svg)](pyproject.toml)
+[![PyPI](https://img.shields.io/pypi/v/citationguard.svg)](https://pypi.org/project/citationguard/)
 
 中文 · [English →](README.en.md)
 
@@ -74,9 +75,9 @@ CiteGuard 对照 **OpenAlex、Crossref、arXiv、Semantic Scholar** 回答两个
 
 **核心库零第三方依赖**,运行于 Python ≥ 3.9。
 
-> ⚠️ **重要**:PyPI 上的 `citeguard` 包是另一个组织的无关项目,**不是本仓库**。本项目的发布名是 **`citationguard`**——安装用 `pip install citationguard`,代码里仍然 `import citeguard`,命令行入口也仍是 `citeguard` / `citeguard-mcp`。`citationguard` 正式发布前,请使用下方的**源码安装**方式。
+> ℹ️ **包名说明**:本项目在 PyPI 的发布名是 **[`citationguard`](https://pypi.org/project/citationguard/)**——安装用 `pip install citationguard`,代码里仍然 `import citeguard`,命令行入口也仍是 `citeguard` / `citeguard-mcp`。PyPI 上的 `citeguard` 包是另一个组织的无关项目,请勿混淆。
 
-已发布包安装:
+通过 PyPI 安装:
 
 ```bash
 python -m pip install citationguard
