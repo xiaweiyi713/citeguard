@@ -116,7 +116,7 @@ citeguard extract examples/references.md                 # 从文稿中提取引
 citeguard counterevidence --claim "The Transformer relies entirely on attention."
 ```
 
-提取支持 Markdown/纯文本参考文献、LaTeX `\bibitem`、BibTeX、编译产物 `.bbl`、LaTeX `\bibliography{refs}` / `\addbibresource{refs.bib}` 外链(含 `\input{...}` / `\include{...}` 子文件)以及 `.docx`——全部只用标准库(即 Markdown/LaTeX/BibTeX/BBL/DOCX 引用提取)。提取行保留 `source_path` / `source_locator` / 行号范围,审计结果可回指原始参考文献条目。
+提取支持 Markdown/纯文本参考文献、**GB/T 7714 中文著录格式**(`[J]/[M]/[C]/[D]` 等标记,自动解析出标题/作者/期刊)、LaTeX `\bibitem`、BibTeX、编译产物 `.bbl`、LaTeX `\bibliography{refs}` / `\addbibresource{refs.bib}` 外链(含 `\input{...}` / `\include{...}` 子文件)以及 `.docx`——全部只用标准库(即 Markdown/LaTeX/BibTeX/BBL/DOCX 引用提取)。提取行保留 `source_path` / `source_locator` / 行号范围,审计结果可回指原始参考文献条目。
 
 所有命令输出 JSON,带稳定的 `next_action` 枚举、风险排序和机器可读错误。完整 CLI 说明(含 `cache` 检查/导出/清理与离线 fixture 回放)见 [docs/cli_reference.md](docs/cli_reference.md);agent 侧完整字段契约见 [docs/agent_output_contract.md](docs/agent_output_contract.md)。
 
@@ -200,7 +200,9 @@ print(support.verdict.value, support.engine)
 
 ## 中文支持
 
-文本匹配对 CJK 友好(中文字符保留并按字符 bigram 分词,**零额外依赖**),中文标题与论点可直接对照 OpenAlex/Crossref 中已收录的大量中文论文核验。判定中文论点的支撑性时,请将 `CITEGUARD_RERANKER_MODEL` / `CITEGUARD_NLI_MODEL` 指向多语模型。
+文本匹配对 CJK 友好(中文字符保留并按字符 bigram 分词,**零额外依赖**);**GB/T 7714 中文参考文献**(`作者. 标题[J]. 期刊, 年, 卷(期): 页` 等)可被自动解析为结构化字段后核验。判定中文论点的支撑性时,请将 `CITEGUARD_RERANKER_MODEL` / `CITEGUARD_NLI_MODEL` 指向多语模型。
+
+**中文论文的现实边界**:中国学者的英文论文(SCI/EI/arXiv)覆盖完整;中文核心期刊多数不在 OpenAlex/Crossref 体系内(其 DOI 注册于中国 DOI/ISTIC),按标题核验通常返回 `not_found`——这表示"开放源查不到",不构成伪造指控。Crossref 对纯中文标题检索无效,CiteGuard 会自动跳过该查询以省去无效请求;**提供 DOI 时的直查路径不受影响**。
 
 知网(CNKI)与万方**未**接入:两者没有开放/免费 API,我们不爬取受限内容。ChinaXiv 可行性调研结论为 NO-GO(其 OAI 端点受访问限制)——见 [`docs/chinaxiv_spike.md`](docs/chinaxiv_spike.md);可插拔的源接口保留,一旦出现开放端点即可添加适配器。
 

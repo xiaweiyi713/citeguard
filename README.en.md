@@ -127,7 +127,9 @@ citeguard extract examples/references.md                 # pull citation candida
 citeguard counterevidence --claim "The Transformer relies entirely on attention."
 ```
 
-Extraction reads Markdown/plain-text reference sections, LaTeX `\bibitem`, BibTeX,
+Extraction reads Markdown/plain-text reference sections, **GB/T 7714 Chinese
+reference format** (`[J]/[M]/[C]/[D]` markers, parsed into structured
+title/authors/venue fields), LaTeX `\bibitem`, BibTeX,
 compiled `.bbl`, LaTeX `\bibliography{refs}` / `\addbibresource{refs.bib}` links
 (including `\input{...}` / `\include{...}` subfiles), and `.docx` — standard
 library only. Extracted rows keep `source_path` / `source_locator` / line-range
@@ -228,7 +230,9 @@ support runs a labelled `heuristic` engine which never emits `supported` or
 
 ## Chinese support
 
-Text matching is CJK-aware (Chinese characters are preserved and tokenized into character bigrams, with **no extra dependencies**), so Chinese titles and claims can be verified against the many Chinese papers already indexed in OpenAlex/Crossref. For judging Chinese claim support, point `CITEGUARD_RERANKER_MODEL` / `CITEGUARD_NLI_MODEL` at multilingual models.
+Text matching is CJK-aware (Chinese characters are preserved and tokenized into character bigrams, with **no extra dependencies**), and **GB/T 7714 Chinese references** (`作者. 标题[J]. 期刊, 年, 卷(期): 页`) are parsed into structured fields before verification. For judging Chinese claim support, point `CITEGUARD_RERANKER_MODEL` / `CITEGUARD_NLI_MODEL` at multilingual models.
+
+**Practical boundary for Chinese papers:** English-language papers by Chinese authors (SCI/EI/arXiv) are fully covered; most Chinese-language core journals are outside the OpenAlex/Crossref ecosystem (their DOIs are registered with China DOI/ISTIC), so title-based checks usually return `not_found` — meaning "not visible in open sources", never a fabrication accusation. Crossref cannot match pure-CJK title queries, so CiteGuard skips that wasted call automatically; **DOI-based lookups are unaffected**.
 
 CNKI (知网) and Wanfang (万方) are **not** integrated: they have no open/free API and we do not scrape gated content. A ChinaXiv feasibility spike concluded NO-GO (its OAI endpoint is access-gated) — see [`docs/chinaxiv_spike.md`](docs/chinaxiv_spike.md); the pluggable source interface remains so an adapter can be added if an open endpoint appears.
 

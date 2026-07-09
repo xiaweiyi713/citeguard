@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Iterable, List, Set, Tuple
 from xml.etree import ElementTree
 
-from .parse import extract_arxiv_id, extract_doi, extract_year
+from .parse import extract_arxiv_id, extract_doi, extract_year, parse_gbt7714_reference
 
 REFERENCE_HEADING_RE = re.compile(
     r"^\s*(?:#{1,6}\s*)?(references|bibliography|works cited|参考文献)\s*$",
@@ -472,6 +472,13 @@ def _candidate(
     year = extract_year(raw_text)
     if year is not None:
         item["year"] = year
+    gbt = parse_gbt7714_reference(raw_text)
+    if gbt:
+        item["title"] = gbt["title"]
+        item["authors"] = list(gbt["authors"])
+        if gbt["venue"]:
+            item["venue"] = gbt["venue"]
+        item["reference_format"] = "gbt7714"
     return item
 
 

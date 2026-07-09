@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from typing import Any, List, Optional
 from urllib.parse import quote
 
@@ -19,6 +20,20 @@ from .utils import (
     stable_record_id,
     strip_tags,
 )
+
+
+# Crossref's bibliographic search does not tokenize CJK text, so
+# predominantly-CJK queries return unrelated results; skip the wasted call.
+# DOI lookups are unaffected and remain the reliable path for Chinese papers.
+_CJK_CHAR_RE = re.compile(r"[\u3400-\u4dbf\u4e00-\u9fff]")
+
+
+def _mostly_cjk(query: str) -> bool:
+    chars = [char for char in (query or "") if not char.isspace()]
+    if not chars:
+        return False
+    cjk = sum(1 for char in chars if _CJK_CHAR_RE.match(char))
+    return cjk / len(chars) >= 0.5
 
 
 class CrossrefMetadataSource(MetadataSource):
@@ -44,6 +59,8 @@ class CrossrefMetadataSource(MetadataSource):
         return list(self._records)
 
     def search(self, query: str, top_k: int = 5) -> List[CitationRecord]:
+        if _mostly_cjk(query):
+            return []
         params = {"query.bibliographic": query, "rows": top_k}
         if self.mailto:
             params["mailto"] = self.mailto

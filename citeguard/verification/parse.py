@@ -28,6 +28,13 @@ ARXIV_BARE_URL_RE = re.compile(
 ARXIV_BARE_RE = re.compile(rf"\b({ARXIV_ID_PATTERN})\b", re.IGNORECASE)
 YEAR_RE = re.compile(r"\b(?:19|20)\d{2}\b")
 
+# GB/T 7714 (Chinese national standard) document-type markers such as
+# [J] journal, [M] monograph, [C] proceedings, [D] thesis, [R] report,
+# [S] standard, [P] patent, [N] newspaper, plus /OL-style carrier suffixes.
+GBT7714_TYPE_RE = re.compile(r"\[(?P<type>EB|DB|CP|CM|DS|[JMCDRSPNAZG])(?:/(?:OL|CD|DK|MT))?\]")
+_GBT7714_AUTHOR_SPLIT_RE = re.compile(r"[,,、;;]")
+_GBT7714_ET_AL = {"等", "et al", "et al."}
+
 
 def extract_doi(text: str) -> str:
     match = DOI_RE.search(text or "")
@@ -51,6 +58,60 @@ def extract_arxiv_id(text: str) -> str:
 def extract_year(text: str) -> Optional[int]:
     match = YEAR_RE.search(text or "")
     return int(match.group(0)) if match else None
+
+
+def parse_gbt7714_reference(text: str) -> Optional[Dict[str, Any]]:
+    """Parse one GB/T 7714 style reference (the Chinese national standard).
+
+    Handles Chinese and English variants such as
+    ``作者1, 作者2. 标题[J]. 期刊名, 年, 卷(期): 页.`` and
+    ``CHEN X, LI Y. Some title[C]//Proceedings. City: Publisher, 2020.``.
+    Returns None when the text does not look like a GB/T 7714 reference, so
+    other free-text parsing stays untouched.
+    """
+
+    cleaned = (text or "").strip()
+    match = GBT7714_TYPE_RE.search(cleaned)
+    if not match:
+        return None
+    head = cleaned[: match.start()].strip()
+    tail = cleaned[match.end() :].strip()
+    type_code = match.group("type")
+
+    authors_part, separator, title_part = head.partition(". ")
+    if not separator:
+        authors_part, separator, title_part = head.partition(".")
+    if not separator:
+        return None
+    title = title_part.strip().rstrip(".").strip()
+    authors_raw = authors_part.strip()
+    if not title or not authors_raw:
+        return None
+
+    authors = [
+        author.strip()
+        for author in _GBT7714_AUTHOR_SPLIT_RE.split(authors_raw)
+        if author.strip() and author.strip().lower() not in _GBT7714_ET_AL
+    ]
+    if not authors:
+        return None
+
+    venue = ""
+    extra: Dict[str, Any] = {"type_code": type_code}
+    tail = tail.lstrip(".").strip()
+    if tail.startswith("//"):
+        tail = tail[2:].strip()
+    if type_code in {"J", "N", "C"} and tail:
+        pieces = re.split(r"[,,]", tail, maxsplit=1)
+        venue = pieces[0].strip().rstrip(".").strip()
+        if type_code == "C":
+            venue = venue.split(". ", 1)[0].strip()
+        if len(pieces) > 1 and pieces[1].strip():
+            extra["publication_info"] = pieces[1].strip().rstrip(".")
+    elif tail:
+        extra["publication_info"] = tail.rstrip(".")
+
+    return {"title": title, "authors": authors, "venue": venue, "gbt7714": extra}
 
 
 def parse_citation(
@@ -78,10 +139,21 @@ def parse_citation(
     if year is None:
         year = extract_year(raw_text)
 
+    record_metadata = dict(metadata or {})
+    if raw_text and not title:
+        parsed_gbt = parse_gbt7714_reference(raw_text)
+        if parsed_gbt:
+            title = parsed_gbt["title"]
+            if not authors:
+                authors = list(parsed_gbt["authors"])
+            if not venue:
+                venue = parsed_gbt["venue"]
+            record_metadata.setdefault("reference_format", "gbt7714")
+            record_metadata.setdefault("gbt7714", parsed_gbt["gbt7714"])
+
     title_explicit = bool(title)
     search_title = title or raw_text
     seed = doi or arxiv_id or search_title or "citation"
-    record_metadata = dict(metadata or {})
     record_metadata.update({"raw_text": raw_text, "title_explicit": title_explicit})
     if evidence_chunks:
         record_metadata["evidence_chunks"] = list(evidence_chunks)

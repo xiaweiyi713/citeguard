@@ -93,6 +93,65 @@ class ParseTests(unittest.TestCase):
         self.assertFalse(record.metadata["title_explicit"])
         self.assertEqual(record.metadata["raw_text"], "Asai et al., OpenScholar, arXiv:2411.14199, 2024")
 
+    def test_parse_gbt7714_chinese_journal_reference(self):
+        record = parse_citation(
+            raw_text="张钹, 朱军, 苏航. 迈向第三代人工智能[J]. 中国科学: 信息科学, 2020, 50(9): 1281-1302."
+        )
+        self.assertEqual(record.title, "迈向第三代人工智能")
+        self.assertEqual(record.authors, ["张钹", "朱军", "苏航"])
+        self.assertEqual(record.venue, "中国科学: 信息科学")
+        self.assertEqual(record.year, 2020)
+        self.assertTrue(record.metadata["title_explicit"])
+        self.assertEqual(record.metadata["reference_format"], "gbt7714")
+        self.assertEqual(record.metadata["gbt7714"]["type_code"], "J")
+
+    def test_parse_gbt7714_monograph_keeps_publisher_in_metadata(self):
+        record = parse_citation(raw_text="周志华. 机器学习[M]. 北京: 清华大学出版社, 2016.")
+        self.assertEqual(record.title, "机器学习")
+        self.assertEqual(record.authors, ["周志华"])
+        self.assertEqual(record.venue, "")
+        self.assertEqual(record.year, 2016)
+        self.assertIn("清华大学出版社", record.metadata["gbt7714"]["publication_info"])
+
+    def test_parse_gbt7714_thesis_and_online_carrier_suffix(self):
+        thesis = parse_citation(raw_text="王芳. 引用核验方法研究[D]. 北京: 清华大学, 2019.")
+        self.assertEqual(thesis.metadata["gbt7714"]["type_code"], "D")
+        self.assertEqual(thesis.title, "引用核验方法研究")
+
+        online = parse_citation(raw_text="李四, 王五, 等. 大模型引用幻觉综述[J/OL]. 软件学报, 2022, 33(4): 1-20.")
+        self.assertEqual(online.title, "大模型引用幻觉综述")
+        self.assertEqual(online.authors, ["李四", "王五"])
+        self.assertEqual(online.venue, "软件学报")
+
+    def test_parse_gbt7714_english_proceedings_variant(self):
+        record = parse_citation(
+            raw_text="CHEN X, LI Y. Deep learning for citation checking[C]//Proceedings of ACL. Stroudsburg: ACL, 2021: 1-10."
+        )
+        self.assertEqual(record.title, "Deep learning for citation checking")
+        self.assertEqual(record.authors, ["CHEN X", "LI Y"])
+        self.assertEqual(record.venue, "Proceedings of ACL")
+        self.assertEqual(record.year, 2021)
+
+    def test_parse_gbt7714_reference_with_doi_keeps_identifier_priority(self):
+        record = parse_citation(
+            raw_text="张三. 某研究[J]. 某学报, 2021, 1(1): 1-10. DOI: 10.1360/SSI-2020-0204."
+        )
+        self.assertEqual(record.doi, "10.1360/ssi-2020-0204")
+        self.assertEqual(record.title, "某研究")
+
+    def test_non_gbt7714_free_text_is_unchanged(self):
+        record = parse_citation(raw_text="Asai et al., OpenScholar, arXiv:2411.14199, 2024")
+        self.assertFalse(record.metadata["title_explicit"])
+        self.assertNotIn("reference_format", record.metadata)
+
+    def test_explicit_title_bypasses_gbt7714_parsing(self):
+        record = parse_citation(
+            raw_text="张钹, 朱军, 苏航. 迈向第三代人工智能[J]. 中国科学: 信息科学, 2020.",
+            title="自定义标题",
+        )
+        self.assertEqual(record.title, "自定义标题")
+        self.assertNotIn("reference_format", record.metadata)
+
 
 if __name__ == "__main__":
     unittest.main()

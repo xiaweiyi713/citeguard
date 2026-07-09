@@ -657,6 +657,43 @@ class ScholarlySourceTests(unittest.TestCase):
         self.assertEqual(http_client.json_calls[0]["params"]["search"], "phantom references fabricated metadata")
         self.assertNotIn("mailto", http_client.json_calls[0]["params"])
 
+    def test_crossref_skips_mostly_cjk_search_queries_without_http_calls(self):
+        http_client = CapturingHTTPClient()
+        source = CrossrefMetadataSource(http_client=http_client, harvest_evidence=False)
+
+        results = source.search("迈向第三代人工智能", top_k=3)
+
+        self.assertEqual(results, [])
+        self.assertEqual(http_client.json_calls, [])
+
+    def test_crossref_still_searches_mixed_and_english_queries(self):
+        http_client = CapturingHTTPClient()
+        source = CrossrefMetadataSource(http_client=http_client, harvest_evidence=False)
+
+        source.search("BERT pretraining survey 大模型", top_k=2)
+
+        self.assertEqual(len(http_client.json_calls), 1)
+
+    def test_crossref_cjk_candidate_with_doi_still_resolves_via_lookup(self):
+        http_client = CrossrefLookupHTTPClient()
+        source = CrossrefMetadataSource(http_client=http_client, harvest_evidence=False)
+
+        record = source.lookup(
+            CitationRecord(
+                citation_id="candidate-zh",
+                title="迈向第三代人工智能",
+                authors=["张钹"],
+                year=2020,
+                venue="",
+                abstract="",
+                doi="10.5555/resolver",
+                source="input",
+            )
+        )
+
+        self.assertIsNotNone(record)
+        self.assertEqual(record.doi, "10.5555/mixedcase")
+
     def test_crossref_handles_sparse_or_unexpected_record_shapes(self):
         http_client = CrossrefSparseHTTPClient()
         source = CrossrefMetadataSource(http_client=http_client, harvest_evidence=True)
