@@ -1,7 +1,7 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-09-29/server.schema.json",
   "name": "io.github.xiaweiyi713/citeguard",
-  "description": "Falsification-first citation auditor: verifies that cited papers exist, metadata is correct, and papers support claims, against OpenAlex/Crossref/arXiv/Semantic Scholar.",
+  "description": "Falsification-first citation auditor: existence, metadata, and claim-support checks via MCP.",
   "repository": {
     "url": "https://github.com/xiaweiyi713/citeguard",
     "source": "github"
