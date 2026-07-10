@@ -530,6 +530,90 @@ class AssessSupportTests(unittest.TestCase):
         self.assertEqual(payload["model_failure_details"][0]["backend"], "transformers_nli")
         self.assertIn("timed out", payload["model_failure_details"][0]["message"])
 
+    def test_oa_fulltext_fetcher_upgrades_support_evidence_to_full_text_scope(self):
+        record = CitationRecord(
+            citation_id="oa-support-1",
+            title="Retrieval Improves Citation Audits",
+            abstract="We study citation auditing systems in general.",
+            authors=["Ada Lovelace"],
+            year=2026,
+            source="openalex",
+            metadata={
+                "open_access": {
+                    "is_oa": True,
+                    "pdf_url": "",
+                    "landing_page_url": "https://example.org/oa",
+                }
+            },
+        )
+        source = InMemoryMetadataSource([record])
+
+        class FakeOaFetcher:
+            def attach(self, resolved):
+                from dataclasses import replace
+
+                metadata = dict(resolved.metadata)
+                metadata["oa_fulltext"] = {
+                    "status": "fetched",
+                    "source_url": "https://example.org/oa",
+                    "content_type": "html",
+                    "chunk_count": 1,
+                }
+                metadata.setdefault("evidence_chunks", []).append(
+                    {
+                        "text": "Our experiments show retrieval improves citation audit recall significantly.",
+                        "source_field": "oa_full_text_1",
+                        "source_url": "https://example.org/oa",
+                        "source_name": "openalex_oa",
+                    }
+                )
+                return replace(resolved, metadata=metadata)
+
+        backend = _FakeBackend({"improves citation audit recall": (0.93, {"entailment": 0.95, "neutral": 0.03, "contradiction": 0.02})})
+        result = check_claim_support(
+            "Retrieval improves citation audit recall.",
+            CitationRecord(citation_id="cand-1", title="Retrieval Improves Citation Audits", year=2026, source="input", metadata={"title_explicit": True}),
+            source,
+            backend=backend,
+            oa_fulltext_fetcher=FakeOaFetcher(),
+        )
+
+        self.assertEqual(result.verdict, SupportVerdict.SUPPORTED)
+        self.assertEqual(result.evidence_scope, "full_text")
+        self.assertEqual(result.evidence["source_field"], "oa_full_text_1")
+        self.assertEqual(result.resolution["oa_fulltext"]["status"], "fetched")
+
+    def test_oa_fetch_failure_never_blocks_abstract_level_support(self):
+        record = CitationRecord(
+            citation_id="oa-support-2",
+            title="Robust Citation Verification",
+            abstract="This paper verifies citation metadata carefully.",
+            source="openalex",
+            metadata={"open_access": {"is_oa": True, "landing_page_url": "https://example.org/down", "pdf_url": ""}},
+        )
+        source = InMemoryMetadataSource([record])
+
+        class FailingOaFetcher:
+            def attach(self, resolved):
+                from dataclasses import replace
+
+                metadata = dict(resolved.metadata)
+                metadata["oa_fulltext"] = {"status": "unavailable", "detail": "URLError"}
+                return replace(resolved, metadata=metadata)
+
+        backend = _FakeBackend({"verifies citation metadata": (0.55, None)})
+        result = check_claim_support(
+            "The paper verifies citation metadata.",
+            CitationRecord(citation_id="cand-2", title="Robust Citation Verification", source="input", metadata={"title_explicit": True}),
+            source,
+            backend=backend,
+            oa_fulltext_fetcher=FailingOaFetcher(),
+        )
+
+        self.assertNotEqual(result.verdict, SupportVerdict.CONTRADICTED)
+        self.assertEqual(result.resolution["oa_fulltext"]["status"], "unavailable")
+        self.assertIn(result.evidence_scope, ("abstract", "title", "mixed"))
+
 
 if __name__ == "__main__":
     unittest.main()

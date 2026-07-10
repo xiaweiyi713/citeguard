@@ -719,6 +719,31 @@ def build_doi_registry_probe(env: Optional[Mapping[str, str]] = None):
     return DoiRegistryProbe(http_client=HTTPClient(timeout=http_timeout(active_env)))
 
 
+def oa_fulltext_enabled(env: Optional[Mapping[str, str]] = None) -> bool:
+    """Return whether open-access full-text fetching is enabled."""
+
+    active_env = env or os.environ
+    return str(active_env.get("CITEGUARD_OA_FULLTEXT", "0")).strip().lower() in {"1", "true", "yes", "on"}
+
+
+def build_oa_fulltext_fetcher(env: Optional[Mapping[str, str]] = None):
+    """Build the open-access full-text fetcher, or None when disabled.
+
+    Fetches paper bodies only from locations the source marks as open access;
+    gated hosts remain blocked and paywalls are never bypassed. Disabled by
+    default; enable with CITEGUARD_OA_FULLTEXT=1. Skipped in fixture mode.
+    """
+
+    from citeguard.retrieval.scholarly_clients.oa_fulltext import OaFulltextFetcher
+
+    active_env = env or os.environ
+    if fixture_citations_path(active_env):
+        return None
+    if not oa_fulltext_enabled(active_env):
+        return None
+    return OaFulltextFetcher(timeout=http_timeout(active_env))
+
+
 def load_fixture_records(path: str) -> List[CitationRecord]:
     """Load CitationRecord objects from a JSON list, JSONL, or manifest fixture."""
 

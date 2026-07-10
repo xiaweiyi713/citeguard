@@ -34,7 +34,7 @@ else:
     _MCP_IMPORT_ERROR = None
 
 from citeguard.errors import error_payload, runtime_config_error_details
-from citeguard.runtime import build_configured_source, build_configured_support_backend, build_doi_registry_probe, environment_status
+from citeguard.runtime import build_configured_source, build_configured_support_backend, build_doi_registry_probe, build_oa_fulltext_fetcher, environment_status
 from citeguard.verification import (
     ClaimSupportAuditItem,
     audit_citations,
@@ -318,7 +318,7 @@ def check_claim_support_tool(
     active_backend = _support_backend_or_error("check_claim_support_tool")
     if isinstance(active_backend, dict):
         return active_backend
-    return check_claim_support(claim, candidate, active_source, backend=active_backend, lang=lang).to_dict()
+    return check_claim_support(claim, candidate, active_source, backend=active_backend, lang=lang, oa_fulltext_fetcher=build_oa_fulltext_fetcher()).to_dict()
 
 
 @mcp.tool()
@@ -417,6 +417,7 @@ def check_claim_support_set_tool(
         active_source,
         backend=active_backend,
         lang=lang,
+        oa_fulltext_fetcher=build_oa_fulltext_fetcher(),
     ).to_dict()
     if include_counterevidence:
         result = enrich_support_payload_with_counterevidence(result, active_source, top_k=parsed_counterevidence_top_k)
@@ -631,6 +632,7 @@ def audit_claim_support_tool(
         active_source,
         backend=active_backend,
         lang=lang,
+        oa_fulltext_fetcher=build_oa_fulltext_fetcher(),
     ).to_dict()
     if include_counterevidence:
         result = enrich_support_payload_with_counterevidence(result, active_source, top_k=parsed_counterevidence_top_k)

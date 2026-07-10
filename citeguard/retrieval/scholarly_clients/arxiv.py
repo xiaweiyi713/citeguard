@@ -117,6 +117,14 @@ class ArxivMetadataSource(MetadataSource):
             abstract = " ".join(summary.split())
             metadata = {
                 "source_score": 0.0,
+                # Every arXiv paper is open access by design.
+                "open_access": {
+                    "is_oa": True,
+                    "pdf_url": f"https://arxiv.org/pdf/{arxiv_id}" if arxiv_id else "",
+                    "landing_page_url": f"https://arxiv.org/abs/{arxiv_id}" if arxiv_id else "",
+                    "license": "arxiv",
+                    "version": "submittedVersion",
+                },
                 "metadata_quality": metadata_quality(
                     title=title,
                     authors=authors,

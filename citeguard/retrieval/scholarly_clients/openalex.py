@@ -111,10 +111,18 @@ class OpenAlexMetadataSource(MetadataSource):
         year = item.get("publication_year")
         abstract = openalex_abstract_to_text(item.get("abstract_inverted_index", {}))
         url = landing_page_url or item.get("id", "")
+        oa_info = item.get("open_access") or {}
         metadata = {
             "openalex_id": item.get("id", ""),
             "source_score": float(item.get("relevance_score", 0.0)),
             "cited_by_count": item.get("cited_by_count", 0),
+            "open_access": {
+                "is_oa": bool(oa_info.get("is_oa") or best_oa_location.get("is_oa")),
+                "pdf_url": str(best_oa_location.get("pdf_url") or ""),
+                "landing_page_url": str(best_oa_location.get("landing_page_url") or ""),
+                "license": str(best_oa_location.get("license") or ""),
+                "version": str(best_oa_location.get("version") or ""),
+            },
             "metadata_quality": metadata_quality(
                 title=title,
                 authors=authors,

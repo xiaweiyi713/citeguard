@@ -90,3 +90,11 @@ CiteGuard is designed to help writers and agents become more skeptical about
 citations. Final decisions about research integrity, plagiarism, misconduct,
 copyright, licensing, or publication suitability remain with qualified humans
 and the relevant institutions.
+
+## Open-Access Full Text
+
+When `CITEGUARD_OA_FULLTEXT=1` is set, CiteGuard fetches paper bodies only from
+locations the scholarly source explicitly marks as open access (for example
+OpenAlex `best_oa_location` or arXiv's own PDF endpoints). Gated hosts remain
+blocked by the same host blocklist as remote evidence harvesting, paywalls are
+never bypassed, and the feature is disabled by default.

@@ -2678,7 +2678,7 @@ def _check_full_text_evidence_boundary_contract_gate(*, project_root: Path) -> D
     docs_requirements = {
         "README.md": {
             "no_scraping": "does not scrape gated sources",
-            "no_remote_full_text": "download remote full text",
+            "oa_only_remote_full_text": "remote full text is OA-only and disabled by default",
             "no_paywall": "bypass paywalls",
             "abstract_boundary": "abstract-level unless you provide full-text evidence",
         },

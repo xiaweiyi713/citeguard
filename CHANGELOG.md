@@ -2,7 +2,14 @@
 
 ## Unreleased
 
-- Nothing yet.
+- Added opt-in open-access full-text support (`CITEGUARD_OA_FULLTEXT=1`):
+  claim-support checks can now fetch the paper body from source-declared OA
+  locations (with an official arXiv PDF fallback) and judge claims at
+  `evidence_scope=full_text`; gated hosts stay blocked and paywalls are never
+  bypassed. Fetch outcomes are reported as `resolution.oa_fulltext` and a
+  failed fetch never changes a verdict.
+- Added a tag-triggered PyPI trusted-publishing workflow that builds, tests,
+  publishes, and attaches artifacts to the GitHub release automatically.
 
 ## 0.1.1 - 2026-07-09
 

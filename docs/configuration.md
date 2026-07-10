@@ -43,6 +43,7 @@ source-checkout fallback.
 | `CITEGUARD_HTTP_RETRY_BACKOFF` | `0.2` | Non-negative base retry backoff in seconds. |
 | `CITEGUARD_HTTP_MIN_INTERVAL` | `0` | Non-negative minimum interval in seconds between uncached live-source HTTP requests from the same adapter. Increase this for slower, more polite live runs. |
 | `CITEGUARD_REMOTE_EVIDENCE` | `0` | Enables limited remote landing-page evidence harvesting when set to `1`, `true`, `yes`, or `on`. Disabled by default. |
+| `CITEGUARD_OA_FULLTEXT` | `0` | Fetches open-access paper bodies for full-text claim support when set to `1`; OA locations only, gated hosts stay blocked, never bypasses paywalls. Disabled by default. |
 | `CITEGUARD_DOI_REGISTRY` | `1` | Checks unresolved DOIs against the global doi.org Handle registry (covers all registrars, including China DOI/ISTIC) and reports `doi_registration` on `not_found` results. Set `0` to disable; automatically skipped in offline fixture mode. |
 | `CITEGUARD_EVIDENCE_TIMEOUT` | `2` | Positive integer timeout in seconds for optional remote evidence fetching. |
 | `SEMANTIC_SCHOLAR_API_KEY` | empty | Optional Semantic Scholar API key. Status reports only whether it is configured. |

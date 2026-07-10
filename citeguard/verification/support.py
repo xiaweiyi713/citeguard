@@ -924,6 +924,7 @@ def check_claim_support(
     backend: Optional[SupportBackend] = None,
     policy: SupportDecisionPolicy = DEFAULT_SUPPORT_POLICY,
     lang: str = "",
+    oa_fulltext_fetcher: Optional[Any] = None,
 ) -> SupportResult:
     """Resolve the cited paper, then judge whether it supports the claim."""
 
@@ -995,6 +996,13 @@ def check_claim_support(
         **input_source_provenance(candidate),
     }
     resolved = _merge_candidate_evidence(outcome.best, candidate)
+    if oa_fulltext_fetcher is not None:
+        resolved = oa_fulltext_fetcher.attach(resolved)
+        oa_report = resolved.metadata.get("oa_fulltext")
+        if isinstance(oa_report, dict):
+            resolution["oa_fulltext"] = {
+                key: value for key, value in oa_report.items() if key != "chunks"
+            }
     return assess_support(claim, resolved, backend=backend, policy=policy, lang=lang, resolution=resolution)
 
 
@@ -1034,6 +1042,7 @@ def audit_claim_support(
     backend: Optional[SupportBackend] = None,
     policy: SupportDecisionPolicy = DEFAULT_SUPPORT_POLICY,
     lang: str = "",
+    oa_fulltext_fetcher: Optional[Any] = None,
 ) -> SupportAuditReport:
     """Resolve and assess many claim-citation pairs."""
 
@@ -1051,6 +1060,7 @@ def audit_claim_support(
                         backend=backend,
                         policy=policy,
                         lang=request.lang or lang,
+                        oa_fulltext_fetcher=oa_fulltext_fetcher,
                     )
                 )
             else:
@@ -1062,6 +1072,7 @@ def audit_claim_support(
                         backend=backend,
                         policy=policy,
                         lang=request.lang or lang,
+                        oa_fulltext_fetcher=oa_fulltext_fetcher,
                     )
                 )
             input_modes.append(mode)
@@ -1073,6 +1084,7 @@ def audit_claim_support(
                 source,
                 backend=backend,
                 policy=policy,
+                oa_fulltext_fetcher=oa_fulltext_fetcher,
                 lang=request.lang or lang,
             )
         )
@@ -1258,6 +1270,7 @@ def check_claim_support_set(
     backend: Optional[SupportBackend] = None,
     policy: SupportDecisionPolicy = DEFAULT_SUPPORT_POLICY,
     lang: str = "",
+    oa_fulltext_fetcher: Optional[Any] = None,
 ) -> ClaimSupportSetResult:
     """Assess whether one claim is supported by a set of cited papers.
 
@@ -1266,7 +1279,10 @@ def check_claim_support_set(
     """
 
     results = [
-        check_claim_support(claim, candidate, source, backend=backend, policy=policy, lang=lang)
+        check_claim_support(
+            claim, candidate, source, backend=backend, policy=policy, lang=lang,
+            oa_fulltext_fetcher=oa_fulltext_fetcher,
+        )
         for candidate in candidates
     ]
     summary = {verdict.value: 0 for verdict in SupportVerdict}
@@ -1707,6 +1723,12 @@ def _merge_candidate_evidence(record: CitationRecord, candidate: CitationRecord)
 
     candidate_chunks = candidate.metadata.get("evidence_chunks", [])
     candidate_abstract = str(candidate.abstract or "").strip()
+    # Carry caller-provided identifiers onto the resolved record so downstream
+    # helpers (e.g. the OA full-text arXiv fallback) can use them.
+    if candidate.arxiv_id and not record.arxiv_id:
+        record = replace(record, arxiv_id=candidate.arxiv_id)
+    if candidate.doi and not record.doi:
+        record = replace(record, doi=candidate.doi)
     if not candidate_chunks and not candidate_abstract:
         return record
 

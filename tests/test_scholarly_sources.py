@@ -657,6 +657,104 @@ class ScholarlySourceTests(unittest.TestCase):
         self.assertEqual(http_client.json_calls[0]["params"]["search"], "phantom references fabricated metadata")
         self.assertNotIn("mailto", http_client.json_calls[0]["params"])
 
+    def test_oa_fulltext_fetcher_attaches_full_text_chunks_from_html(self):
+        from citeguard.retrieval.scholarly_clients.oa_fulltext import OaFulltextFetcher
+
+        fetcher = OaFulltextFetcher()
+        fetcher._fetch_bytes = lambda url: (
+            b"<html><body><p>The proposed method improves citation audit recall by a wide margin. "
+            b"Extensive experiments confirm the effect across benchmarks.</p></body></html>",
+            "",
+        )
+        record = CitationRecord(
+            citation_id="oa-1",
+            title="An Open Access Paper",
+            source="openalex",
+            metadata={
+                "open_access": {
+                    "is_oa": True,
+                    "pdf_url": "",
+                    "landing_page_url": "https://example.org/oa-paper",
+                }
+            },
+        )
+
+        enriched = fetcher.attach(record)
+
+        report = enriched.metadata["oa_fulltext"]
+        self.assertEqual(report["status"], "fetched")
+        self.assertEqual(report["content_type"], "html")
+        self.assertGreaterEqual(report["chunk_count"], 1)
+        chunks = enriched.metadata["evidence_chunks"]
+        self.assertTrue(any(chunk["source_field"].startswith("oa_full_text_") for chunk in chunks))
+        self.assertTrue(all(chunk.get("source_url") == "https://example.org/oa-paper" for chunk in chunks))
+        # 原 record 不可变,attach 返回新对象
+        self.assertNotIn("oa_fulltext", record.metadata)
+
+    def test_oa_fulltext_fetcher_skips_non_open_access_records(self):
+        from citeguard.retrieval.scholarly_clients.oa_fulltext import OaFulltextFetcher
+
+        fetcher = OaFulltextFetcher()
+        fetcher._fetch_bytes = lambda url: (_ for _ in ()).throw(AssertionError("must not fetch"))
+        record = CitationRecord(
+            citation_id="closed-1",
+            title="A Paywalled Paper",
+            source="openalex",
+            metadata={"open_access": {"is_oa": False, "pdf_url": "https://example.org/p.pdf"}},
+        )
+
+        enriched = fetcher.attach(record)
+
+        self.assertEqual(enriched.metadata["oa_fulltext"]["status"], "skipped_not_open_access")
+        self.assertNotIn("evidence_chunks", enriched.metadata)
+
+    def test_oa_fulltext_fetcher_blocks_gated_hosts_even_when_marked_oa(self):
+        from citeguard.retrieval.scholarly_clients.oa_fulltext import OaFulltextFetcher
+
+        fetcher = OaFulltextFetcher()
+        fetcher._fetch_bytes = lambda url: (_ for _ in ()).throw(AssertionError("must not fetch"))
+        record = CitationRecord(
+            citation_id="gated-1",
+            title="Gated Host Paper",
+            source="openalex",
+            metadata={
+                "open_access": {
+                    "is_oa": True,
+                    "pdf_url": "https://www.cnki.net/fake.pdf",
+                    "landing_page_url": "",
+                }
+            },
+        )
+
+        enriched = fetcher.attach(record)
+
+        self.assertEqual(enriched.metadata["oa_fulltext"]["status"], "skipped_blocked_url")
+
+    def test_oa_fulltext_fetcher_treats_network_failure_conservatively(self):
+        from citeguard.retrieval.scholarly_clients.oa_fulltext import OaFulltextFetcher
+
+        fetcher = OaFulltextFetcher()
+        fetcher._fetch_bytes = lambda url: (None, "URLError")
+        record = CitationRecord(
+            citation_id="oa-down",
+            title="Unreachable OA Paper",
+            source="openalex",
+            metadata={
+                "open_access": {
+                    "is_oa": True,
+                    "pdf_url": "",
+                    "landing_page_url": "https://example.org/down",
+                }
+            },
+        )
+
+        enriched = fetcher.attach(record)
+
+        report = enriched.metadata["oa_fulltext"]
+        self.assertEqual(report["status"], "unavailable")
+        self.assertEqual(report["detail"], "URLError")
+        self.assertNotIn("evidence_chunks", enriched.metadata)
+
     def test_doi_registry_probe_reports_registered_doi_with_resolution_url(self):
         class HandleHTTPClient(FakeHTTPClient):
             def get_json(self, url, params=None, headers=None, use_cache=True, timeout=None):

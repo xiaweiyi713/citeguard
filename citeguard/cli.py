@@ -11,7 +11,7 @@ import sys
 from typing import Any, Iterable, Optional, TextIO
 
 from citeguard.errors import error_payload, runtime_config_error_details
-from citeguard.runtime import build_configured_source, build_configured_support_backend, build_doi_registry_probe, cache_path, environment_status
+from citeguard.runtime import build_configured_source, build_configured_support_backend, build_doi_registry_probe, build_oa_fulltext_fetcher, cache_path, environment_status
 from citeguard.verification import (
     ClaimSupportAuditItem,
     ClaimSupportRequest,
@@ -431,6 +431,7 @@ def run(
                 active_source,
                 backend=active_backend,
                 lang=args.lang,
+                oa_fulltext_fetcher=build_oa_fulltext_fetcher(),
             )
             _print_json(result.to_dict(), out, compact=args.compact)
             return 0
@@ -492,6 +493,7 @@ def run(
                 active_source,
                 backend=active_backend,
                 lang=args.lang,
+                oa_fulltext_fetcher=build_oa_fulltext_fetcher(),
             )
             payload = result.to_dict()
             if args.with_counterevidence:
@@ -543,6 +545,7 @@ def run(
                 active_source,
                 backend=active_backend,
                 lang=args.lang,
+                oa_fulltext_fetcher=build_oa_fulltext_fetcher(),
             )
             payload = report.to_dict()
             if args.with_counterevidence:

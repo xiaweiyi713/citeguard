@@ -73,10 +73,12 @@ CiteGuard answers two questions, against **OpenAlex, Crossref, arXiv, and Semant
 | `contradicted` | the abstract actively contradicts the claim |
 
 Support results carry a machine-readable `evidence_scope` so agents never present
-abstract-level evidence as a full-text conclusion. Full-text support is opt-in via
-caller-provided lawful excerpts or local text/PDF files (`pip install "citationguard[pdf]"`
-for PDF extraction); CiteGuard does not scrape gated sources, download remote full
-text, or bypass paywalls.
+abstract-level evidence as a full-text conclusion. Full-text support has two opt-in
+paths: caller-provided lawful excerpts or local text/PDF files, or
+`CITEGUARD_OA_FULLTEXT=1`, which fetches the paper body **only from locations the
+source marks as open access** (all of arXiv qualifies; PDF extraction needs
+`pip install "citationguard[pdf]"`). CiteGuard does not scrape gated sources or
+bypass paywalls; remote full text is OA-only and disabled by default.
 
 Two guardrails keep it honest: a source being **unreachable is never escalated to "fabricated"** (it lowers confidence, sets `outage_limited=true` for outage-limited `not_found` results, and reports `sources_available`, `sources_failed`, and `source_failure_mode`), and `insufficient_evidence` / `not_found` are phrased as "could not confirm", leaving the final judgment to a human or the host agent.
 
@@ -218,6 +220,7 @@ print(support.verdict.value, support.engine)
 | `CITEGUARD_FIXTURE_CITATIONS` | — | JSON/JSONL citation fixture for deterministic offline runs |
 | `CITEGUARD_HTTP_TIMEOUT` | `10` | timeout, in seconds, for live scholarly API calls |
 | `CITEGUARD_REMOTE_EVIDENCE` | `0` | set to `1` to fetch landing-page snippets in addition to title/abstract metadata |
+| `CITEGUARD_OA_FULLTEXT` | `0` | set to `1` to fetch open-access paper bodies for full-text claim support; OA locations only, never bypasses paywalls |
 | `CITEGUARD_RERANKER_MODEL` / `CITEGUARD_NLI_MODEL` | English models | support deep-mode models — set multilingual ones for non-English claims |
 
 The full runtime contract (retry/backoff knobs, evidence timeouts, cache paths,

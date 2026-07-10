@@ -65,7 +65,7 @@ CiteGuard 对照 **OpenAlex、Crossref、arXiv、Semantic Scholar** 回答两个
 | `insufficient_evidence` | 摘要未涉及该论点——**弃权**,不等于"不支持" |
 | `contradicted` | 摘要与论点相矛盾 |
 
-支撑性结果带机器可读的 `evidence_scope` 字段,agent 不会把摘要级证据当成全文结论。全文级支撑为可选:调用方可通过 CLI/MCP/JSON 提供合法摘录或本地 text/PDF 文件(PDF 解析需 `pip install "citationguard[pdf]"`);CiteGuard 不抓取受限源、不下载远程全文、不绕过付费墙。
+支撑性结果带机器可读的 `evidence_scope` 字段,agent 不会把摘要级证据当成全文结论。全文级支撑有两条可选通道:调用方提供合法摘录或本地 text/PDF 文件;或设置 `CITEGUARD_OA_FULLTEXT=1`,让 CiteGuard 自动拉取**源明确标记为开放获取(OA)的论文全文**(arXiv 全部适用,PDF 解析需 `pip install "citationguard[pdf]"`)。CiteGuard 不抓取受限源、不绕过付费墙;远程全文仅限 OA 地址且默认关闭。
 
 两条守护原则保证它"诚实":**源不可达永远不会升级成"伪造"**(只降低置信度,设置 `outage_limited=true` 并上报 `sources_available` / `sources_failed` / `source_failure_mode`);`insufficient_evidence` / `not_found` 一律表述为"无法确认",最终裁决留给人或宿主 agent。
 
@@ -194,6 +194,7 @@ print(support.verdict.value, support.engine)
 | `CITEGUARD_FIXTURE_CITATIONS` | — | JSON/JSONL 引用 fixture,用于确定性离线运行 |
 | `CITEGUARD_HTTP_TIMEOUT` | `10` | 实时学术 API 调用超时(秒) |
 | `CITEGUARD_REMOTE_EVIDENCE` | `0` | 设为 `1` 时额外抓取落地页摘要片段 |
+| `CITEGUARD_OA_FULLTEXT` | `0` | 设为 `1` 时自动拉取开放获取(OA)论文全文用于全文级支撑判定;仅限 OA 地址,绝不绕过付费墙 |
 | `CITEGUARD_RERANKER_MODEL` / `CITEGUARD_NLI_MODEL` | 英文模型 | 支撑性深度模式模型——非英文论点请配置多语模型 |
 
 完整运行时契约(重试/退避、证据超时、缓存路径、远程证据边界)见 [docs/configuration.md](docs/configuration.md)。
