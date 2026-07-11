@@ -37,6 +37,20 @@ Verifying 2 citations against OpenAlex + arXiv ...
 
 > 输出为实时采集,置信度与匹配到的记录会随源数据漂移。
 
+**中文文献同样开箱即用**(GB/T 7714 解析 + 全球 DOI 注册表兜底,均为真实输出):
+
+```text
+$ citeguard extract refs_zh.md        # GB/T 7714 中文参考文献
+{"title": "迈向第三代人工智能", "authors": ["张钹", "朱军", "苏航"],
+ "venue": "中国科学: 信息科学", "year": 2020, "reference_format": "gbt7714"}
+
+$ citeguard verify --title "迈向第三代人工智能" --doi "10.1360/SSI-2020-0204"
+verdict: not_found                    # 开放学术源没有它的元数据……
+doi_registration:
+  registered: true                    # ……但全球 DOI 注册表确认论文真实存在
+  resolution_url: engine.scichina.com/doi/10.1360/SSI-2020-0204
+```
+
 ---
 
 ## 它做什么

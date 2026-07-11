@@ -44,6 +44,20 @@ Verifying 2 citations against OpenAlex + arXiv ...
 
 > Output is captured live, so exact confidence and matched-record details can drift with source data.
 
+**Chinese bibliographies work out of the box** (GB/T 7714 parsing + a global DOI-registry safety net; real output):
+
+```text
+$ citeguard extract refs_zh.md        # GB/T 7714 Chinese references
+{"title": "迈向第三代人工智能", "authors": ["张钹", "朱军", "苏航"],
+ "venue": "中国科学: 信息科学", "year": 2020, "reference_format": "gbt7714"}
+
+$ citeguard verify --title "迈向第三代人工智能" --doi "10.1360/SSI-2020-0204"
+verdict: not_found                    # no metadata in open scholarly sources...
+doi_registration:
+  registered: true                    # ...but the global DOI registry confirms the paper is real
+  resolution_url: engine.scichina.com/doi/10.1360/SSI-2020-0204
+```
+
 ---
 
 ## What it does
