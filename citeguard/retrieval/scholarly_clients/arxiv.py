@@ -52,20 +52,27 @@ class ArxivMetadataSource(MetadataSource):
         self._remember(records)
         return records
 
+    def lookup_identifier(self, candidate: CitationRecord) -> Optional[CitationRecord]:
+        if not candidate.arxiv_id:
+            return None
+        payload = self.http_client.get_text(
+            self.BASE_URL,
+            params={"id_list": normalize_arxiv_id(candidate.arxiv_id)},
+        )
+        records = self._parse_entries(payload)
+        if records:
+            self._remember(records[:1])
+            return records[0]
+        return None
+
     def lookup(self, candidate: CitationRecord) -> Optional[CitationRecord]:
         local_match = find_local_match(candidate, self._records)
         if local_match is not None:
             return local_match
 
-        if candidate.arxiv_id:
-            payload = self.http_client.get_text(
-                self.BASE_URL,
-                params={"id_list": normalize_arxiv_id(candidate.arxiv_id)},
-            )
-            records = self._parse_entries(payload)
-            if records:
-                self._remember(records[:1])
-                return records[0]
+        identified = self.lookup_identifier(candidate)
+        if identified is not None:
+            return identified
 
         candidates = self.search(candidate.title, top_k=3)
         best = max(candidates, key=lambda record: record_match_score(candidate, record), default=None)

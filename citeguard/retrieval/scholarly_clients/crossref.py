@@ -73,24 +73,31 @@ class CrossrefMetadataSource(MetadataSource):
         self._remember(records)
         return records
 
+    def lookup_identifier(self, candidate: CitationRecord) -> Optional[CitationRecord]:
+        if not candidate.doi:
+            return None
+        params = {}
+        if self.mailto:
+            params["mailto"] = self.mailto
+        payload = self.http_client.get_json(
+            f"{self.BASE_URL}/{quote(normalize_doi(candidate.doi), safe='')}",
+            params=params,
+        )
+        message = payload.get("message")
+        if message:
+            record = self._to_record(message)
+            self._remember([record])
+            return record
+        return None
+
     def lookup(self, candidate: CitationRecord) -> Optional[CitationRecord]:
         local_match = find_local_match(candidate, self._records)
         if local_match is not None:
             return local_match
 
-        if candidate.doi:
-            params = {}
-            if self.mailto:
-                params["mailto"] = self.mailto
-            payload = self.http_client.get_json(
-                f"{self.BASE_URL}/{quote(normalize_doi(candidate.doi), safe='')}",
-                params=params,
-            )
-            message = payload.get("message")
-            if message:
-                record = self._to_record(message)
-                self._remember([record])
-                return record
+        identified = self.lookup_identifier(candidate)
+        if identified is not None:
+            return identified
 
         candidates = self.search(candidate.title, top_k=3)
         best = max(candidates, key=lambda record: record_match_score(candidate, record), default=None)
