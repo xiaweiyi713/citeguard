@@ -10,7 +10,7 @@ from citeguard.retrieval.scholarly_clients.base import MetadataSource
 from citeguard.retrieval.scholarly_clients.utils import normalize_arxiv_id, normalize_doi
 
 from .models import FieldDiff, VerificationResult, Verdict, classify_source_failure_mode
-from .resolve import STRONG_MATCH, resolve_citation
+from .resolve import STRONG_MATCH, is_suspect_record, resolve_citation
 
 TITLE_MATCH = 0.90
 AUTHOR_MATCH = 0.50
@@ -137,6 +137,20 @@ def verify_citation(
         )
 
     if outcome.ambiguous:
+        ambiguity_explanations = {
+            "year_conflict": (
+                "Matching records disagree on the publication year across sources (likely a reprint or "
+                "mirror record); provide a DOI or arXiv id to disambiguate."
+            ),
+            "suspect_record": (
+                "The best match shows signs of a hijacked or mirror record; provide a DOI or arXiv id "
+                "to disambiguate."
+            ),
+        }
+        base_explanation = ambiguity_explanations.get(
+            outcome.ambiguity_reason,
+            "Multiple plausible matches; cannot disambiguate without a DOI or arXiv id.",
+        )
         return VerificationResult(
             verdict=Verdict.AMBIGUOUS,
             confidence=_confidence_with_source_failures(outcome.score, failure_mode),
@@ -145,7 +159,7 @@ def verify_citation(
             field_diffs=[],
             suggested_citation="",
             explanation=(
-                "Multiple plausible matches; cannot disambiguate without a DOI or arXiv id."
+                base_explanation
                 + _source_failure_note(failure_mode, failed)
                 + miss_note
             ),
@@ -162,13 +176,19 @@ def verify_citation(
     diffs = _field_diffs(candidate, outcome.best)
     mismatched = [diff.field for diff in diffs if not diff.matches]
     if mismatched:
+        identifier_confirmed = identifier_status == "hit" or outcome.score >= 1.0
+        suggested = (
+            formatter.format_reference(outcome.best)
+            if (identifier_confirmed or not is_suspect_record(outcome.best))
+            else ""
+        )
         return VerificationResult(
             verdict=Verdict.METADATA_MISMATCH,
             confidence=_confidence_with_source_failures(outcome.score, failure_mode),
             input_citation=candidate,
             canonical_record=outcome.best,
             field_diffs=diffs,
-            suggested_citation=formatter.format_reference(outcome.best),
+            suggested_citation=suggested,
             explanation=(
                 f"The paper exists, but these fields disagree with the canonical record: {', '.join(mismatched)}."
                 + _source_failure_note(failure_mode, failed)

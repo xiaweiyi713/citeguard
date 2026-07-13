@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import os
 import socket
 from dataclasses import dataclass
+from datetime import date
 from typing import Any, Dict, List, Optional
 
 from citeguard.citation import author_coverage, sequence_similarity, year_matches
@@ -14,6 +16,31 @@ from citeguard.retrieval.scholarly_clients.utils import normalize_arxiv_id, norm
 
 STRONG_MATCH = 0.70
 AMBIGUOUS_MARGIN = 0.05
+
+DEFAULT_SUSPECT_DOI_PREFIXES = ("10.65215",)
+
+
+def _suspect_doi_prefixes() -> tuple:
+    extra = os.environ.get("CITEGUARD_SUSPECT_DOI_PREFIXES", "")
+    return DEFAULT_SUSPECT_DOI_PREFIXES + tuple(p.strip() for p in extra.split(",") if p.strip())
+
+
+def is_suspect_record(record: CitationRecord, now_year: Optional[int] = None) -> bool:
+    """Heuristic for hijacked/mirror records.
+
+    Only ever used to DOWNGRADE a verdict to ambiguous - never to accuse.
+    Signals: a greylisted DOI prefix, or an implausible citation count for a
+    brand-new publication year (e.g. thousands of citations on a paper dated
+    this year - the signature of a hijacked duplicate of a classic paper).
+    """
+
+    doi = normalize_doi(record.doi)
+    if doi and any(doi.startswith(prefix) for prefix in _suspect_doi_prefixes()):
+        return True
+    cited = int(record.metadata.get("cited_by_count") or 0)
+    year = record.year
+    current = now_year if now_year is not None else date.today().year
+    return bool(cited >= 1000 and year is not None and year >= current - 1)
 
 
 @dataclass(frozen=True)
@@ -182,7 +209,7 @@ def resolve_citation(candidate: CitationRecord, source: MetadataSource) -> Resol
             continue
         seen.add(record.citation_id)
         scored.append((verification_match_score(candidate, record), record))
-    scored.sort(key=lambda item: item[0], reverse=True)
+    scored.sort(key=lambda item: (item[0], 0 if is_suspect_record(item[1]) else 1), reverse=True)
 
     if not scored:
         return ResolveOutcome(
@@ -206,6 +233,14 @@ def resolve_citation(candidate: CitationRecord, source: MetadataSource) -> Resol
         and (best_score - scored[1][0]) < AMBIGUOUS_MARGIN
         and not (candidate.doi or candidate.arxiv_id)
     )
+    ambiguity_reason = "near_duplicate" if ambiguous else ""
+    if not identifier_hit and scored:
+        strong_records = [record for score, record in scored if score >= STRONG_MATCH]
+        years = {record.year for record in strong_records if record.year is not None}
+        if len(years) >= 2 and (max(years) - min(years) > 1):
+            ambiguous, ambiguity_reason = True, "year_conflict"
+        elif best is not None and is_suspect_record(best):
+            ambiguous, ambiguity_reason = True, (ambiguity_reason or "suspect_record")
     return ResolveOutcome(
         best=best,
         score=best_score,
@@ -216,7 +251,7 @@ def resolve_citation(candidate: CitationRecord, source: MetadataSource) -> Resol
         source_failure_details=failure_details,
         ambiguous=ambiguous,
         identifier_lookup=identifier_info,
-        ambiguity_reason="near_duplicate" if ambiguous else "",
+        ambiguity_reason=ambiguity_reason,
     )
 
 
