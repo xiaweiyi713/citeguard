@@ -26,6 +26,8 @@ class ResolveOutcome:
     sources_failed: List[str]
     source_failure_details: List[Dict[str, Any]]
     ambiguous: bool
+    identifier_lookup: Optional[Dict[str, Any]] = None
+    ambiguity_reason: str = ""
 
 
 def verification_match_score(candidate: CitationRecord, record: CitationRecord) -> float:
@@ -54,6 +56,74 @@ def source_names(source: MetadataSource) -> List[str]:
     return [inner.name]
 
 
+IDENTIFIER_AUTHORITY = {"arxiv_id": "arxiv", "doi": "crossref"}
+
+
+def _child_sources(source: MetadataSource) -> List[MetadataSource]:
+    inner = getattr(source, "inner", source)
+    if isinstance(inner, MultiSourceMetadataSource):
+        return list(inner.sources)
+    return [inner]
+
+
+def _identifier_authority(candidate: CitationRecord, source: MetadataSource):
+    """Strictly resolve the caller-provided identifier at its home source.
+
+    Returns (info, record_or_None) where info["status"] is one of
+    "hit" | "miss" | "failed" | "unavailable"; returns None when the candidate
+    carries no identifier. Never falls back to title search: a reliable
+    hit/miss/failed signal is the whole point.
+    """
+
+    if candidate.arxiv_id:
+        id_kind, value = "arxiv_id", normalize_arxiv_id(candidate.arxiv_id)
+    elif candidate.doi:
+        id_kind, value = "doi", normalize_doi(candidate.doi)
+    else:
+        return None
+    authority_name = IDENTIFIER_AUTHORITY[id_kind]
+    info: Dict[str, Any] = {"kind": id_kind, "value": value, "source": authority_name}
+    child = next(
+        (item for item in _child_sources(source) if getattr(item, "name", "") == authority_name),
+        None,
+    )
+    if child is None:
+        info["status"] = "unavailable"
+        return info, None
+
+    last_detail: Optional[Dict[str, Any]] = None
+    for _attempt in range(2):  # one explicit retry: the authority path deserves a second chance
+        try:
+            record = child.lookup_identifier(candidate)
+        except Exception as exc:
+            code, kind = _classify_source_exception(exc)
+            last_detail = {
+                "source": authority_name, "code": code, "kind": kind,
+                "status_code": None, "url": "", "error": exc.__class__.__name__,
+            }
+            continue
+        http_client = getattr(child, "http_client", None)
+        error_code = getattr(http_client, "last_error_code", "") if http_client is not None else ""
+        if record is not None:
+            info["status"] = "hit"
+            return info, record
+        if not error_code:
+            info["status"] = "miss"
+            return info, None
+        last_detail = {
+            "source": authority_name,
+            "code": error_code,
+            "kind": getattr(http_client, "last_error_kind", ""),
+            "status_code": getattr(http_client, "last_status_code", None),
+            "url": getattr(http_client, "last_url", ""),
+            "error": getattr(http_client, "last_error", ""),
+        }
+    info["status"] = "failed"
+    if last_detail is not None:
+        info["failure_detail"] = last_detail
+    return info, None
+
+
 def resolve_citation(candidate: CitationRecord, source: MetadataSource) -> ResolveOutcome:
     checked = source_names(source)
     query = candidate.title or candidate.metadata.get("raw_text", "")
@@ -61,7 +131,20 @@ def resolve_citation(candidate: CitationRecord, source: MetadataSource) -> Resol
     failure_details: List[Dict[str, Any]] = []
 
     results: List[CitationRecord] = []
-    if candidate.doi or candidate.arxiv_id:
+    identifier_info: Optional[Dict[str, Any]] = None
+    authority = _identifier_authority(candidate, source)
+    if authority is not None:
+        identifier_info, authority_record = authority
+        if identifier_info.get("status") == "hit" and authority_record is not None:
+            results.append(authority_record)
+        elif identifier_info.get("status") == "failed":
+            detail = identifier_info.get("failure_detail")
+            if detail:
+                failure_details.append(dict(detail))
+                failed.append(str(detail.get("source", "")))
+
+    identifier_hit = bool(identifier_info and identifier_info.get("status") == "hit")
+    if (candidate.doi or candidate.arxiv_id) and not identifier_hit:
         try:
             match = source.lookup(candidate)
         except Exception as exc:
@@ -102,7 +185,18 @@ def resolve_citation(candidate: CitationRecord, source: MetadataSource) -> Resol
     scored.sort(key=lambda item: item[0], reverse=True)
 
     if not scored:
-        return ResolveOutcome(None, 0.0, [], checked, responded, failed, failure_details, False)
+        return ResolveOutcome(
+            best=None,
+            score=0.0,
+            alternatives=[],
+            sources_checked=checked,
+            sources_responded=responded,
+            sources_failed=failed,
+            source_failure_details=failure_details,
+            ambiguous=False,
+            identifier_lookup=identifier_info,
+            ambiguity_reason="",
+        )
 
     best_score, best = scored[0]
     alternatives = [record for _, record in scored[1:4]]
@@ -112,7 +206,18 @@ def resolve_citation(candidate: CitationRecord, source: MetadataSource) -> Resol
         and (best_score - scored[1][0]) < AMBIGUOUS_MARGIN
         and not (candidate.doi or candidate.arxiv_id)
     )
-    return ResolveOutcome(best, best_score, alternatives, checked, responded, failed, failure_details, ambiguous)
+    return ResolveOutcome(
+        best=best,
+        score=best_score,
+        alternatives=alternatives,
+        sources_checked=checked,
+        sources_responded=responded,
+        sources_failed=failed,
+        source_failure_details=failure_details,
+        ambiguous=ambiguous,
+        identifier_lookup=identifier_info,
+        ambiguity_reason="near_duplicate" if ambiguous else "",
+    )
 
 
 def _exception_failure_details(source_names: List[str], exc: Exception) -> List[Dict[str, Any]]:
