@@ -7,7 +7,7 @@ from typing import Any, List, Optional
 from citeguard.citation import CitationFormatter, author_coverage, sequence_similarity, year_matches
 from citeguard.graph import CitationRecord
 from citeguard.retrieval.scholarly_clients.base import MetadataSource
-from citeguard.retrieval.scholarly_clients.utils import normalize_doi
+from citeguard.retrieval.scholarly_clients.utils import normalize_arxiv_id, normalize_doi
 
 from .models import FieldDiff, VerificationResult, Verdict, classify_source_failure_mode
 from .resolve import STRONG_MATCH, resolve_citation
@@ -37,6 +37,9 @@ def _field_diffs(candidate: CitationRecord, canonical: CitationRecord) -> List[F
     if candidate.doi:
         matches = normalize_doi(candidate.doi) == normalize_doi(canonical.doi)
         diffs.append(FieldDiff("doi", candidate.doi, canonical.doi, matches))
+    if candidate.arxiv_id:
+        matches = normalize_arxiv_id(candidate.arxiv_id) == normalize_arxiv_id(canonical.arxiv_id)
+        diffs.append(FieldDiff("arxiv_id", candidate.arxiv_id, canonical.arxiv_id, matches))
     return diffs
 
 
@@ -51,6 +54,14 @@ def verify_citation(
     checked, responded, failed = outcome.sources_checked, outcome.sources_responded, outcome.sources_failed
     failure_details = outcome.source_failure_details
     failure_mode = classify_source_failure_mode(checked, failed, responded)
+    identifier_info = outcome.identifier_lookup or {}
+    identifier_status = str(identifier_info.get("status", ""))
+    miss_note = (
+        f" Note: the provided {identifier_info.get('kind', 'identifier')} was not found at "
+        f"{identifier_info.get('source', 'its home source')}."
+        if identifier_status == "miss"
+        else ""
+    )
 
     if outcome.best is None or outcome.score < STRONG_MATCH:
         confidence = round(1.0 - outcome.score, 4)
@@ -98,6 +109,31 @@ def verify_citation(
             outage_limited=outage_limited,
             alternatives=outcome.alternatives,
             doi_registration=doi_registration,
+            identifier_lookup=outcome.identifier_lookup,
+        )
+
+    if identifier_status == "failed" and outcome.best is not None and outcome.score < 1.0:
+        return VerificationResult(
+            verdict=Verdict.AMBIGUOUS,
+            confidence=min(_confidence_with_source_failures(outcome.score, failure_mode), 0.6),
+            input_citation=candidate,
+            canonical_record=outcome.best,
+            field_diffs=[],
+            suggested_citation="",
+            explanation=(
+                f"The authoritative {identifier_info.get('kind', 'identifier')} lookup failed on "
+                f"{identifier_info.get('source', 'its home source')}; a title-based match exists but cannot "
+                "be confirmed against the provided identifier. Retry or check source health - this is not "
+                "evidence of fabrication."
+            ),
+            sources_checked=checked,
+            sources_responded=responded,
+            sources_failed=failed,
+            source_failure_details=failure_details,
+            source_failure_mode=failure_mode,
+            outage_limited=True,
+            alternatives=outcome.alternatives,
+            identifier_lookup=outcome.identifier_lookup,
         )
 
     if outcome.ambiguous:
@@ -111,6 +147,7 @@ def verify_citation(
             explanation=(
                 "Multiple plausible matches; cannot disambiguate without a DOI or arXiv id."
                 + _source_failure_note(failure_mode, failed)
+                + miss_note
             ),
             sources_checked=checked,
             sources_responded=responded,
@@ -119,6 +156,7 @@ def verify_citation(
             source_failure_mode=failure_mode,
             outage_limited=False,
             alternatives=outcome.alternatives,
+            identifier_lookup=outcome.identifier_lookup,
         )
 
     diffs = _field_diffs(candidate, outcome.best)
@@ -134,6 +172,7 @@ def verify_citation(
             explanation=(
                 f"The paper exists, but these fields disagree with the canonical record: {', '.join(mismatched)}."
                 + _source_failure_note(failure_mode, failed)
+                + miss_note
             ),
             sources_checked=checked,
             sources_responded=responded,
@@ -141,6 +180,7 @@ def verify_citation(
             source_failure_details=failure_details,
             source_failure_mode=failure_mode,
             outage_limited=False,
+            identifier_lookup=outcome.identifier_lookup,
         )
 
     return VerificationResult(
@@ -153,6 +193,7 @@ def verify_citation(
         explanation=(
             "Citation resolves to a real record and the provided metadata matches."
             + _source_failure_note(failure_mode, failed)
+            + miss_note
         ),
         sources_checked=checked,
         sources_responded=responded,
@@ -160,6 +201,7 @@ def verify_citation(
         source_failure_details=failure_details,
         source_failure_mode=failure_mode,
         outage_limited=False,
+        identifier_lookup=outcome.identifier_lookup,
     )
 
 

@@ -7,8 +7,10 @@ from citeguard.retrieval.scholarly_clients import InMemoryMetadataSource, MultiS
 from citeguard.retrieval.scholarly_clients.arxiv import ArxivMetadataSource
 from citeguard.retrieval.scholarly_clients.base import MetadataSource
 from citeguard.retrieval.scholarly_clients.crossref import CrossrefMetadataSource
+from citeguard.verification.models import Verdict
 from citeguard.verification.parse import parse_citation
 from citeguard.verification.resolve import resolve_citation
+from citeguard.verification.verify import verify_citation
 
 
 ARXIV_ATOM_OK = """<?xml version=\"1.0\"?>
@@ -195,6 +197,46 @@ class IdentifierAuthorityResolveTests(unittest.TestCase):
             MultiSourceMetadataSource([openalex]),
         )
         self.assertIsNone(outcome.identifier_lookup)
+
+
+class IdentifierAuthorityVerifyTests(unittest.TestCase):
+    def _candidate(self):
+        return parse_citation(title="Attention Is All You Need", arxiv_id="1706.03762", year=2017)
+
+    def test_id_hit_verifies_despite_junk_record(self):
+        arxiv = _HitIdentifierSource([], "arxiv", AIAYN_TRUE)
+        openalex = _NamedMemory([AIAYN_JUNK], "openalex")
+        result = verify_citation(self._candidate(), MultiSourceMetadataSource([openalex, arxiv]))
+        self.assertEqual(result.verdict, Verdict.VERIFIED)
+        self.assertEqual(result.canonical_record.year, 2017)
+        self.assertEqual(result.to_dict()["identifier_lookup"]["status"], "hit")
+
+    def test_id_failure_never_yields_title_only_mismatch(self):
+        arxiv = _FailingIdentifierSource([], "arxiv")
+        openalex = _NamedMemory([AIAYN_JUNK], "openalex")
+        result = verify_citation(self._candidate(), MultiSourceMetadataSource([openalex, arxiv]))
+        self.assertEqual(result.verdict, Verdict.AMBIGUOUS)
+        self.assertTrue(result.outage_limited)
+        self.assertEqual(result.suggested_citation, "")
+        self.assertIn("identifier", result.explanation.lower())
+
+    def test_id_failure_with_cross_source_id_confirmation_still_verifies(self):
+        # another source's record carries the same arXiv id -> identifier effectively confirmed
+        arxiv = _FailingIdentifierSource([], "arxiv")
+        openalex = _NamedMemory([AIAYN_TRUE], "openalex")
+        result = verify_citation(self._candidate(), MultiSourceMetadataSource([openalex, arxiv]))
+        self.assertEqual(result.verdict, Verdict.VERIFIED)
+
+    def test_arxiv_id_field_diff_added_on_miss(self):
+        arxiv = _HitIdentifierSource([], "arxiv", None, payloads=[(EMPTY_ARXIV_FEED, ""), (EMPTY_ARXIV_FEED, "")])
+        plain = CitationRecord(citation_id="x", title="Attention Is All You Need",
+                               authors=["Ashish Vaswani"], year=2017, source="openalex")
+        openalex = _NamedMemory([plain], "openalex")
+        result = verify_citation(self._candidate(), MultiSourceMetadataSource([openalex, arxiv]))
+        self.assertEqual(result.verdict, Verdict.METADATA_MISMATCH)
+        diff_fields = [d.field for d in result.field_diffs]
+        self.assertIn("arxiv_id", diff_fields)
+        self.assertIn("not found at", result.explanation)
 
 
 if __name__ == "__main__":
