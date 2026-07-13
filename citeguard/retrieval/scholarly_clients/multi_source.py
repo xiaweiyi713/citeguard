@@ -93,7 +93,11 @@ class MultiSourceMetadataSource(MetadataSource):
             title_similarity = sequence_similarity(query, record.title)
             overlap = len(query_tokens & set(tokenize_text(f"{record.title} {record.abstract}")))
             normalized_overlap = overlap / max(len(query_tokens), 1)
-            source_score = float(record.metadata.get("source_score", 0.0))
+            raw_source_score = float(record.metadata.get("source_score", 0.0))
+            # Raw relevance scores are source-specific and unbounded (OpenAlex
+            # returns values in the thousands); squash to 0-1 so this term
+            # cannot dominate title similarity and completeness.
+            source_score = raw_source_score / (raw_source_score + 50.0) if raw_source_score > 0 else 0.0
             completeness = min(1.0, sum(bool(value) for value in [
                 record.authors,
                 record.year,
