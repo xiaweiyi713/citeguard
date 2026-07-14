@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import socket
-from typing import Any, Dict, Iterable, List, Optional
+from concurrent.futures import Future, ThreadPoolExecutor, wait
+from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple
 
 from citeguard.citation import sequence_similarity, tokenize_text
 from citeguard.graph import CitationRecord
@@ -17,8 +18,9 @@ class MultiSourceMetadataSource(MetadataSource):
 
     name = "multi_source"
 
-    def __init__(self, sources: Iterable[MetadataSource]) -> None:
+    def __init__(self, sources: Iterable[MetadataSource], budget_seconds: float = 8.0) -> None:
         self.sources = list(sources)
+        self.budget_seconds = max(0.1, float(budget_seconds))
         self.last_failures: List[str] = []
         self.last_failure_details: List[Dict[str, Any]] = []
 
@@ -31,35 +33,14 @@ class MultiSourceMetadataSource(MetadataSource):
 
     def search(self, query: str, top_k: int = 5) -> List[CitationRecord]:
         per_source = max(top_k, 3)
-        merged: List[CitationRecord] = []
-        self.last_failures = []
-        self.last_failure_details = []
-        for source in self.sources:
-            try:
-                records = source.search(query, top_k=per_source)
-            except Exception as exc:
-                self._record_failure(source, exc)
-                continue
-            if not records:
-                self._record_http_failure_if_present(source)
-            merged.extend(records)
+        values = self._fan_out(lambda item: item.search(query, top_k=per_source))
+        merged = [record for value in values if value for record in value]
         ranked = self._rank(query, merge_record_list(merged))
         return ranked[:top_k]
 
     def lookup(self, candidate: CitationRecord) -> Optional[CitationRecord]:
-        matches = []
-        self.last_failures = []
-        self.last_failure_details = []
-        for source in self.sources:
-            try:
-                match = source.lookup(candidate)
-            except Exception as exc:
-                self._record_failure(source, exc)
-                continue
-            if match is not None:
-                matches.append(match)
-            else:
-                self._record_http_failure_if_present(source)
+        values = self._fan_out(lambda item: item.lookup(candidate))
+        matches = [value for value in values if value is not None]
         if not matches:
             return None
         ranked = sorted(
@@ -70,14 +51,57 @@ class MultiSourceMetadataSource(MetadataSource):
         best = ranked[0]
         return best if record_match_score(candidate, best) >= 0.70 else None
 
-    def _record_failure(self, source: MetadataSource, exc: Exception) -> None:
-        detail = _source_failure_detail(source, exc)
-        self._append_failure_detail(detail)
+    def _fan_out(self, call: Callable[[MetadataSource], Any]) -> List[Any]:
+        """Run `call(source)` across all sources concurrently within the budget.
 
-    def _record_http_failure_if_present(self, source: MetadataSource) -> None:
+        Thread-safety contract: each source runs in exactly one worker thread and
+        owns its HTTPClient, so per-source `last_*` state is single-threaded; the
+        worker snapshots any failure detail immediately after the call, and all
+        shared-state appends happen on the main thread afterwards. Sources that
+        exceed the budget are recorded as `budget_exceeded` failures; their
+        threads finish in the background (never joined) - acceptable for a
+        long-lived server, and at worst one HTTP timeout for a CLI exit.
+        """
+
+        self.last_failures = []
+        self.last_failure_details = []
+        pool = ThreadPoolExecutor(max_workers=max(1, len(self.sources)))
+        futures: List[Tuple[Future, MetadataSource]] = []
+        values: List[Any] = []
+        try:
+            for source in self.sources:
+                futures.append((pool.submit(self._probe, source, call), source))
+            done, _ = wait([future for future, _ in futures], timeout=self.budget_seconds)
+            for future, source in futures:
+                if future in done:
+                    value, detail = future.result()
+                    if detail is not None:
+                        self._append_failure_detail(detail)
+                    values.append(value)
+                else:
+                    self._append_failure_detail({
+                        "source": source.name,
+                        "code": "budget_exceeded",
+                        "kind": "timeout",
+                        "status_code": None,
+                        "url": "",
+                        "error": f"source exceeded fan-out budget of {self.budget_seconds}s",
+                    })
+            return values
+        finally:
+            pool.shutdown(wait=False, cancel_futures=True)
+
+    @staticmethod
+    def _probe(
+        source: MetadataSource, call: Callable[[MetadataSource], Any]
+    ) -> Tuple[Any, Optional[Dict[str, Any]]]:
+        try:
+            value = call(source)
+        except Exception as exc:
+            return None, _source_failure_detail(source, exc)
         detail = _source_failure_detail(source)
-        if detail.get("code"):
-            self._append_failure_detail(detail)
+        empty = value is None or value == []
+        return value, (detail if (empty and detail.get("code")) else None)
 
     def _append_failure_detail(self, detail: Dict[str, Any]) -> None:
         source_name = str(detail.get("source", ""))

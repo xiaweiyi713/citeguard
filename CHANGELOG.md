@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- Multi-source queries now fan out concurrently within a total time budget
+  (`CITEGUARD_SOURCE_BUDGET`, default 8 seconds); sources that exceed the
+  budget are recorded as `budget_exceeded` failures instead of blocking the
+  whole verification.
+- BEHAVIOR CHANGE: `build_live_metadata_source` no longer enables landing-page
+  evidence harvesting by default (opt in via `harvest_remote_evidence=True` /
+  `CITEGUARD_REMOTE_EVIDENCE=1`), aligning the library default with the MCP
+  runtime.
 - Added opt-in open-access full-text support (`CITEGUARD_OA_FULLTEXT=1`):
   claim-support checks can now fetch the paper body from source-declared OA
   locations (with an official arXiv PDF fallback) and judge claims at

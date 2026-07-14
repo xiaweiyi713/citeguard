@@ -27,8 +27,9 @@ def build_live_metadata_source(
     http_retries: int = 1,
     http_retry_backoff: float = 0.2,
     http_min_interval: float = 0.0,
-    harvest_remote_evidence: bool = True,
+    harvest_remote_evidence: bool = False,
     evidence_timeout: int = 4,
+    source_budget: float = 8.0,
 ) -> MetadataSource:
     """Create a multi-source metadata adapter from a list of source names."""
 
@@ -81,7 +82,7 @@ def build_live_metadata_source(
         raise ValueError("No valid scholarly sources were selected.")
     if len(sources) == 1:
         return sources[0]
-    return MultiSourceMetadataSource(sources)
+    return MultiSourceMetadataSource(sources, budget_seconds=source_budget)
 
 
 def polite_user_agent(mailto: str = DEFAULT_CONTACT_EMAIL) -> str:
