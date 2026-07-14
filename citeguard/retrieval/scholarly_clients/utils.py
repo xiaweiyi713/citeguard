@@ -81,6 +81,17 @@ def normalize_arxiv_id(arxiv_id: str) -> str:
     return value.strip().strip("/").rstrip(".,;").lower()
 
 
+def base_arxiv_id(arxiv_id: str) -> str:
+    """Normalized arXiv id with any version suffix stripped.
+
+    Citations conventionally omit the version (``1706.03762``) while source
+    records often carry one (``1706.03762v7``); identity comparisons must use
+    the version-less base id.
+    """
+
+    return re.sub(r"v\d+$", "", normalize_arxiv_id(arxiv_id))
+
+
 def openalex_abstract_to_text(abstract_index: Dict[str, List[int]]) -> str:
     """Reconstruct an OpenAlex abstract from its inverted index representation."""
 
@@ -99,7 +110,7 @@ def record_match_score(candidate: CitationRecord, record: CitationRecord) -> flo
     score = 0.0
     if candidate.doi and record.doi and normalize_doi(candidate.doi) == normalize_doi(record.doi):
         score += 0.6
-    if candidate.arxiv_id and record.arxiv_id and normalize_arxiv_id(candidate.arxiv_id) == normalize_arxiv_id(record.arxiv_id):
+    if candidate.arxiv_id and record.arxiv_id and base_arxiv_id(candidate.arxiv_id) == base_arxiv_id(record.arxiv_id):
         score += 0.6
     score += 0.25 * sequence_similarity(candidate.title, record.title)
     score += 0.10 * author_coverage(candidate.authors, record.authors)

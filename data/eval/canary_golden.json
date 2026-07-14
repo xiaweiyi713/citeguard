@@ -1,0 +1,44 @@
+{
+  "cases": [
+    {
+      "id": "g01",
+      "fields": {"title": "Attention Is All You Need", "arxiv_id": "1706.03762", "year": 2017},
+      "expect": {"verdict_in": ["verified"], "canonical_year": 2017}
+    },
+    {
+      "id": "g02",
+      "fields": {"title": "Attention Is All You Need", "authors": ["Ashish Vaswani"], "year": 2017},
+      "expect": {"must_not": ["metadata_mismatch"]}
+    },
+    {
+      "id": "g03",
+      "fields": {"title": "OpenScholar: Synthesizing Scientific Literature with Retrieval-augmented LMs", "arxiv_id": "2411.14199"},
+      "expect": {"verdict_in": ["verified", "metadata_mismatch"], "canonical_year_in": [2024, 2025]}
+    },
+    {
+      "id": "g04",
+      "fields": {"title": "Quantum Teleportation of Citation Hallucinations in Synthetic Benchmarks"},
+      "expect": {"verdict_in": ["not_found"]}
+    },
+    {
+      "id": "g05",
+      "fields": {"title": "A Unified Theory of Phantom References That Was Never Written"},
+      "expect": {"verdict_in": ["not_found"]}
+    },
+    {
+      "id": "g06",
+      "fields": {"title": "迈向第三代人工智能", "doi": "10.1360/SSI-2020-0204"},
+      "expect": {"verdict_in": ["verified", "metadata_mismatch", "ambiguous"]}
+    },
+    {
+      "id": "g07",
+      "fields": {"doi": "10.48550/arXiv.2504.08066"},
+      "expect": {"verdict_in": ["verified", "metadata_mismatch", "ambiguous"]}
+    },
+    {
+      "id": "g08",
+      "fields": {"title": "GhostCite: A Large-Scale Analysis of Citation Validity in the Age of Large Language Models", "year": 2026},
+      "expect": {"must_not": ["metadata_mismatch"]}
+    }
+  ]
+}

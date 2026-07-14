@@ -81,7 +81,7 @@ CiteGuard 对照 **OpenAlex、Crossref、arXiv、Semantic Scholar** 回答两个
 
 支撑性结果带机器可读的 `evidence_scope` 字段,agent 不会把摘要级证据当成全文结论。全文级支撑有两条可选通道:调用方提供合法摘录或本地 text/PDF 文件;或设置 `CITEGUARD_OA_FULLTEXT=1`,让 CiteGuard 自动拉取**源明确标记为开放获取(OA)的论文全文**(arXiv 全部适用,PDF 解析需 `pip install "citationguard[pdf]"`)。CiteGuard 不抓取受限源、不绕过付费墙;远程全文仅限 OA 地址且默认关闭。
 
-两条守护原则保证它"诚实":**源不可达永远不会升级成"伪造"**(只降低置信度,设置 `outage_limited=true` 并上报 `sources_available` / `sources_failed` / `source_failure_mode`);`insufficient_evidence` / `not_found` 一律表述为"无法确认",最终裁决留给人或宿主 agent。
+两条守护原则保证它"诚实":**源不可达永远不会升级成"伪造"**(只降低置信度,设置 `outage_limited=true` 并上报 `sources_available` / `sources_failed` / `source_failure_mode`);`insufficient_evidence` / `not_found` 一律表述为"无法确认",最终裁决留给人或宿主 agent。此外,**标识符是硬裁决**:DOI / arXiv id 会先在其权威源(Crossref / arXiv)直查,命中即定音、压过任何同名记录;权威查询失败时结果降级为 `ambiguous` 并标记 `outage_limited`,绝不用纯标题匹配冒充高置信结论(输出附 `identifier_lookup` 字段)。多源查询并发执行,总预算默认 8 秒(`CITEGUARD_SOURCE_BUDGET`),慢源记为 `budget_exceeded` 而不拖垮整次核验。
 
 ---
 

@@ -531,6 +531,7 @@ class CitationExtractionTests(unittest.TestCase):
             year=2026,
             venue="arXiv",
             doi="10.48550/arxiv.2602.06718",
+            arxiv_id="2602.06718",
             source="memory",
         )
         source = InMemoryMetadataSource([record])

@@ -270,6 +270,8 @@ an integer or digit string. Errors include `details.tool`, `details.field`, and
 | `CITEGUARD_HTTP_RETRIES` | `1` | Short retries for transient `429`/`5xx`/timeout failures. |
 | `CITEGUARD_HTTP_RETRY_BACKOFF` | `0.2` | Base retry backoff in seconds; numeric or HTTP-date `Retry-After` is capped for interactive use. |
 | `CITEGUARD_HTTP_MIN_INTERVAL` | `0` | Minimum interval in seconds between uncached live-source HTTP requests from one adapter. |
+| `CITEGUARD_SOURCE_BUDGET` | `8.0` | Total fan-out budget in seconds for one multi-source query; slower sources are recorded as `budget_exceeded` failures. |
+| `CITEGUARD_SUSPECT_DOI_PREFIXES` | empty | Comma-separated DOI prefixes appended to the built-in hijacked/mirror-record greylist. |
 | `CITEGUARD_REMOTE_EVIDENCE` | `0` | Enable slower landing-page snippet harvesting. |
 | `CITEGUARD_EVIDENCE_TIMEOUT` | `2` | Landing-page evidence timeout in seconds. |
 | `CITEGUARD_RERANKER_MODEL` | built-in default | Claim-support reranker model. |

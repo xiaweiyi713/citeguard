@@ -233,6 +233,7 @@ print(support.verdict.value, support.engine)
 | `CITEGUARD_CACHE` | `data/logs/verification_cache.sqlite` | local SQLite resolution cache |
 | `CITEGUARD_FIXTURE_CITATIONS` | — | JSON/JSONL citation fixture for deterministic offline runs |
 | `CITEGUARD_HTTP_TIMEOUT` | `10` | timeout, in seconds, for live scholarly API calls |
+| `CITEGUARD_SOURCE_BUDGET` | `8.0` | total fan-out budget for one multi-source query; slow sources become `budget_exceeded` failures instead of blocking |
 | `CITEGUARD_REMOTE_EVIDENCE` | `0` | set to `1` to fetch landing-page snippets in addition to title/abstract metadata |
 | `CITEGUARD_OA_FULLTEXT` | `0` | set to `1` to fetch open-access paper bodies for full-text claim support; OA locations only, never bypasses paywalls |
 | `CITEGUARD_RERANKER_MODEL` / `CITEGUARD_NLI_MODEL` | English models | support deep-mode models — set multilingual ones for non-English claims |

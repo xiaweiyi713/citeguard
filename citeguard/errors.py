@@ -19,6 +19,7 @@ ERROR_CODE_RECOVERY: Dict[str, str] = {
     "model_unavailable": "Install the models extra or treat support output as heuristic or weak.",
     "ambiguous_citation": "Ask for a DOI, arXiv id, or more metadata.",
     "timeout": "Retry, raise the timeout, or continue with reduced confidence.",
+    "budget_exceeded": "Retry later or raise the budget; treat the result as source-limited, not as evidence of fabrication.",
     "unsupported_command": "Upgrade CiteGuard or fix the invocation.",
 }
 
@@ -33,6 +34,7 @@ ERROR_CODE_NEXT_ACTION: Dict[str, str] = {
     "model_unavailable": "install_or_configure_dependency",
     "ambiguous_citation": "disambiguate_identifier",
     "timeout": "retry_or_check_source_health",
+    "budget_exceeded": "retry_or_check_source_health",
     "unsupported_command": "repair_input",
 }
 
@@ -47,6 +49,7 @@ ERROR_CODE_RETRYABLE: Dict[str, bool] = {
     "model_unavailable": False,
     "ambiguous_citation": False,
     "timeout": True,
+    "budget_exceeded": True,
     "unsupported_command": False,
 }
 
@@ -61,6 +64,7 @@ ERROR_CODE_CATEGORY: Dict[str, str] = {
     "model_unavailable": "dependency_limited",
     "ambiguous_citation": "disambiguation",
     "timeout": "source_limited",
+    "budget_exceeded": "source_limited",
     "unsupported_command": "input_repair",
 }
 

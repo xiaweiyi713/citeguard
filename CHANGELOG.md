@@ -2,6 +2,33 @@
 
 ## Unreleased
 
+- Identifier-authority resolution: when a citation carries a DOI/arXiv id, the
+  id is now resolved strictly at its home source (Crossref/arXiv) first, with
+  one retry. A hit is definitive and beats any title match; a failed authority
+  lookup downgrades the verdict to `ambiguous` with `outage_limited=true`
+  instead of risking a title-only `metadata_mismatch`. Results expose the new
+  `identifier_lookup` field (`kind`/`value`/`source`/`status`).
+- Polluted-record defense: same-title candidates that disagree on publication
+  year across sources, or best matches that look like hijacked/mirror records
+  (greylisted DOI prefixes via `CITEGUARD_SUSPECT_DOI_PREFIXES`, implausible
+  citation counts on brand-new years), now degrade to `ambiguous` instead of a
+  confident mismatch, and never produce a `suggested_citation`.
+- arXiv ids are compared by their version-less base id, so a cited
+  `1706.03762` matches a source record carrying `1706.03762v7`.
+- Fixed multi-source search ranking: raw source relevance scores (unbounded,
+  e.g. OpenAlex values in the thousands) are now squashed to 0-1 so they can
+  no longer dominate title similarity.
+- Added a golden-case live canary (`scripts/canary_live.py` +
+  `data/eval/canary_golden.json`) with a nightly GitHub Actions run that opens
+  an issue on verdict drift.
+- Multi-source queries now fan out concurrently within a total time budget
+  (`CITEGUARD_SOURCE_BUDGET`, default 8 seconds); sources that exceed the
+  budget are recorded as `budget_exceeded` failures instead of blocking the
+  whole verification.
+- BEHAVIOR CHANGE: `build_live_metadata_source` no longer enables landing-page
+  evidence harvesting by default (opt in via `harvest_remote_evidence=True` /
+  `CITEGUARD_REMOTE_EVIDENCE=1`), aligning the library default with the MCP
+  runtime.
 - Added opt-in open-access full-text support (`CITEGUARD_OA_FULLTEXT=1`):
   claim-support checks can now fetch the paper body from source-declared OA
   locations (with an official arXiv PDF fallback) and judge claims at

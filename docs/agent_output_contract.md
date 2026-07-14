@@ -27,6 +27,16 @@ Common `next_action` values include
 `inspect_full_text_or_find_stronger_citation`, and
 `rewrite_or_replace_evidence`.
 
+## Identifier authority (`identifier_lookup`)
+
+Single verification results include `identifier_lookup` (`null` when the input
+carries no DOI/arXiv id): an object with `kind` (`arxiv_id` or `doi`), `value`,
+`source` (the identifier's home source, `arxiv` or `crossref`), `status`, and
+`failure_detail` when the lookup failed. `status` is `hit` (id confirmed at its
+home source), `miss` (home source answered but the id was not found), `failed`
+(authority lookup errored; the result is source-limited, not fabrication
+evidence), or `unavailable` (home source not configured).
+
 ## Batch `review_summary`
 
 Batch `audit` and `support-audit` reports

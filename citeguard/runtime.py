@@ -127,6 +127,17 @@ def remote_evidence_enabled(env: Optional[Mapping[str, str]] = None) -> bool:
     return str(raw).strip().lower() in {"1", "true", "yes", "on"}
 
 
+def source_budget(env: Optional[Mapping[str, str]] = None) -> float:
+    """Total fan-out budget (seconds) for multi-source queries."""
+
+    active_env = env or os.environ
+    raw = active_env.get("CITEGUARD_SOURCE_BUDGET", "8.0")
+    try:
+        return max(1.0, float(raw))
+    except (TypeError, ValueError):
+        return 8.0
+
+
 def contact_email_configured(env: Optional[Mapping[str, str]] = None) -> bool:
     """Whether live scholarly-source requests have a non-default contact email."""
 
@@ -694,6 +705,7 @@ def build_configured_source(env: Optional[Mapping[str, str]] = None):
         http_min_interval=http_min_interval(active_env),
         harvest_remote_evidence=remote_evidence_enabled(active_env),
         evidence_timeout=evidence_timeout(active_env),
+        source_budget=source_budget(active_env),
     )
     db_path = cache_path(active_env)
     ensure_cache_parent(db_path)

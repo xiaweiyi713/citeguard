@@ -24,3 +24,13 @@ class MetadataSource(ABC):
     @abstractmethod
     def lookup(self, candidate: CitationRecord) -> Optional[CitationRecord]:
         """Find the canonical record that best matches the candidate."""
+
+    def lookup_identifier(self, candidate: CitationRecord) -> Optional[CitationRecord]:
+        """Resolve strictly by persistent identifier (DOI/arXiv id).
+
+        Returns None when this source does not support the candidate's
+        identifier or the identifier has no record. Implementations must NOT
+        fall back to title search here; that separation lets callers detect
+        identifier-path failures reliably.
+        """
+        return None
