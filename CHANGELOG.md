@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- BEHAVIOR CHANGE: `verify_citation_tool` no longer accepts claim-support
+  inputs (`abstract`, `evidence_chunks`, `evidence_text`, `full_text`,
+  `full_text_file`); those belong to the claim-support tools. Existence and
+  metadata verification never used them.
 - Identifier-authority resolution: when a citation carries a DOI/arXiv id, the
   id is now resolved strictly at its home source (Crossref/arXiv) first, with
   one retry. A hit is definitive and beats any title match; a failed authority

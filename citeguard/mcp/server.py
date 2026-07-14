@@ -139,11 +139,6 @@ def verify_citation_tool(
     authors: Optional[List[str]] = None,
     year: Optional[int] = None,
     venue: str = "",
-    abstract: str = "",
-    evidence_chunks: Optional[List[dict]] = None,
-    evidence_text: Any = None,
-    full_text: Any = None,
-    full_text_file: Any = None,
     doi: str = "",
     arxiv_id: str = "",
 ) -> dict:
@@ -154,7 +149,8 @@ def verify_citation_tool(
     (verified | metadata_mismatch | not_found | ambiguous), the canonical record,
     per-field diffs, a suggested corrected citation when confident, and which
     sources were checked. A `not_found` verdict means "could not be verified",
-    not a definitive proof of fabrication.
+    not a definitive proof of fabrication. Evidence and full-text inputs belong
+    to the claim-support tools, not to existence/metadata verification.
     """
     if not _has_citation_input(raw_text=raw_text, title=title, doi=doi, arxiv_id=arxiv_id):
         return error_payload(
@@ -169,13 +165,8 @@ def verify_citation_tool(
             authors=authors,
             year=year,
             venue=venue,
-            abstract=abstract,
             doi=doi,
             arxiv_id=arxiv_id,
-            evidence_chunks=evidence_chunks,
-            evidence_text=evidence_text,
-            full_text=full_text,
-            full_text_file=full_text_file,
             tool="verify_citation_tool",
         )
     except (MCPInputError, MCPFileError) as exc:
