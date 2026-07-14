@@ -241,3 +241,32 @@ class IdentifierAuthorityVerifyTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+AIAYN_TRUE_V7 = CitationRecord(
+    citation_id="arxiv:aiayn-v7", title="Attention Is All You Need",
+    authors=["Ashish Vaswani"], year=2017, arxiv_id="1706.03762v7", source="arxiv",
+)
+
+
+class ArxivVersionSuffixTests(unittest.TestCase):
+    """A version-suffixed record id must match the caller's unversioned id."""
+
+    def test_base_arxiv_id_strips_version(self):
+        from citeguard.retrieval.scholarly_clients.utils import base_arxiv_id
+
+        self.assertEqual(base_arxiv_id("1706.03762v7"), "1706.03762")
+        self.assertEqual(base_arxiv_id("arXiv:1706.03762"), "1706.03762")
+        self.assertEqual(base_arxiv_id(""), "")
+
+    def test_identifier_hit_with_versioned_record_verifies(self):
+        arxiv = _HitIdentifierSource([], "arxiv", AIAYN_TRUE_V7)
+        openalex = _NamedMemory([AIAYN_JUNK], "openalex")
+        candidate = parse_citation(
+            title="Attention Is All You Need", arxiv_id="1706.03762", year=2017
+        )
+        result = verify_citation(candidate, MultiSourceMetadataSource([openalex, arxiv]))
+        self.assertEqual(result.verdict, Verdict.VERIFIED)
+        self.assertEqual(result.confidence, 1.0)
+        diff_by_field = {d.field: d.matches for d in result.field_diffs}
+        self.assertTrue(diff_by_field.get("arxiv_id", False))

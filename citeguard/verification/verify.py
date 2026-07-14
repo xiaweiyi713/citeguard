@@ -7,7 +7,7 @@ from typing import Any, List, Optional
 from citeguard.citation import CitationFormatter, author_coverage, sequence_similarity, year_matches
 from citeguard.graph import CitationRecord
 from citeguard.retrieval.scholarly_clients.base import MetadataSource
-from citeguard.retrieval.scholarly_clients.utils import normalize_arxiv_id, normalize_doi
+from citeguard.retrieval.scholarly_clients.utils import base_arxiv_id, normalize_doi
 
 from .models import FieldDiff, VerificationResult, Verdict, classify_source_failure_mode
 from .resolve import STRONG_MATCH, is_suspect_record, resolve_citation
@@ -38,7 +38,7 @@ def _field_diffs(candidate: CitationRecord, canonical: CitationRecord) -> List[F
         matches = normalize_doi(candidate.doi) == normalize_doi(canonical.doi)
         diffs.append(FieldDiff("doi", candidate.doi, canonical.doi, matches))
     if candidate.arxiv_id:
-        matches = normalize_arxiv_id(candidate.arxiv_id) == normalize_arxiv_id(canonical.arxiv_id)
+        matches = base_arxiv_id(candidate.arxiv_id) == base_arxiv_id(canonical.arxiv_id)
         diffs.append(FieldDiff("arxiv_id", candidate.arxiv_id, canonical.arxiv_id, matches))
     return diffs
 

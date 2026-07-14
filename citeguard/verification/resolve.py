@@ -12,7 +12,7 @@ from citeguard.citation import author_coverage, sequence_similarity, year_matche
 from citeguard.graph import CitationRecord
 from citeguard.retrieval.scholarly_clients.base import MetadataSource
 from citeguard.retrieval.scholarly_clients.multi_source import MultiSourceMetadataSource
-from citeguard.retrieval.scholarly_clients.utils import normalize_arxiv_id, normalize_doi
+from citeguard.retrieval.scholarly_clients.utils import base_arxiv_id, normalize_arxiv_id, normalize_doi
 
 STRONG_MATCH = 0.70
 AMBIGUOUS_MARGIN = 0.05
@@ -65,7 +65,7 @@ def verification_match_score(candidate: CitationRecord, record: CitationRecord) 
     if (
         candidate.arxiv_id
         and record.arxiv_id
-        and normalize_arxiv_id(candidate.arxiv_id) == normalize_arxiv_id(record.arxiv_id)
+        and base_arxiv_id(candidate.arxiv_id) == base_arxiv_id(record.arxiv_id)
     ):
         return 1.0
     title = sequence_similarity(candidate.title, record.title)
