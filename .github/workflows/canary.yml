@@ -1,0 +1,39 @@
+name: canary
+
+on:
+  schedule:
+    - cron: "17 19 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  canary:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install package
+        run: python -m pip install --upgrade pip && python -m pip install -e .
+
+      - name: Run live golden-case canary
+        run: python scripts/canary_live.py --report-md canary_report.md
+
+      - name: Open drift issue
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ ! -f canary_report.md ]; then
+            echo "The canary run crashed before producing a report; see the workflow logs." > canary_report.md
+          fi
+          gh issue create --title "Canary drift: golden citation cases failed" --body-file canary_report.md
