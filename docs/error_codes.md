@@ -105,6 +105,7 @@ preserve `recovery_code` as the stable reason/error-code hint when present.
 | `model_unavailable` | dependency_limited | false | Deep support models are not installed or failed to load. | Install the models extra or treat support output as heuristic or weak. |
 | `ambiguous_citation` | disambiguation | false | Multiple plausible records match the citation. | Ask for a DOI, arXiv id, or more metadata. |
 | `timeout` | source_limited | true | A source or model operation exceeded its configured timeout. | Retry, raise the timeout, or continue with reduced confidence. |
+| `budget_exceeded` | source_limited | true | One source did not answer within the multi-source fan-out budget (`CITEGUARD_SOURCE_BUDGET`); faster sources were still used. | Retry later or raise the budget; treat the result as source-limited, not as evidence of fabrication. |
 | `unsupported_command` | input_repair | false | The CLI parser accepted a command name that has no handler. | Upgrade CiteGuard or fix the invocation. |
 
 ## Details Contract
