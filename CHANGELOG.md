@@ -30,6 +30,9 @@
   inputs (`abstract`, `evidence_chunks`, `evidence_text`, `full_text`,
   `full_text_file`); those belong to the claim-support tools. Existence and
   metadata verification never used them.
+
+## 0.1.2 - 2026-07-15
+
 - Identifier-authority resolution: when a citation carries a DOI/arXiv id, the
   id is now resolved strictly at its home source (Crossref/arXiv) first, with
   one retry. A hit is definitive and beats any title match; a failed authority

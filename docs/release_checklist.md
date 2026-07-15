@@ -3,6 +3,27 @@
 Use this checklist before publishing CiteGuard as a PyPI package, MCP tool, or
 agent skill bundle.
 
+## One-Time: PyPI Trusted Publisher
+
+`.github/workflows/publish.yml` publishes via PyPI trusted publishing (OIDC), so
+no API token is stored anywhere. This requires a **one-time registration on
+PyPI** — without it the publish job fails with
+`invalid-publisher: valid token, but no corresponding publisher`, even though the
+build job succeeds.
+
+Register at `https://pypi.org/manage/project/citationguard/settings/publishing/`
+with exactly these values (they must match the OIDC claims the workflow sends):
+
+| field | value |
+|---|---|
+| PyPI Project Name | `citationguard` |
+| Owner | `xiaweiyi713` |
+| Repository name | `citeguard` |
+| Workflow name | `publish.yml` |
+| Environment name | `pypi` |
+
+Verify with a `workflow_dispatch` run of `Publish` before relying on a tag push.
+
 ## Package Metadata
 
 - Confirm `pyproject.toml` has the correct version, authors, license, Python
