@@ -38,5 +38,3 @@ dist/
 .env
 *.local
 
-# uv artifact from local 3.11 venv bootstrap
-uv.lock
