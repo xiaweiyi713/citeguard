@@ -6,7 +6,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from _bootstrap import ensure_project_root
 
@@ -46,7 +46,7 @@ def _parse_language_threshold(value: str) -> tuple[str, int]:
     return language, threshold
 
 
-def main(argv: List[str] | None = None) -> int:
+def main(argv: Optional[List[str]] = None) -> int:
     parser = argparse.ArgumentParser(
         description="Compare support-eval baselines and quality gates in a reproducible JSON table."
     )

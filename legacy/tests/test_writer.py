@@ -3,7 +3,7 @@
 import unittest
 
 from citeguard.graph import CitationRecord
-from citeguard.orchestrator import AgentTask, CiteGuardAgent
+from legacy.orchestrator import AgentTask, CiteGuardAgent
 from citeguard.retrieval.scholarly_clients import InMemoryMetadataSource
 
 

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional, cast
 
 from citeguard.graph import CCEG
 
@@ -30,13 +30,13 @@ class AuditReportBuilder:
 
     def to_markdown(self, report: Dict[str, object]) -> str:
         lines = ["# CiteGuard Audit Report", ""]
-        summary = report["summary"]
+        summary = cast(Dict[str, Any], report["summary"])
         lines.append(f"- Claims: {summary['claims']}")
         lines.append(f"- Citations: {summary['citations']}")
         lines.append(f"- Decisions: {summary['decisions']}")
         lines.append("")
         lines.append("## Provenance")
-        for row in report["provenance"]:
+        for row in cast(List[Dict[str, Any]], report["provenance"]):
             lines.append(
                 f"- {row['claim_id']}: action={row['action']}, risk={row['risk_score']:.3f}, citations={row['citations']}"
             )

@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Dict, List
 
-from citeguard.orchestrator import AgentRunResult, AgentTask
+from legacy.orchestrator import AgentRunResult, AgentTask
 
 
 @dataclass(frozen=True)

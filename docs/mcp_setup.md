@@ -7,7 +7,7 @@ CiteGuard exposes citation verification through a stdio MCP server.
 For an installed or published package:
 
 ```bash
-python -m pip install "citationguard[mcp]"
+python -m pip install citationguard
 ```
 
 For a local source checkout:
@@ -138,6 +138,10 @@ and include `filtered.returned_indexes` / `filtered.omitted_indexes` using the
 original batch indexes. They also include `filtered.omitted_review_summary`,
 which preserves omitted rows' risk counts, `next_actions`, `action_queues`, and
 `recommended_next_steps` so agents can explain what the high-risk filter hid.
+Both tools also accept `max_workers` from 1 to 16 (default 4). Their
+`batch_execution.progress` field is a completion snapshot, not streaming
+progress; it records completed/total items, input-order preservation,
+source-level serialization, and the recommended 100-row chunk size.
 `audit_claim_support_tool` items can be single-citation objects with `claim`
 plus citation fields, or citation-set objects with `claim` plus `citations`, a
 non-empty list of citation objects. Citation-set rows return
@@ -264,7 +268,9 @@ an integer or digit string. Errors include `details.tool`, `details.field`, and
 | `CITEGUARD_SOURCES` | `openalex,crossref,arxiv` | Live scholarly sources to query. |
 | `CITEGUARD_MAILTO` | empty | Real contact email for polite OpenAlex/Crossref usage; unset or placeholder values are not sent as `mailto`. |
 | `SEMANTIC_SCHOLAR_API_KEY` | empty | Optional Semantic Scholar key. |
-| `CITEGUARD_CACHE` | `data/logs/verification_cache.sqlite` | SQLite cache path; use `:memory:` for ephemeral runs. |
+| `CITEGUARD_CACHE` | OS user cache directory | SQLite cache path; use `:memory:` for ephemeral runs. |
+| `CITEGUARD_CACHE_TTL` | `86400` | Positive-result cache TTL in seconds. |
+| `CITEGUARD_NEGATIVE_CACHE_TTL` | `900` | Empty-result cache TTL in seconds. |
 | `CITEGUARD_FIXTURE_CITATIONS` | empty | JSON/JSONL citation fixture for offline deterministic runs. |
 | `CITEGUARD_HTTP_TIMEOUT` | `10` | Live scholarly API timeout in seconds. |
 | `CITEGUARD_HTTP_RETRIES` | `1` | Short retries for transient `429`/`5xx`/timeout failures. |
@@ -274,6 +280,7 @@ an integer or digit string. Errors include `details.tool`, `details.field`, and
 | `CITEGUARD_SUSPECT_DOI_PREFIXES` | empty | Comma-separated DOI prefixes appended to the built-in hijacked/mirror-record greylist. |
 | `CITEGUARD_REMOTE_EVIDENCE` | `0` | Enable slower landing-page snippet harvesting. |
 | `CITEGUARD_EVIDENCE_TIMEOUT` | `2` | Landing-page evidence timeout in seconds. |
+| `CITEGUARD_ALLOWED_FILE_ROOTS` | server working directory | Allowed roots for local `full_text_file` evidence. |
 | `CITEGUARD_RERANKER_MODEL` | built-in default | Claim-support reranker model. |
 | `CITEGUARD_NLI_MODEL` | built-in default | Claim-support NLI model. |
 
@@ -281,9 +288,9 @@ an integer or digit string. Errors include `details.tool`, `details.field`, and
 `support_models.deep_models_available`, `support_models.missing_dependencies`,
 and `support_models.next_action`. If `next_action=install_or_configure_dependency`,
 tell the user that claim-support checks are running in `heuristic_fallback`
-mode and suggest installing `citeguard[models]` first. For local development,
+mode and suggest installing `citationguard[models]` first. For local development,
 use `.[models]` from a source checkout, then run
-`python3 scripts/warmup_support_models.py` before relying on deep reranker/NLI
+`citeguard models warmup` before relying on deep reranker/NLI
 support. If `support_models.install_hint` is present, quote that package-first
 hint instead of inventing a local install command.
 

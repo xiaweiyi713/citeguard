@@ -124,8 +124,8 @@ class SentenceTransformerRerankerBackend(SupportBackend):
     def __init__(self, model_name: str = "", threshold: float = 0.48) -> None:
         self.model_name = model_name
         self.threshold = threshold
-        self._model = None
-        self._cross_encoder = None
+        self._model: Any = None
+        self._cross_encoder: Any = None
 
     def is_available(self) -> bool:
         if not self.model_name:
@@ -193,8 +193,8 @@ class TransformersNLIBackend(SupportBackend):
         self.model_name = model_name
         self.threshold = threshold
         self.margin = margin
-        self._tokenizer = None
-        self._model = None
+        self._tokenizer: Any = None
+        self._model: Any = None
 
     def is_available(self) -> bool:
         if not self.model_name:
@@ -429,11 +429,17 @@ def combine_support_assessments(
             passed = True
             decision_path = "nli_pass"
         elif reranker is not None:
+            nli_margin_ok = nli.score >= contradiction_score + 0.05
             paired_support = reranker.passed and (
-                (nli.score >= active_policy.pair_nli_floor and combined_score >= active_policy.pair_combined_threshold)
+                (
+                    nli_margin_ok
+                    and nli.score >= active_policy.pair_nli_floor
+                    and combined_score >= active_policy.pair_combined_threshold
+                )
                 or (
                     heuristic is not None
                     and heuristic.passed
+                    and nli_margin_ok
                     and contradiction_score <= active_policy.contradiction_max
                     and combined_score >= active_policy.pair_combined_threshold
                 )

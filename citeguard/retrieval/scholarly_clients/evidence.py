@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import html
+import ipaddress
 import re
 import socket
 import urllib.error
@@ -240,7 +241,16 @@ def harvest_remote_evidence_report(
         if not is_allowed_remote_evidence_url(url):
             continue
         try:
-            payload = http_client.get_text(url, timeout=timeout)
+            if isinstance(http_client, HTTPClient):
+                payload = http_client.get_text(
+                    url,
+                    timeout=timeout,
+                    url_validator=is_allowed_remote_evidence_url_resolved,
+                )
+            else:
+                # Lightweight fixture clients used by offline adapters do not
+                # perform network I/O and need not implement the safety hook.
+                payload = http_client.get_text(url, timeout=timeout)
         except Exception as exc:
             failures.append(_remote_evidence_exception_detail(source_name, url, exc))
             continue
@@ -278,10 +288,37 @@ def is_allowed_remote_evidence_url(url: str) -> bool:
     hostname = (parsed.hostname or "").lower().strip(".")
     if not hostname:
         return False
+    if hostname == "localhost" or hostname.endswith(".localhost"):
+        return False
+    try:
+        address = ipaddress.ip_address(hostname)
+    except ValueError:
+        address = None
+    if address is not None and not address.is_global:
+        return False
     return not any(
         hostname == suffix or hostname.endswith(f".{suffix}")
         for suffix in BLOCKED_EVIDENCE_HOST_SUFFIXES
     )
+
+
+def is_allowed_remote_evidence_url_resolved(url: str) -> bool:
+    """Fail closed unless every resolved address is globally routable."""
+
+    if not is_allowed_remote_evidence_url(url):
+        return False
+    parsed = urlparse(url)
+    try:
+        addresses = socket.getaddrinfo(parsed.hostname, parsed.port or 443, type=socket.SOCK_STREAM)
+    except (OSError, socket.gaierror):
+        return False
+    resolved = {item[4][0] for item in addresses if item[4]}
+    if not resolved:
+        return False
+    try:
+        return all(ipaddress.ip_address(address).is_global for address in resolved)
+    except ValueError:
+        return False
 
 
 def merge_evidence_chunks(*collections: Iterable[dict]) -> List[dict]:

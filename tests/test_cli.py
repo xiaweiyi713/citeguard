@@ -168,6 +168,30 @@ class CLITests(unittest.TestCase):
         self.assertTrue(payload["cache_status"]["inspect_ok"])
         self.assertEqual(payload["cache_status"]["next_action"], "continue")
 
+    def test_models_warmup_uses_installed_cli_surface(self):
+        stdout = io.StringIO()
+        warmup = mock.Mock(return_value={"ok": True, "reranker": {}, "nli": {}})
+        with mock.patch.dict(run.__globals__, {"warmup_support_models": warmup}):
+            code = run(
+                ["models", "warmup", "--reranker-model", "r", "--nli-model", "n"],
+                stdout=stdout,
+            )
+
+        self.assertEqual(code, 0)
+        self.assertTrue(json.loads(stdout.getvalue())["ok"])
+        warmup.assert_called_once_with(reranker_model="r", nli_model="n")
+
+    def test_models_warmup_reports_missing_dependencies(self):
+        stderr = io.StringIO()
+        warmup = mock.Mock(side_effect=RuntimeError("models missing"))
+        with mock.patch.dict(run.__globals__, {"warmup_support_models": warmup}):
+            code = run(["models", "warmup"], stderr=stderr)
+
+        self.assertEqual(code, 2)
+        payload = json.loads(stderr.getvalue())
+        self.assertEqual(payload["error"]["code"], "model_unavailable")
+        self.assertIn("citationguard[models]", payload["error"]["details"]["install_hint"])
+
     def test_compact_output_can_follow_subcommand(self):
         stdout = io.StringIO()
 

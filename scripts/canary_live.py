@@ -219,10 +219,19 @@ def main() -> int:
         action="store_true",
         help="Accepted for interface symmetry; the JSON report is always printed to stdout.",
     )
+    parser.add_argument("--min-pass", type=int, default=1, help="Minimum passing cases required for a healthy run.")
+    parser.add_argument(
+        "--max-skip-fraction",
+        type=float,
+        default=0.8,
+        help="Fail source-health coverage when a larger fraction of cases is skipped.",
+    )
     args = parser.parse_args()
 
     source_names = [name.strip() for name in args.sources.split(",") if name.strip()]
     mailto = os.environ.get("CITEGUARD_MAILTO", DEFAULT_MAILTO)
+    if not mailto or mailto == DEFAULT_MAILTO:
+        parser.error("Set CITEGUARD_MAILTO to a real contact email before running the live canary.")
 
     report = run_canary(args.dataset, source_names, mailto)
     print(json.dumps(report, indent=2, ensure_ascii=False))
@@ -232,7 +241,10 @@ def main() -> int:
         report_path.parent.mkdir(parents=True, exist_ok=True)
         report_path.write_text(render_markdown(report), encoding="utf-8")
 
-    return 1 if report["summary"]["fail"] else 0
+    total = sum(report["summary"].values())
+    skip_fraction = report["summary"]["skip"] / total if total else 1.0
+    coverage_failed = report["summary"]["pass"] < args.min_pass or skip_fraction > args.max_skip_fraction
+    return 1 if report["summary"]["fail"] or coverage_failed else 0
 
 
 if __name__ == "__main__":

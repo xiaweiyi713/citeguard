@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "cases": [
+    {"id": "positive_check", "request": "Please check my citations before I submit.", "should_trigger": true},
+    {"id": "positive_bibliography", "request": "Audit this bibliography and flag references that do not resolve.", "should_trigger": true},
+    {"id": "positive_doi", "request": "Verify whether this DOI matches the title and year.", "should_trigger": true},
+    {"id": "positive_claim", "request": "Does this paper support this claim?", "should_trigger": true},
+    {"id": "positive_zh", "request": "帮我核验这些参考文献是否真实存在。", "should_trigger": true},
+    {"id": "negative_format", "request": "Convert these references to APA style only; do not verify them.", "should_trigger": false},
+    {"id": "negative_zh_format", "request": "只做格式转换，不要核验引用。", "should_trigger": false},
+    {"id": "negative_prose", "request": "Polish the prose in my introduction.", "should_trigger": false},
+    {"id": "negative_discussion", "request": "Explain the transformer architecture at a high level.", "should_trigger": false}
+  ]
+}

@@ -1,0 +1,38 @@
+name: Deep model smoke
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 3 * * 1"
+
+jobs:
+  model-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install production model stack
+        run: python -m pip install --upgrade pip && python -m pip install -e ".[models]"
+
+      - name: Load models and run entailment probe
+        run: citeguard models warmup > model-smoke.json
+
+      - name: Run automated release review
+        run: python scripts/automated_release_review.py --output automated-release-review.json
+
+      - name: Preserve model smoke result
+        uses: actions/upload-artifact@v4
+        with:
+          name: citeguard-model-smoke
+          path: |
+            model-smoke.json
+            automated-release-review.json

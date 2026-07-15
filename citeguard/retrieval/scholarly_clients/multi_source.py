@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import socket
-from concurrent.futures import Future, ThreadPoolExecutor, wait
+import queue
+import threading
+from concurrent.futures import Future, wait
 from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple
 
 from citeguard.citation import sequence_similarity, tokenize_text
@@ -11,6 +13,38 @@ from citeguard.graph import CitationRecord
 
 from .base import MetadataSource
 from .utils import merge_record_list, record_match_score
+
+
+class _SourceWorker:
+    """One daemon worker per adapter with a bounded request queue."""
+
+    def __init__(self, source: MetadataSource) -> None:
+        self.source = source
+        self._queue: queue.Queue[Tuple[Callable[[MetadataSource], Any], Future]] = queue.Queue(maxsize=100)
+        self._thread = threading.Thread(
+            target=self._run,
+            name=f"citeguard-source-{getattr(source, 'name', 'unknown')}",
+            daemon=True,
+        )
+        self._thread.start()
+
+    def submit(self, call: Callable[[MetadataSource], Any]) -> Optional[Future]:
+        future: Future = Future()
+        try:
+            self._queue.put_nowait((call, future))
+        except queue.Full:
+            return None
+        return future
+
+    def _run(self) -> None:
+        while True:
+            call, future = self._queue.get()
+            if future.set_running_or_notify_cancel():
+                try:
+                    future.set_result(MultiSourceMetadataSource._probe(self.source, call))
+                except BaseException as exc:  # pragma: no cover - _probe normally contains adapter errors
+                    future.set_exception(exc)
+            self._queue.task_done()
 
 
 class MultiSourceMetadataSource(MetadataSource):
@@ -21,8 +55,24 @@ class MultiSourceMetadataSource(MetadataSource):
     def __init__(self, sources: Iterable[MetadataSource], budget_seconds: float = 8.0) -> None:
         self.sources = list(sources)
         self.budget_seconds = max(0.1, float(budget_seconds))
-        self.last_failures: List[str] = []
-        self.last_failure_details: List[Dict[str, Any]] = []
+        self._local = threading.local()
+        self._workers = [_SourceWorker(source) for source in self.sources]
+
+    @property
+    def last_failures(self) -> List[str]:
+        return getattr(self._local, "last_failures", [])
+
+    @last_failures.setter
+    def last_failures(self, value: List[str]) -> None:
+        self._local.last_failures = value
+
+    @property
+    def last_failure_details(self) -> List[Dict[str, Any]]:
+        return getattr(self._local, "last_failure_details", [])
+
+    @last_failure_details.setter
+    def last_failure_details(self, value: List[Dict[str, Any]]) -> None:
+        self._local.last_failure_details = value
 
     def all_records(self) -> List[CitationRecord]:
         return merge_record_list(
@@ -51,45 +101,71 @@ class MultiSourceMetadataSource(MetadataSource):
         best = ranked[0]
         return best if record_match_score(candidate, best) >= 0.70 else None
 
+    def lookup_identifier(self, candidate: CitationRecord) -> Optional[CitationRecord]:
+        authority = "arxiv" if candidate.arxiv_id else "crossref" if candidate.doi else ""
+        pair = next(
+            ((worker, item) for worker, item in zip(self._workers, self.sources) if item.name == authority),
+            None,
+        )
+        self.last_failures = []
+        self.last_failure_details = []
+        if pair is None:
+            return None
+        worker, source = pair
+        values = self._collect_workers(
+            [(worker, source)],
+            lambda item: item.lookup_identifier(candidate),
+        )
+        return values[0] if values else None
+
     def _fan_out(self, call: Callable[[MetadataSource], Any]) -> List[Any]:
         """Run `call(source)` across all sources concurrently within the budget.
 
-        Thread-safety contract: each source runs in exactly one worker thread and
-        owns its HTTPClient, so per-source `last_*` state is single-threaded; the
-        worker snapshots any failure detail immediately after the call, and all
-        shared-state appends happen on the main thread afterwards. Sources that
-        exceed the budget are recorded as `budget_exceeded` failures; their
-        threads finish in the background (never joined) - acceptable for a
-        long-lived server, and at worst one HTTP timeout for a CLI exit.
+        Each adapter owns one persistent daemon worker. Calls from concurrent
+        batch items queue behind that worker, so adapters are never overlapped.
         """
-
         self.last_failures = []
         self.last_failure_details = []
-        pool = ThreadPoolExecutor(max_workers=max(1, len(self.sources)))
+        return self._collect_workers(list(zip(self._workers, self.sources)), call)
+
+    def _collect_workers(
+        self,
+        workers: List[Tuple[_SourceWorker, MetadataSource]],
+        call: Callable[[MetadataSource], Any],
+    ) -> List[Any]:
         futures: List[Tuple[Future, MetadataSource]] = []
         values: List[Any] = []
-        try:
-            for source in self.sources:
-                futures.append((pool.submit(self._probe, source, call), source))
-            done, _ = wait([future for future, _ in futures], timeout=self.budget_seconds)
-            for future, source in futures:
-                if future in done:
-                    value, detail = future.result()
-                    if detail is not None:
-                        self._append_failure_detail(detail)
-                    values.append(value)
-                else:
-                    self._append_failure_detail({
-                        "source": source.name,
-                        "code": "budget_exceeded",
-                        "kind": "timeout",
-                        "status_code": None,
-                        "url": "",
-                        "error": f"source exceeded fan-out budget of {self.budget_seconds}s",
-                    })
-            return values
-        finally:
-            pool.shutdown(wait=False, cancel_futures=True)
+        for worker, source in workers:
+            future = worker.submit(call)
+            if future is None:
+                self._append_failure_detail({
+                    "source": source.name,
+                    "code": "budget_exceeded",
+                    "kind": "source_busy",
+                    "status_code": None,
+                    "url": "",
+                    "error": "source request queue is full",
+                })
+            else:
+                futures.append((future, source))
+        done, _ = wait([future for future, _ in futures], timeout=self.budget_seconds)
+        for future, source in futures:
+            if future in done:
+                value, detail = future.result()
+                if detail is not None:
+                    self._append_failure_detail(detail)
+                values.append(value)
+            else:
+                future.cancel()
+                self._append_failure_detail({
+                    "source": source.name,
+                    "code": "budget_exceeded",
+                    "kind": "timeout",
+                    "status_code": None,
+                    "url": "",
+                    "error": f"source exceeded fan-out budget of {self.budget_seconds}s",
+                })
+        return values
 
     @staticmethod
     def _probe(

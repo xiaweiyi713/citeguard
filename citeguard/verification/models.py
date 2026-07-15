@@ -188,6 +188,8 @@ class VerificationResult:
     alternatives: List[CitationRecord] = field(default_factory=list)
     doi_registration: Optional[Dict[str, Any]] = None
     identifier_lookup: Optional[Dict[str, Any]] = None
+    suggested_bibtex: str = ""
+    suggested_gbt7714: str = ""
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -198,6 +200,8 @@ class VerificationResult:
             "canonical_metadata_quality": canonical_metadata_quality(self.canonical_record),
             "field_diffs": [asdict(diff) for diff in self.field_diffs],
             "suggested_citation": self.suggested_citation,
+            "suggested_bibtex": self.suggested_bibtex,
+            "suggested_gbt7714": self.suggested_gbt7714,
             "explanation": self.explanation,
             "sources_checked": list(self.sources_checked),
             "sources_responded": list(self.sources_responded),
@@ -221,6 +225,7 @@ class AuditReport:
     results: List[VerificationResult]
     summary: Dict[str, int]
     risk_ranking: List[Dict[str, Any]] = field(default_factory=list)
+    batch_execution: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -228,7 +233,30 @@ class AuditReport:
             "review_summary": review_summary_from_risk_ranking(len(self.results), self.risk_ranking),
             "risk_ranking": [dict(item) for item in self.risk_ranking],
             "results": [result.to_dict() for result in self.results],
+            "batch_execution": dict(self.batch_execution),
         }
+
+
+def batch_execution_summary(total: int, max_workers: int) -> Dict[str, Any]:
+    """Describe completed batch execution without pretending MCP streamed progress."""
+
+    return {
+        "schema_version": 1,
+        "status": "complete",
+        "progress": {
+            "completed_items": total,
+            "total_items": total,
+            "fraction": 1.0,
+        },
+        "max_workers": max_workers,
+        "input_order_preserved": True,
+        "source_requests_serialized_per_adapter": True,
+        "streaming": False,
+        "chunking": {
+            "recommended_chunk_size": 100,
+            "next_offset": None,
+        },
+    }
 
 
 def review_summary_from_risk_ranking(total: int, risk_ranking: List[Dict[str, Any]]) -> Dict[str, Any]:

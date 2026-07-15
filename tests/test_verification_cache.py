@@ -4,6 +4,7 @@ import json
 import os
 import sqlite3
 import tempfile
+from concurrent.futures import ThreadPoolExecutor
 import unittest
 from dataclasses import asdict
 
@@ -230,7 +231,9 @@ class CacheTests(unittest.TestCase):
         self.assertIsInstance(exported["exported_at"], float)
         self.assertEqual(exported["record_count"], 1)
         self.assertEqual(exported["records"][0]["title"], self.record.title)
-        self.assertEqual(exported["records"][0]["metadata"]["cache_key"], "search:citation hallucination:5")
+        cache_key = exported["records"][0]["metadata"]["cache_key"]
+        self.assertTrue(cache_key.startswith("search:"))
+        self.assertTrue(cache_key.endswith(":citation hallucination:5"))
         provenance = exported["records"][0]["metadata"]["cache_provenance"]
         self.assertEqual(provenance["operation"], "search")
         self.assertEqual(provenance["source"], "metadata_source")
@@ -340,6 +343,67 @@ class CacheTests(unittest.TestCase):
         self.assertEqual(exported["cache_entry_count"], 1)
         self.assertEqual(exported["record_count"], 1)
         self.assertEqual(exported["records"][0]["metadata"]["cache_key"], "search:legacy:5")
+
+    def test_cache_namespace_prevents_cross_source_reuse(self):
+        class _NamedSource(_CountingSource):
+            def __init__(self, records, name):
+                super().__init__(records)
+                self.name = name
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = os.path.join(tmpdir, "cache.sqlite")
+            source_a = _NamedSource(
+                [CitationRecord(citation_id="a", title=self.record.title, source="source_a")],
+                "source_a",
+            )
+            source_b = _NamedSource(
+                [CitationRecord(citation_id="b", title=self.record.title, source="source_b")],
+                "source_b",
+            )
+            first = CachingMetadataSource(source_a, db_path=path).search("citation hallucination")
+            second = CachingMetadataSource(source_b, db_path=path).search("citation hallucination")
+
+        self.assertEqual(first[0].citation_id, "a")
+        self.assertEqual(second[0].citation_id, "b")
+        self.assertEqual(source_b.search_calls, 1)
+
+    def test_positive_and_negative_entries_expire_with_separate_ttls(self):
+        now = [100.0]
+        positive_inner = _CountingSource([self.record])
+        positive = CachingMetadataSource(
+            positive_inner,
+            ttl_seconds=10,
+            negative_ttl_seconds=2,
+            clock=lambda: now[0],
+        )
+        positive.search("citation hallucination")
+        now[0] = 109.0
+        positive.search("citation hallucination")
+        now[0] = 111.0
+        positive.search("citation hallucination")
+        self.assertEqual(positive_inner.search_calls, 2)
+
+        now[0] = 200.0
+        negative_inner = _CountingSource([])
+        negative = CachingMetadataSource(
+            negative_inner,
+            ttl_seconds=10,
+            negative_ttl_seconds=2,
+            clock=lambda: now[0],
+        )
+        negative.search("missing paper")
+        now[0] = 201.0
+        negative.search("missing paper")
+        now[0] = 203.0
+        negative.search("missing paper")
+        self.assertEqual(negative_inner.search_calls, 2)
+
+    def test_cache_connection_is_safe_across_worker_threads(self):
+        cached = CachingMetadataSource(_CountingSource([self.record]), db_path=":memory:")
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            results = list(pool.map(lambda _: cached.search("citation hallucination"), range(2)))
+
+        self.assertEqual([items[0].citation_id for items in results], ["r1", "r1"])
 
     def test_export_missing_cache_returns_empty_manifest(self):
         with tempfile.TemporaryDirectory() as tmpdir:

@@ -17,6 +17,9 @@ env/
 .DS_Store
 .vscode/
 .idea/
+.claude/
+.mcp.json
+.playwright-mcp/
 
 # Data artifacts
 data/raw/
@@ -34,3 +37,6 @@ dist/
 # Local env files
 .env
 *.local
+
+# uv artifact from local 3.11 venv bootstrap
+uv.lock

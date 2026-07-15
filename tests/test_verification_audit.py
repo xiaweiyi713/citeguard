@@ -48,6 +48,10 @@ class AuditTests(unittest.TestCase):
         self.assertEqual(report.risk_ranking[-1]["suggested_fix"]["kind"], "keep")
         self.assertIn("recommendation", report.to_dict()["risk_ranking"][0])
         review_summary = report.to_dict()["review_summary"]
+        batch_execution = report.to_dict()["batch_execution"]
+        self.assertEqual(batch_execution["progress"], {"completed_items": 3, "total_items": 3, "fraction": 1.0})
+        self.assertTrue(batch_execution["input_order_preserved"])
+        self.assertFalse(batch_execution["streaming"])
         self.assertEqual(review_summary["total"], 3)
         self.assertEqual(review_summary["risk_counts"], {"high": 1, "medium": 1, "low": 1})
         self.assertEqual(review_summary["high_risk_count"], 1)

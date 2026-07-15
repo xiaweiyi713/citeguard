@@ -18,7 +18,9 @@ agent skill bundle.
 - Run the consolidated release package gate:
 
   ```bash
-  python scripts/release_package_gate.py --require-build-tools --min-high-risk-reviewed-by-language zh=0
+  python -m pip install -e ".[models]"
+  python scripts/automated_release_review.py --output automated-release-review.json
+  python scripts/release_package_gate.py --require-build-tools --release-claim-mode software --automated-review-report automated-release-review.json
   python scripts/release_package_gate.py --skip-install-smoke --include-mcp-extra-smoke --require-mcp-extra-smoke
   python scripts/release_package_gate.py --skip-install-smoke --include-mcp-stdio-smoke --require-mcp-stdio-smoke
   python scripts/release_package_gate.py --skip-install-smoke --include-published-smoke-plan --include-published-mcp-smoke-plan
@@ -26,6 +28,18 @@ agent skill bundle.
   python scripts/release_package_gate.py --skip-install-smoke --include-testpypi-smoke-run --include-testpypi-mcp-smoke-run
   python scripts/release_package_gate.py --skip-install-smoke --include-published-smoke-run --include-published-mcp-smoke-run
   ```
+
+  `--release-claim-mode development` is the default and grants no publication
+  authorization. `software` requires a fresh automated review artifact whose
+  dataset and implementation digests match the checkout. That artifact requires
+  the NLI, semantic-reranker, and lexical reviewers plus the deterministic
+  support-set policy gate, and may authorize only an ordinary software release.
+  It always records `human_benchmark_claim_allowed=false`. Use
+  `human-benchmark` only after real independent labels exist; that mode also
+  requires positive human-review/high-risk/dual-annotation thresholds, a raw
+  agreement threshold, zero supported-label disagreements, and a passing
+  sidecar gate. Automated model outputs must never be written into the sidecar
+  as human annotations.
 
   This runs fresh-venv wheel and source-distribution install smokes, checks
   package archive cleanliness, verifies expected release files, runs the
@@ -288,12 +302,12 @@ agent skill bundle.
   the seed benchmark, use `scripts/calibrate_support.py --support-eval-dataset
   data/eval/support_eval.json --split dev`; `dev` is the default split so
   threshold tuning does not touch held-out `test` results. The
-  label-sidecar gate should report coverage
-  `1.0`; keep `--min-human-reviewed`, `--min-high-risk-reviewed`, and
-  `--min-dual-annotated` at `0` for the synthetic seed set, then raise them when
-  a human-reviewed subset exists. Keep language-specific placeholders such as
-  `--min-high-risk-reviewed-by-language zh=0` in CI/release commands, then raise
-  them when claiming language-specific benchmark readiness. The gate metrics
+  label-sidecar gate should report coverage `1.0`. Zero human thresholds are
+  valid for an automated ordinary software release, but they do not establish
+  human-reviewed benchmark readiness. The tag-publish workflow runs the
+  production automated review and requests `--release-claim-mode software`.
+  A future `human-benchmark` release should set explicit reviewed, high-risk,
+  language-slice, dual-annotation, agreement, and disagreement thresholds. The gate metrics
   expose `high_risk_case_count_by_language`,
   `high_risk_reviewed_by_language`, and
   `high_risk_unreviewed_by_language`, plus
@@ -345,6 +359,16 @@ agent skill bundle.
   `merge_report.source_packet_ids` with the source `packet_id` values.
 
 - Review support-label provenance maturity before making benchmark claims:
+
+  First validate the trigger dataset and score decisions collected from the
+  actual target agent/client. The lexical release-contract smoke is not model
+  or client trigger-quality evidence.
+
+  ```bash
+  python scripts/eval_skill_trigger.py --validate-only
+  python scripts/eval_skill_trigger.py --write-template /tmp/citeguard-trigger-predictions.json
+  python scripts/eval_skill_trigger.py --predictions /tmp/citeguard-trigger-predictions.json
+  ```
 
   ```bash
   python scripts/prepare_support_label_sidecar.py --existing-sidecar data/eval/support_eval_label_sidecar.json --audit

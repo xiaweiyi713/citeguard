@@ -7,7 +7,7 @@ from typing import List, Optional, Tuple
 from citeguard.audit import AuditReportBuilder
 from citeguard.citation import CitationProposer
 from citeguard.graph import CCEG, ActionType, ClaimCitationLink, InMemoryGraphStore, RelationType
-from citeguard.planner import ClaimDecomposer, OutlinePlanner
+from legacy.planner import ClaimDecomposer, OutlinePlanner
 from citeguard.retrieval import HybridRetriever, MetadataSourceRetriever
 from citeguard.retrieval.scholarly_clients import MetadataSource
 from citeguard.verifiers import (
@@ -18,7 +18,7 @@ from citeguard.verifiers import (
     SupportVerifier,
     UncertaintyGate,
 )
-from citeguard.writer import AbstentionController, ConstrainedWriter
+from legacy.writer import AbstentionController, ConstrainedWriter
 
 from .policies import RiskPolicy
 from .states import AgentRunResult, AgentTask, SectionDraft

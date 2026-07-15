@@ -119,9 +119,10 @@ def _identifier_authority(candidate: CitationRecord, source: MetadataSource):
         return info, None
 
     last_detail: Optional[Dict[str, Any]] = None
+    authority_source = source if getattr(source, "inner", None) is not None else child
     for _attempt in range(2):  # one explicit retry: the authority path deserves a second chance
         try:
-            record = child.lookup_identifier(candidate)
+            record = authority_source.lookup_identifier(candidate)
         except Exception as exc:
             code, kind = _classify_source_exception(exc)
             last_detail = {

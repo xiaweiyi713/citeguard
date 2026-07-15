@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from citeguard.orchestrator import CiteGuardAgent
+from legacy.orchestrator import CiteGuardAgent
 from citeguard.version import __version__
 
 from .schemas import GenerateRequest, GenerateResponse

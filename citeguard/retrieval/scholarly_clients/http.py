@@ -63,8 +63,12 @@ class HTTPClient:
         headers: Optional[dict] = None,
         use_cache: bool = True,
         timeout: Optional[int] = None,
+        url_validator: Optional[Callable[[str], bool]] = None,
     ) -> str:
         full_url = self._build_url(url, params)
+        if url_validator is not None and not url_validator(full_url):
+            self._set_blocked_url(full_url)
+            return ""
         if use_cache and full_url in self._cache:
             self._clear_error()
             self.last_status_code = None
@@ -98,7 +102,15 @@ class HTTPClient:
             self.last_retry_count = attempt
             try:
                 self._sleep_for_min_interval()
-                with urllib.request.urlopen(request, timeout=timeout or self.timeout) as response:  # nosec B310
+                if url_validator is None:
+                    response_context = urllib.request.urlopen(request, timeout=timeout or self.timeout)  # nosec B310
+                else:
+                    response_context = open_validated_request(
+                        request,
+                        timeout=timeout or self.timeout,
+                        validator=url_validator,
+                    )
+                with response_context as response:
                     self._last_request_monotonic = self.clock()
                     self.last_status_code = getattr(response, "status", None) or getattr(response, "code", None)
                     self.last_final_url = getattr(response, "geturl", lambda: full_url)() or full_url
@@ -164,6 +176,16 @@ class HTTPClient:
         separator = "&" if "?" in url else "?"
         return f"{url}{separator}{query}"
 
+    def _set_blocked_url(self, url: str) -> None:
+        self._clear_error()
+        self.last_url = url
+        self.last_final_url = url
+        self.last_redirected = False
+        self.last_cache_hit = False
+        self.last_error = "blocked_unsafe_url"
+        self.last_error_code = "source_unavailable"
+        self.last_error_kind = "unsafe_url"
+
     def _should_retry_http_error(self, exc: urllib.error.HTTPError, attempt: int) -> bool:
         return attempt < self.retries and exc.code in self.RETRY_STATUS_CODES
 
@@ -189,6 +211,32 @@ class HTTPClient:
         self.last_error_code = ""
         self.last_error_kind = ""
         self.last_retry_after_seconds = None
+
+
+class _ValidatingRedirectHandler(urllib.request.HTTPRedirectHandler):
+    def __init__(self, validator: Callable[[str], bool]) -> None:
+        super().__init__()
+        self.validator = validator
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        if not self.validator(newurl):
+            raise urllib.error.URLError("redirect target is not a safe public URL")
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
+def open_validated_request(
+    request: urllib.request.Request,
+    *,
+    timeout: int,
+    validator: Callable[[str], bool],
+):
+    """Open a request only when the initial URL and every redirect are safe."""
+
+    url = request.full_url
+    if not validator(url):
+        raise urllib.error.URLError("URL is not a safe public URL")
+    opener = urllib.request.build_opener(_ValidatingRedirectHandler(validator))
+    return opener.open(request, timeout=timeout)
 
 
 def _retry_after_seconds(exc: urllib.error.HTTPError) -> Optional[float]:

@@ -1,5 +1,7 @@
 """Tests for claim-support models and verdict mapping."""
 
+import threading
+import time
 import unittest
 
 from citeguard.verification.support import (
@@ -25,6 +27,65 @@ class SupportModelTests(unittest.TestCase):
     def test_default_policy_values(self):
         self.assertEqual(DEFAULT_SUPPORT_POLICY.entail_strong, 0.55)
         self.assertEqual(DEFAULT_SUPPORT_POLICY.contra_strong, 0.55)
+
+    def test_support_audit_parallelizes_items_and_preserves_order(self):
+        class _TrackedBackend:
+            def __init__(self):
+                self.active = 0
+                self.max_active = 0
+                self.lock = threading.Lock()
+
+            def assess(self, claim_text, evidence_text):
+                with self.lock:
+                    self.active += 1
+                    self.max_active = max(self.max_active, self.active)
+                try:
+                    time.sleep(0.05)
+                    return SupportAssessment(
+                        backend_name="tracked",
+                        score=0.7,
+                        passed=True,
+                        rationale="parallel audit probe",
+                        details={"probabilities": {"entailment": 0.8, "contradiction": 0.02, "neutral": 0.18}},
+                    )
+                finally:
+                    with self.lock:
+                        self.active -= 1
+
+        records = [
+            CitationRecord(
+                citation_id=f"record-{index}",
+                title=f"Parallel Support Paper {index}",
+                abstract=f"Parallel claim {index} is supported by this evidence.",
+                doi=f"10.5555/parallel-{index}",
+                source="fixture",
+            )
+            for index in range(4)
+        ]
+        requests = [
+            ClaimSupportRequest(
+                f"Parallel claim {index} is supported.",
+                CitationRecord(
+                    citation_id=f"candidate-{index}",
+                    title=record.title,
+                    doi=record.doi,
+                ),
+            )
+            for index, record in enumerate(records)
+        ]
+        backend = _TrackedBackend()
+
+        report = audit_claim_support(
+            requests,
+            InMemoryMetadataSource(records),
+            backend=backend,
+            max_workers=4,
+        )
+
+        self.assertGreaterEqual(backend.max_active, 2)
+        self.assertEqual([result.claim for result in report.results], [request.claim for request in requests])
+        self.assertEqual(report.to_dict()["batch_execution"]["progress"]["completed_items"], 4)
+        self.assertEqual(report.to_dict()["batch_execution"]["max_workers"], 4)
 
     def test_support_result_to_dict(self):
         result = SupportResult(
@@ -416,6 +477,69 @@ class AssessSupportTests(unittest.TestCase):
 
         self.assertEqual(result.verdict, SupportVerdict.CONTRADICTED)
         self.assertIn("explicit contradiction", result.explanation)
+
+    def test_chinese_source_outage_fabrication_claim_is_contradicted(self):
+        backend = _FakeBackend({
+            "来源暂时不可达": (0.90, {"entailment": 0.91, "contradiction": 0.05, "neutral": 0.04})
+        })
+
+        result = assess_support(
+            "来源暂时不可达证明该引用是伪造的。",
+            _paper("来源暂时不可达只说明检索失败，不能证明引用是伪造的；应稍后重试。"),
+            backend,
+            lang="zh",
+        )
+
+        self.assertEqual(result.verdict, SupportVerdict.CONTRADICTED)
+
+    def test_full_text_boundary_overrides_spurious_high_entailment(self):
+        backend = _FakeBackend({
+            "does not describe exclusion criteria": (
+                0.90,
+                {"entailment": 0.92, "contradiction": 0.04, "neutral": 0.04},
+            )
+        })
+
+        result = assess_support(
+            "The intervention excluded participants who missed baseline surveys.",
+            _paper("The abstract does not describe exclusion criteria; those details are available in the full text."),
+            backend,
+        )
+
+        self.assertEqual(result.verdict, SupportVerdict.INSUFFICIENT_EVIDENCE)
+        self.assertIn("scope or provenance boundary", result.explanation)
+
+    def test_synthetic_provenance_cannot_support_human_reviewed_benchmark_claim(self):
+        backend = _FakeBackend({
+            "maintainer-authored synthetic": (
+                0.75,
+                {"entailment": 0.30, "contradiction": 0.20, "neutral": 0.50},
+            )
+        })
+
+        result = assess_support(
+            "The seed evaluation proves CiteGuard has an independently human-reviewed benchmark.",
+            _paper(
+                "The support evaluation is a maintainer-authored synthetic seed set; "
+                "independent annotation is planned."
+            ),
+            backend,
+        )
+
+        self.assertEqual(result.verdict, SupportVerdict.INSUFFICIENT_EVIDENCE)
+
+    def test_final_verdict_claim_is_contradicted_by_review_only_evidence(self):
+        backend = _FakeBackend({
+            "must not be presented": (0.50, {"entailment": 0.10, "contradiction": 0.35, "neutral": 0.55})
+        })
+
+        result = assess_support(
+            "Counter-evidence search leads are final contradiction verdicts.",
+            _paper("Search leads must not be presented as a contradiction verdict without adjudication."),
+            backend,
+        )
+
+        self.assertEqual(result.verdict, SupportVerdict.CONTRADICTED)
 
     def test_unrelated_negation_is_not_treated_as_contradiction(self):
         backend = _FakeBackend({

@@ -1,6 +1,6 @@
 # Contributing to CiteGuard
 
-Thanks for considering a contribution. CiteGuard is currently an early-stage research prototype, so the best contributions are the ones that improve rigor, reproducibility, and failure transparency.
+Thanks for considering a contribution. CiteGuard is an alpha agent-facing citation auditor; the best contributions improve rigor, reproducibility, installation reliability, and failure transparency.
 
 ## Good First Contributions
 
@@ -18,7 +18,7 @@ Thanks for considering a contribution. CiteGuard is currently an early-stage res
 
 ```bash
 python -m pip install --upgrade pip
-python -m pip install -e .
+python -m pip install -e ".[dev]"
 ```
 
 4. If you want model-backed support verification, install the optional model stack:
@@ -31,6 +31,8 @@ python -m pip install -r requirements-optional.txt
 
 ```bash
 python3 -m unittest discover -s tests -v
+python -m ruff check .
+python -m mypy citeguard/
 ```
 
 ## Coding Guidelines
@@ -48,6 +50,6 @@ python3 -m unittest discover -s tests -v
 - If your change affects verifier thresholds, evidence extraction, or benchmark behavior, include before/after results.
 - If your change touches scholarly sources, note any source-specific limitations or rate-limit assumptions.
 
-## Research Caveat
+## Product Caveat
 
-This repository is a research prototype, not a production citation service. Contributions that make uncertainty visible are more valuable than contributions that only make outputs look smoother.
+This repository is alpha software, not a hosted production citation service. Claim-support evaluation remains label-maturity limited; contributions that make uncertainty visible are more valuable than changes that only make outputs look smoother.

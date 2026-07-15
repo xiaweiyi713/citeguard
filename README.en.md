@@ -1,6 +1,7 @@
 # CiteGuard
 
 [![CI](https://github.com/xiaweiyi713/citeguard/actions/workflows/ci.yml/badge.svg)](https://github.com/xiaweiyi713/citeguard/actions/workflows/ci.yml)
+[![Live canary](https://github.com/xiaweiyi713/citeguard/actions/workflows/canary.yml/badge.svg)](https://github.com/xiaweiyi713/citeguard/actions/workflows/canary.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.9%2B-blue.svg)](pyproject.toml)
 [![PyPI](https://img.shields.io/pypi/v/citationguard.svg)](https://pypi.org/project/citationguard/)
@@ -100,17 +101,15 @@ Two guardrails keep it honest: a source being **unreachable is never escalated t
 
 ## Quick start
 
-The **core library has zero third-party dependencies** and runs on Python ≥ 3.9.
+The verification library runs on Python ≥ 3.9; on Python ≥ 3.10 the base install also includes the MCP SDK so a registry-installed package can launch `citeguard-mcp` directly.
 
 > ℹ️ **Package naming:** this project publishes on PyPI as **[`citationguard`](https://pypi.org/project/citationguard/)** — install with `pip install citationguard`, then `import citeguard` as usual (the `citeguard` / `citeguard-mcp` console commands are unchanged). The `citeguard` package on PyPI is an unrelated project by another organization.
 
 For an installed or published package:
 
 ```bash
-python -m pip install citationguard
-python -m pip install "citationguard[mcp]"     # + MCP server (requires Python >= 3.10)
+python -m pip install citationguard            # includes MCP server (Python >= 3.10)
 python -m pip install "citationguard[models]"  # + reranker/NLI stack for support deep mode (heavy)
-python -m pip install "citationguard[api]"     # + FastAPI surface
 ```
 
 From a local source checkout: `python -m pip install -e .` (plus the same extras).
@@ -126,7 +125,7 @@ citeguard verify \
   --year 2017 \
   --arxiv-id 1706.03762
 
-citeguard audit examples/citations.json                  # batch: JSON array or .jsonl
+citeguard audit examples/citations.json --jobs 4         # batch: JSON array or .jsonl
 citeguard audit examples/references.md --high-risk-only  # extract + audit a bibliography file
 
 citeguard support \
@@ -164,7 +163,7 @@ CiteGuard is listed in the [official MCP registry](https://registry.modelcontext
 For an installed or published package:
 
 ```bash
-python -m pip install "citationguard[mcp]"   # requires Python >= 3.10
+python -m pip install citationguard          # MCP server requires Python >= 3.10
 citeguard-mcp                            # stdio transport
 ```
 
@@ -207,10 +206,12 @@ For agent clients that support skills, [`skills/citeguard-verify/SKILL.md`](skil
 ### As a Python library
 
 ```python
+import os
+
 from citeguard.retrieval.scholarly_clients import build_live_metadata_source
 from citeguard.verification import parse_citation, verify_citation, check_claim_support
 
-source = build_live_metadata_source(["openalex", "arxiv"], mailto="you@example.com")
+source = build_live_metadata_source(["openalex", "arxiv"], mailto=os.environ["CITEGUARD_MAILTO"])
 
 result = verify_citation(parse_citation(title="Attention Is All You Need", arxiv_id="1706.03762"), source)
 print(result.verdict.value, result.confidence)          # -> verified 0.7
@@ -230,7 +231,7 @@ print(support.verdict.value, support.engine)
 | `CITEGUARD_SOURCES` | `openalex,crossref,arxiv` | which sources to query (plus `semantic_scholar` / `s2`); unknown names fail fast |
 | `CITEGUARD_MAILTO` | — | real contact email for polite OpenAlex/Crossref; unset values are not sent as `mailto` |
 | `SEMANTIC_SCHOLAR_API_KEY` | — | optional, improves Semantic Scholar access |
-| `CITEGUARD_CACHE` | `data/logs/verification_cache.sqlite` | local SQLite resolution cache |
+| `CITEGUARD_CACHE` | OS user cache directory | local SQLite resolution cache |
 | `CITEGUARD_FIXTURE_CITATIONS` | — | JSON/JSONL citation fixture for deterministic offline runs |
 | `CITEGUARD_HTTP_TIMEOUT` | `10` | timeout, in seconds, for live scholarly API calls |
 | `CITEGUARD_SOURCE_BUDGET` | `8.0` | total fan-out budget for one multi-source query; slow sources become `budget_exceeded` failures instead of blocking |
@@ -242,7 +243,7 @@ The full runtime contract (retry/backoff knobs, evidence timeouts, cache paths,
 remote-evidence boundaries) is in [docs/configuration.md](docs/configuration.md).
 
 Support deep mode downloads model weights on first use; pre-download with
-`python3 scripts/warmup_support_models.py`. Without the `[models]` extra,
+`citeguard models warmup`. Without the `[models]` extra,
 support runs a labelled `heuristic` engine which never emits `supported` or
 `contradicted`; `citeguard status` reports this as
 `support_models.engine=heuristic_fallback` with
@@ -292,7 +293,10 @@ python3 -m unittest discover -s tests -v   # full unittest suite; optional MCP s
 python3 scripts/smoke_mcp.py --require-sdk # MCP stdio smoke; the MCP SDK requires Python 3.10+
 python3 scripts/eval_verification.py       # offline, deterministic existence/metadata eval
 python3 scripts/eval_support.py --report --split test --quality-gate
-python3 scripts/release_package_gate.py    # full release gate; add --require-build-tools before publishing
+python3 scripts/release_package_gate.py    # development/contract gate; grants no release claim
+python3 -m pip install -e ".[models]"
+python3 scripts/automated_release_review.py --output automated-release-review.json
+python3 scripts/release_package_gate.py --release-claim-mode software --automated-review-report automated-release-review.json --require-build-tools
 ```
 
 The unit suite and evals are network-free and run in CI. Eval datasets live in
@@ -300,6 +304,9 @@ The unit suite and evals are network-free and run in CI. Eval datasets live in
 label-provenance sidecars, and blinded annotation packets — is documented in
 [docs/support_eval.md](docs/support_eval.md); release smokes and publish flows
 are in [docs/release_checklist.md](docs/release_checklist.md).
+The production-model review may authorize an ordinary software release, but it
+cannot upgrade maintainer-synthetic labels into a human-reviewed benchmark;
+that claim still requires real independent annotation and adjudication.
 
 ---
 
@@ -314,11 +321,12 @@ citeguard/
   retrieval/      # scholarly source adapters (OpenAlex/Crossref/arXiv/Semantic Scholar) + retrievers
   verifiers/      # existence/metadata + the reranker+NLI support ensemble
   citation/ graph/ audit/                 # shared models and helpers
-  orchestrator/ planner/ writer/ benchmark/ api/   # source-checkout experiments and benchmark/API utilities
+  benchmark/      # support-eval metrics, calibration, and experiment artifacts (shipped)
 skills/citeguard-verify/   # reusable Codex/Claude/Cursor agent skill
 scripts/                   # demo + eval + corpus/model utilities
 data/eval/                 # offline benchmarks
 docs/                      # release docs, architecture, benchmark notes, spike notes
+legacy/                    # source-checkout experiments and benchmark/API utilities: the retired writing-agent prototype, never packaged
 tests/                     # unittest suite
 ```
 
@@ -331,7 +339,7 @@ surface; see [`docs/public_api_migration.md`](docs/public_api_migration.md).
 
 ## Documents
 
-- Setup/reference: [`docs/configuration.md`](docs/configuration.md) · [`docs/mcp_setup.md`](docs/mcp_setup.md) · [`docs/cli_reference.md`](docs/cli_reference.md) · [`docs/agent_output_contract.md`](docs/agent_output_contract.md) · [`docs/error_codes.md`](docs/error_codes.md) · [`docs/public_api_migration.md`](docs/public_api_migration.md)
+- Setup/reference: [`docs/claude_code_quickstart.md`](docs/claude_code_quickstart.md) · [`docs/troubleshooting.md`](docs/troubleshooting.md) · [`docs/configuration.md`](docs/configuration.md) · [`docs/mcp_setup.md`](docs/mcp_setup.md) · [`docs/cli_reference.md`](docs/cli_reference.md) · [`docs/agent_output_contract.md`](docs/agent_output_contract.md) · [`docs/error_codes.md`](docs/error_codes.md) · [`docs/public_api_migration.md`](docs/public_api_migration.md)
 - Benchmarks: [`docs/support_eval.md`](docs/support_eval.md) · [`docs/benchmark_design.md`](docs/benchmark_design.md) · [`docs/benchmark_todo.md`](docs/benchmark_todo.md) · [`docs/support_labeling_guidelines.md`](docs/support_labeling_guidelines.md)
 - Release/safety: [`docs/release_checklist.md`](docs/release_checklist.md) · [`docs/security_compliance.md`](docs/security_compliance.md)
 - Architecture: [`docs/architecture.md`](docs/architecture.md) · Roadmap: [`ROADMAP.md`](ROADMAP.md) · ChinaXiv spike: [`docs/chinaxiv_spike.md`](docs/chinaxiv_spike.md)

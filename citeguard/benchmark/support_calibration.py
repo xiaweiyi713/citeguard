@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass
 from itertools import product
-from typing import Dict, Iterable, List, Optional, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Tuple, cast
 
 from citeguard.verifiers import (
     DEFAULT_NLI_MODEL,
@@ -380,7 +380,7 @@ def grid_search_support_configs(
     if profile not in {"quick", "standard"}:
         raise ValueError("profile must be 'quick' or 'standard'")
 
-    grids = {
+    grids = cast(Dict[str, List[Any]], {
         "quick": {
             "heuristic_thresholds": [0.16, 0.18, 0.22],
             "reranker_thresholds": [0.45, 0.48, 0.52],
@@ -413,9 +413,9 @@ def grid_search_support_configs(
                 (0.65, 0.20),
             ],
         },
-    }[profile]
+    }[profile])
 
-    results = []
+    results: List[Dict[str, Any]] = []
     for heuristic_threshold, reranker_threshold, nli_threshold, nli_margin in product(
         grids["heuristic_thresholds"],
         grids["reranker_thresholds"],
@@ -538,7 +538,7 @@ def _decision_path_counts(rows_by_bucket: Dict[str, List[Dict[str, object]]]) ->
 
 
 def _average(values: Iterable[object]) -> Optional[float]:
-    numbers = [float(value) for value in values]
+    numbers = [float(cast(Any, value)) for value in values]
     if not numbers:
         return None
     return round(sum(numbers) / len(numbers), 4)
@@ -548,7 +548,7 @@ def _rebuild_component_assessments(
     scored_example: ScoredSupportExample,
     config: SupportCalibrationConfig,
 ) -> List[SupportAssessment]:
-    overlap_terms = scored_example.heuristic_details.get("overlap_terms", [])
+    overlap_terms = cast(List[Any], scored_example.heuristic_details.get("overlap_terms", []))
     entailment = float(scored_example.nli_probabilities.get("entailment", 0.0))
     contradiction = float(scored_example.nli_probabilities.get("contradiction", 0.0))
     return [

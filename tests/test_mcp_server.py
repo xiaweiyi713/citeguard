@@ -99,10 +99,16 @@ def _clear_mcp_server_modules():
 
 class MCPServerHelperTests(unittest.TestCase):
     def setUp(self):
+        self.file_roots = mock.patch.dict(
+            os.environ,
+            {"CITEGUARD_ALLOWED_FILE_ROOTS": os.pathsep.join([tempfile.gettempdir(), "/tmp"])},
+        )
+        self.file_roots.start()
         self.server = import_server_with_fake_mcp()
 
     def tearDown(self):
         _clear_mcp_server_modules()
+        self.file_roots.stop()
 
     def test_batch_tool_metadata_documents_high_risk_filtering(self):
         for tool_name in ("audit_citations_tool", "audit_claim_support_tool"):
@@ -162,7 +168,7 @@ class MCPServerHelperTests(unittest.TestCase):
         self.assertIsInstance(support_models["deep_models_available"], bool)
         self.assertIsInstance(support_models["model_dependencies"], dict)
         self.assertIsInstance(support_models["missing_dependencies"], list)
-        self.assertIn("warmup_support_models.py", support_models["warmup_command"])
+        self.assertEqual(support_models["warmup_command"], "citeguard models warmup")
         if support_models["deep_models_available"]:
             self.assertEqual(support_models["engine"], "production_ensemble")
             self.assertEqual(support_models["next_action"], "continue")
@@ -172,6 +178,41 @@ class MCPServerHelperTests(unittest.TestCase):
             self.assertEqual(support_models["next_action"], "install_or_configure_dependency")
             self.assertTrue(support_models["missing_dependencies"])
         self.assertIn("warnings", status)
+
+    def test_full_text_file_is_limited_to_configured_roots(self):
+        with mock.patch.dict(os.environ, {"CITEGUARD_ALLOWED_FILE_ROOTS": tempfile.gettempdir()}):
+            report = self.server.check_claim_support_tool(
+                claim="A claim.",
+                title="GhostCite",
+                full_text_file="/etc/passwd",
+            )
+
+        self.assertFalse(report["ok"])
+        self.assertEqual(report["error"]["code"], "file_error")
+        self.assertEqual(report["error"]["details"]["errno"], errno.EACCES)
+
+    def test_full_text_file_and_batches_have_hard_size_limits(self):
+        with tempfile.NamedTemporaryFile("wb", suffix=".txt", delete=False) as handle:
+            handle.truncate(self.server.MAX_EVIDENCE_FILE_BYTES + 1)
+            oversized_path = handle.name
+        try:
+            report = self.server.check_claim_support_tool(
+                claim="A claim.",
+                title="GhostCite",
+                full_text_file=oversized_path,
+            )
+        finally:
+            os.unlink(oversized_path)
+
+        self.assertEqual(report["error"]["details"]["errno"], errno.EFBIG)
+        batch = self.server.audit_citations_tool(
+            [{"title": f"Paper {index}"} for index in range(self.server.MAX_BATCH_ITEMS + 1)]
+        )
+        self.assertFalse(batch["ok"])
+        self.assertEqual(batch["error"]["details"]["max_items"], self.server.MAX_BATCH_ITEMS)
+        invalid_workers = self.server.audit_citations_tool([{"title": "Paper"}], max_workers=17)
+        self.assertFalse(invalid_workers["ok"])
+        self.assertEqual(invalid_workers["error"]["details"]["field"], "max_workers")
 
     def test_status_tool_can_request_live_source_probe(self):
         status = mock.Mock(
@@ -728,6 +769,8 @@ class MCPServerHelperTests(unittest.TestCase):
         self.assertEqual(report["results"][0]["evidence_scope"], "full_text")
         self.assertEqual(report["results"][0]["evidence"]["source_field"], "user_full_text_file_1")
         self.assertEqual(report["risk_ranking"][0]["evidence_source_field"], "user_full_text_file_1")
+        self.assertIn("full-text evidence", report["risk_ranking"][0]["recommendation"])
+        self.assertIn("full-text evidence", report["results"][0]["explanation"])
 
     def test_audit_claim_support_tool_accepts_citation_set_items(self):
         source = InMemoryMetadataSource(
