@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+## 0.1.3 - 2026-07-15
+
+- Documented the release-gated documentation contract
+  (`docs/documentation_contract.md`, linked from `CONTRIBUTING.md`): the rules
+  the 80 release-metadata gates enforce — five-file version bumps, error-code
+  registration before documentation, archived headers on historical design
+  notes — previously existed only inside the test file and were discoverable
+  only by tripping them.
+- Documented the one-time PyPI trusted-publisher setup in the release checklist
+  and allowed `workflow_dispatch` reruns of `Publish`; the trusted publisher had
+  never been registered, so the tag-triggered publish workflow had never
+  actually run to completion.
 - Replaced the impossible tag-publish human-review threshold with a two-track
   release policy: a production NLI/reranker/lexical automated review may
   authorize an ordinary software release, while human-reviewed benchmark claims
