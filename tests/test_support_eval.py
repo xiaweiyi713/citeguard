@@ -2936,6 +2936,37 @@ class SupportEvalTests(unittest.TestCase):
         self.assertEqual(gate["failures"], [])
         self.assertEqual(gate["metrics"]["false_support_count"], 0)
 
+    def test_release_summary_separates_model_quality_from_label_maturity(self):
+        cases = [
+            SupportCase("a", "claim", "evidence", "supported", case_type="direct_support"),
+            SupportCase("b", "claim", "evidence", "contradicted", case_type="contradiction"),
+            SupportCase("c", "claim", "evidence", "insufficient_evidence", case_type="hard_negative"),
+        ]
+        report = run_support_eval_fixture_report(cases)
+        report["label_sidecar_gate"] = {"ok": True, "metrics": {"high_risk_unreviewed": 3}}
+
+        immature = compute_support_release_summary(report, compute_support_quality_gate(report))
+
+        self.assertEqual(immature["status"], "evaluation_passed_but_labels_immature")
+        self.assertTrue(immature["model_acceptance_ok"])
+        self.assertFalse(immature["labels_mature_for_benchmark_claims"])
+        self.assertFalse(immature["benchmark_claim_safe"])
+        self.assertFalse(immature["ok_to_accept_supported"])
+        self.assertEqual(immature["next_action"], "complete_human_label_review")
+
+        report["label_sidecar"] = {
+            "human_reviewed": 3,
+            "label_maturity": {"dual_annotated_count": 2, "published_benchmark_count": 3},
+        }
+        report["label_sidecar_gate"] = {
+            "ok": True,
+            "metrics": {"dual_annotated": 2, "high_risk_reviewed": 3, "high_risk_unreviewed": 0},
+        }
+        mature = compute_support_release_summary(report, compute_support_quality_gate(report))
+
+        self.assertTrue(mature["labels_mature_for_benchmark_claims"])
+        self.assertTrue(mature["ok_to_accept_supported"])
+
     def test_quality_gate_fails_on_false_support(self):
         cases = [
             SupportCase("a", "claim", "evidence", "supported", case_type="direct_support"),

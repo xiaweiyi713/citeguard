@@ -51,6 +51,8 @@ class YearConflictTests(unittest.TestCase):
         result = verify_citation(candidate, source)
         self.assertEqual(result.verdict, Verdict.AMBIGUOUS)
         self.assertEqual(result.suggested_citation, "")
+        self.assertEqual(result.suggested_bibtex, "")
+        self.assertEqual(result.suggested_gbt7714, "")
         self.assertIn("year", result.explanation.lower())
 
     def test_suspect_only_best_degrades_to_ambiguous(self):

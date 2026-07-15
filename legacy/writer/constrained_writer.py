@@ -6,7 +6,7 @@ from typing import Dict, Iterable, List, Optional
 
 from citeguard.citation import CitationFormatter
 from citeguard.graph import ActionType, CitationRecord, Claim, ClaimDecision
-from citeguard.planner import OutlineSection
+from legacy.planner import OutlineSection
 
 
 class ConstrainedWriter:

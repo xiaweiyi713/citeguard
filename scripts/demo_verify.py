@@ -7,6 +7,8 @@ Run from the repo root:
 
 from __future__ import annotations
 
+import os
+
 from _bootstrap import ensure_project_root
 
 ensure_project_root()
@@ -18,7 +20,10 @@ ICON = {"verified": "[OK]", "metadata_mismatch": "[!]", "not_found": "[X]", "amb
 
 
 def main() -> None:
-    source = build_live_metadata_source(["openalex", "arxiv"], mailto="you@example.com")
+    mailto = os.environ.get("CITEGUARD_MAILTO", "").strip()
+    if not mailto:
+        raise SystemExit("Set CITEGUARD_MAILTO to a real contact email before running the live demo.")
+    source = build_live_metadata_source(["openalex", "arxiv"], mailto=mailto)
     print("Verifying 2 citations against OpenAlex + arXiv ...\n")
     cases = [
         (

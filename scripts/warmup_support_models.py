@@ -9,12 +9,8 @@ from _bootstrap import ensure_project_root
 
 ensure_project_root()
 
-from citeguard.verifiers import (  # noqa: E402
-    DEFAULT_NLI_MODEL,
-    DEFAULT_RERANKER_MODEL,
-    SentenceTransformerRerankerBackend,
-    TransformersNLIBackend,
-)
+from citeguard.model_tools import warmup_support_models  # noqa: E402
+from citeguard.verifiers import DEFAULT_NLI_MODEL, DEFAULT_RERANKER_MODEL  # noqa: E402
 
 
 def main() -> None:
@@ -23,16 +19,7 @@ def main() -> None:
     parser.add_argument("--nli-model", default=DEFAULT_NLI_MODEL)
     args = parser.parse_args()
 
-    claim = "The literature analyzes phantom references and fabricated metadata in large language models."
-    evidence = "This paper analyzes phantom references and fabricated bibliographic metadata in large language models."
-
-    reranker = SentenceTransformerRerankerBackend(model_name=args.reranker_model)
-    nli = TransformersNLIBackend(model_name=args.nli_model)
-
-    output = {
-        "reranker": reranker.assess(claim, evidence).__dict__,
-        "nli": nli.assess(claim, evidence).__dict__,
-    }
+    output = warmup_support_models(args.reranker_model, args.nli_model)
     print(json.dumps(output, ensure_ascii=False, indent=2))
 
 

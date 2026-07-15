@@ -165,6 +165,11 @@ python3 scripts/prepare_support_label_sidecar.py \
 For independent human labeling, use a blinded annotation packet so reviewers do
 not see dataset gold labels:
 
+Automated release reviewers are intentionally separate from this workflow.
+Their outputs may authorize an ordinary software release, but they are not
+human labels, cannot be merged into the sidecar, and cannot authorize a
+human-reviewed benchmark claim.
+
 ```bash
 python3 scripts/prepare_support_label_sidecar.py \
   --dataset data/eval/support_eval.json \

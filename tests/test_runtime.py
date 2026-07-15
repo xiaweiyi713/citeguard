@@ -8,6 +8,8 @@ import unittest
 from citeguard.runtime import (
     SOURCE_HEALTH_SCHEMA_VERSION,
     build_configured_source,
+    cache_path,
+    cache_ttl,
     environment_status,
     evidence_timeout,
     http_min_interval,
@@ -16,6 +18,8 @@ from citeguard.runtime import (
     http_timeout,
     load_fixture_records,
     remote_evidence_enabled,
+    negative_cache_ttl,
+    source_budget,
     source_health_status,
 )
 from citeguard.verification import CachingMetadataSource, CitationRecord
@@ -145,6 +149,33 @@ def cached_health_source_factory(names, **kwargs):
 
 
 class RuntimeConfigTests(unittest.TestCase):
+    def test_default_cache_uses_user_cache_directory_not_working_directory(self):
+        path = cache_path({})
+
+        self.assertTrue(path.endswith(os.path.join("citeguard", "verification_cache.sqlite")))
+        self.assertTrue(os.path.isabs(path))
+        self.assertNotIn(os.path.join("data", "logs"), path)
+
+    def test_xdg_cache_home_and_explicit_cache_override(self):
+        self.assertEqual(
+            cache_path({"XDG_CACHE_HOME": "/tmp/custom-cache"}),
+            "/tmp/custom-cache/citeguard/verification_cache.sqlite",
+        )
+        self.assertEqual(cache_path({"CITEGUARD_CACHE": ":memory:"}), ":memory:")
+
+    def test_cache_ttls_and_source_budget_are_strictly_validated(self):
+        self.assertEqual(cache_ttl({}), 86400.0)
+        self.assertEqual(negative_cache_ttl({}), 900.0)
+        self.assertEqual(source_budget({}), 8.0)
+        self.assertEqual(source_budget({"CITEGUARD_SOURCE_BUDGET": "0.25"}), 0.25)
+        for name, function in (
+            ("CITEGUARD_CACHE_TTL", cache_ttl),
+            ("CITEGUARD_NEGATIVE_CACHE_TTL", negative_cache_ttl),
+            ("CITEGUARD_SOURCE_BUDGET", source_budget),
+        ):
+            with self.subTest(name=name), self.assertRaises(ValueError):
+                function({name: "invalid"})
+
     def test_remote_evidence_is_disabled_by_default(self):
         self.assertFalse(remote_evidence_enabled(env={}))
         status = environment_status(env={}, module_checker=lambda name: False)
@@ -185,15 +216,15 @@ class RuntimeConfigTests(unittest.TestCase):
             support_models["install_hint"].index('python -m pip install "citationguard[models]"'),
             support_models["install_hint"].index('python -m pip install -e ".[models]"'),
         )
-        self.assertEqual(support_models["warmup_command"], "python3 scripts/warmup_support_models.py")
+        self.assertEqual(support_models["warmup_command"], "citeguard models warmup")
         self.assertFalse(support_models["model_weights_loaded"])
         self.assertTrue(any("Remote landing-page evidence" in warning for warning in status["warnings"]))
         mcp_warning = next(warning for warning in status["warnings"] if "MCP SDK is not installed" in warning)
-        self.assertIn('python -m pip install "citationguard[mcp]"', mcp_warning)
-        self.assertIn('python -m pip install -e ".[mcp]"', mcp_warning)
+        self.assertIn("python -m pip install citationguard", mcp_warning)
+        self.assertIn("python -m pip install -e .", mcp_warning)
         self.assertLess(
-            mcp_warning.index('python -m pip install "citationguard[mcp]"'),
-            mcp_warning.index('python -m pip install -e ".[mcp]"'),
+            mcp_warning.index("python -m pip install citationguard"),
+            mcp_warning.index("python -m pip install -e ."),
         )
 
     def test_status_reports_production_support_engine_when_model_dependencies_are_available(self):

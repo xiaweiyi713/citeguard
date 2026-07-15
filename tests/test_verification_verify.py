@@ -74,6 +74,10 @@ class VerifyTests(unittest.TestCase):
         self.assertEqual(result.verdict, Verdict.METADATA_MISMATCH)
         self.assertIn("year", [diff.field for diff in result.field_diffs if not diff.matches])
         self.assertTrue(result.suggested_citation)
+        self.assertIn("@article{", result.suggested_bibtex)
+        self.assertIn("title = {GhostCite", result.suggested_bibtex)
+        self.assertIn("[J]", result.suggested_gbt7714)
+        self.assertEqual(result.to_dict()["suggested_bibtex"], result.suggested_bibtex)
 
     def test_fabricated_citation_is_not_found(self):
         candidate = parse_citation(title="Quantum Teleportation of Citation Hallucinations in Synthetic Benchmarks")

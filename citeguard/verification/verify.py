@@ -201,6 +201,8 @@ def verify_citation(
             source_failure_mode=failure_mode,
             outage_limited=False,
             identifier_lookup=outcome.identifier_lookup,
+            suggested_bibtex=formatter.format_bibtex(outcome.best) if suggested else "",
+            suggested_gbt7714=formatter.format_gbt7714(outcome.best) if suggested else "",
         )
 
     return VerificationResult(

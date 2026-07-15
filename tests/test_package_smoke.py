@@ -59,7 +59,8 @@ class PackageSmokeTests(unittest.TestCase):
         required_skill_files = {
             "skills/citeguard-verify/SKILL.md",
             "skills/citeguard-verify/agents/openai.yaml",
-            "skills/citeguard-verify/references/examples.md",
+            "skills/citeguard-verify/references/tool-payloads.md",
+            "skills/citeguard-verify/references/result-policy.md",
         }
 
         self.assertTrue(required_skill_files.issubset(expected_release_files))
@@ -91,8 +92,8 @@ class PackageSmokeTests(unittest.TestCase):
 
         self.assertIn("docs/releases/v9.9.9.md", expected)
 
-    def test_mcp_stdio_smoke_requires_mcp_extra_with_dependencies(self):
-        with self.assertRaisesRegex(RuntimeError, "--mcp-stdio-smoke requires --extra mcp --with-deps"):
+    def test_mcp_stdio_smoke_requires_dependencies(self):
+        with self.assertRaisesRegex(RuntimeError, "--mcp-stdio-smoke requires --with-deps"):
             smoke_package.main(["--mcp-stdio-smoke"])
 
     def test_mcp_stdio_smoke_dispatches_installed_entrypoint(self):

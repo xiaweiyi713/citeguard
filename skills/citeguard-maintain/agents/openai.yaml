@@ -1,0 +1,7 @@
+interface:
+  display_name: "CiteGuard Maintain"
+  short_description: "Evaluate and release CiteGuard safely"
+  default_prompt: "Use $citeguard-maintain to run CiteGuard evaluation, packaging, or release-maintenance workflows."
+
+policy:
+  allow_implicit_invocation: false

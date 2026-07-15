@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "policy": "Every lexical safety rule must document intent, source cases, a positive example, and counterexamples.",
+  "term_sets": {
+    "zh_source_outage": ["源不可达", "来源不可达", "数据源不可达", "源失败", "来源失败", "源故障", "来源故障", "检索失败", "查询失败", "超时", "限流", "未找到", "找不到"],
+    "zh_fabrication": ["伪造", "虚假", "编造", "幻觉", "捏造"],
+    "zh_confidence": ["提高", "增加", "提升", "证明", "证据", "置信", "确信"],
+    "zh_confidence_reduction": ["降低", "下调", "减少"],
+    "zh_certainty": ["置信", "可信", "确定"],
+    "zh_proof_denial": ["不能证明", "无法证明", "不可证明"],
+    "zh_evidence_denial": ["不是证据", "并非证据", "不构成证据", "不能作为证据"],
+    "zh_classification_denial": ["不应", "不能", "不可"],
+    "zh_classification": ["指控", "判定", "标记", "归类"],
+    "zh_retry_or_health": ["来源健康", "源健康", "稍后重试", "人工复核"]
+  },
+  "rules": [
+    {"id": "en_improvement_denial", "language": "en", "intent": "Detect an explicit negative result against an improvement claim.", "source_case_ids": ["s08", "s29"], "positive": {"claim": "Method M improves task T.", "evidence": "Method M does not improve task T."}, "counterexamples": [{"claim": "Method M improves task T.", "evidence": "Method M improves task T."}]},
+    {"id": "en_necessity_denial", "language": "en", "intent": "Detect optional evidence against universal or necessary wording.", "source_case_ids": ["s15"], "positive": {"claim": "Component C is always required.", "evidence": "Component C is optional by default."}, "counterexamples": [{"claim": "Component C may help.", "evidence": "Component C is optional."}]},
+    {"id": "en_support_denial", "language": "en", "intent": "Detect explicit denial that evidence supports a positive support claim.", "source_case_ids": ["s37"], "positive": {"claim": "The paper supports claim C.", "evidence": "The paper does not support claim C."}, "counterexamples": [{"claim": "The paper does not support claim C.", "evidence": "The paper does not support claim C."}]},
+    {"id": "en_fabrication_denial", "language": "en", "intent": "Prevent claims that the system labels missing citations as fabricated.", "source_case_ids": ["s45"], "positive": {"claim": "The system labels missing citations fabricated.", "evidence": "The system does not label missing citations fabricated."}, "counterexamples": [{"claim": "The system avoids fabrication claims.", "evidence": "The system does not label missing citations fabricated."}]},
+    {"id": "source_outage_safety", "language": "multilingual", "intent": "Recognize evidence that outages lower confidence rather than prove fabrication.", "source_case_ids": ["s50", "s51"], "positive": {"claim": "A source timeout proves a citation is fake.", "evidence": "A source timeout lowers confidence and is not proof of fabrication."}, "counterexamples": [{"claim": "A source timeout occurred.", "evidence": "The source timed out."}]},
+    {"id": "zh_universal_denial", "language": "zh", "intent": "Detect Chinese universal claims contradicted by optional or non-universal evidence.", "source_case_ids": ["s31"], "positive": {"claim": "该组件总是必须使用。", "evidence": "该组件未必需要，可选。"}, "counterexamples": [{"claim": "该组件可以使用。", "evidence": "该组件可选。"}]},
+    {"id": "zh_improvement_denial", "language": "zh", "intent": "Detect Chinese improvement claims contradicted by negative outcomes.", "source_case_ids": ["s32"], "positive": {"claim": "方法提升性能。", "evidence": "实验显示方法未提升性能。"}, "counterexamples": [{"claim": "方法提升性能。", "evidence": "实验显示方法提升性能。"}]},
+    {"id": "zh_support_denial", "language": "zh", "intent": "Detect Chinese positive support claims denied by evidence.", "source_case_ids": ["s33"], "positive": {"claim": "论文支持该结论。", "evidence": "论文不支持该结论。"}, "counterexamples": [{"claim": "论文不支持该结论。", "evidence": "论文不支持该结论。"}]},
+    {"id": "en_verdict_classification_denial", "language": "en", "intent": "Prevent retrieval leads from being upgraded to final verdicts when the evidence explicitly forbids that classification.", "source_case_ids": ["s48"], "positive": {"claim": "Search leads are final contradiction verdicts.", "evidence": "Search leads must not be presented as a contradiction verdict."}, "counterexamples": [{"claim": "Search leads require review.", "evidence": "Search leads must not be presented as a contradiction verdict."}]},
+    {"id": "full_text_boundary_en", "language": "en", "matcher": "full_text_boundary", "intent": "Abstain when a detailed claim requires criteria explicitly omitted from the supplied excerpt.", "source_case_ids": ["s17"], "positive": {"claim": "The study excluded participants who missed baseline surveys.", "evidence": "The abstract does not describe exclusion criteria."}, "counterexamples": [{"claim": "The study reports survey outcomes.", "evidence": "The abstract reports survey outcomes."}]},
+    {"id": "full_text_boundary_zh", "language": "zh", "matcher": "full_text_boundary", "intent": "Abstain when a Chinese detailed claim depends on supplementary material that the abstract only references.", "source_case_ids": ["s43"], "positive": {"claim": "摘要证明所有补充材料中的排除标准都被满足。", "evidence": "摘要仅报告主要结果，排除标准详见补充材料。"}, "counterexamples": [{"claim": "摘要报告主要结果。", "evidence": "摘要报告主要结果。"}]},
+    {"id": "human_review_provenance_boundary", "language": "en", "matcher": "human_review_provenance_boundary", "intent": "Prevent maintainer-authored synthetic labels or automated checks from being described as an independently human-reviewed benchmark.", "source_case_ids": ["s31"], "positive": {"claim": "The seed evaluation proves CiteGuard has an independently human-reviewed benchmark.", "evidence": "The evaluation is a maintainer-authored synthetic set; independent annotation is planned."}, "counterexamples": [{"claim": "The evaluation is a maintainer-authored synthetic seed set.", "evidence": "The evaluation is a maintainer-authored synthetic seed set."}]}
+  ]
+}

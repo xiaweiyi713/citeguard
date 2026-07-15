@@ -1,7 +1,7 @@
 # CiteGuard Roadmap
 
-This roadmap tracks the most important work needed to move CiteGuard from an
-early research prototype toward a stable agent-facing skeptical citation auditor.
+This roadmap tracks the work needed to move CiteGuard from an alpha
+agent-facing package toward a stable skeptical citation auditor.
 
 ## Current Stage
 
@@ -15,8 +15,8 @@ early research prototype toward a stable agent-facing skeptical citation auditor
 Implemented foundations:
 
 - Public `citeguard.*` package facades for verification, retrieval, MCP, CLI,
-  and runtime use; the legacy `src` root package is now a compatibility bridge
-  with a documented migration path.
+  and runtime use; removed writing-agent prototypes live under repository-root
+  `legacy/` and are not included in published artifacts.
 - MCP stdio smoke coverage that can initialize a client, list tools, call
   status, run fixture-backed verification/support checks, and validate
   structured errors when the MCP SDK is installed.
@@ -107,8 +107,8 @@ Definition of done:
 
 Status: current
 
-- Keep tightening public API stability around `citeguard.*` while preserving
-  legacy shims long enough for users to migrate
+- Keep tightening public API stability around `citeguard.*`; legacy writing
+  experiments remain outside the published Python package
 - Add better configuration management for source selection, thresholds, and
   experiment presets
 - Improve developer ergonomics around model setup and experiment execution

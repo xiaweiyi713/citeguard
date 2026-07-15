@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Dict, List
 
 from citeguard.citation import CitationFormatter
-from citeguard.orchestrator import AgentTask
+from legacy.orchestrator import AgentTask
 from citeguard.retrieval import HybridRetriever
 from citeguard.retrieval.scholarly_clients import MetadataSource
 

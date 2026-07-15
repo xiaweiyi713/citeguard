@@ -22,8 +22,9 @@ from .evidence import (
     build_text_evidence_chunks,
     extract_html_evidence_chunks,
     is_allowed_remote_evidence_url,
+    is_allowed_remote_evidence_url_resolved,
 )
-from .http import DEFAULT_HTTP_USER_AGENT
+from .http import DEFAULT_HTTP_USER_AGENT, open_validated_request
 
 FETCHED = "fetched"
 SKIPPED_NOT_OA = "skipped_not_open_access"
@@ -164,7 +165,11 @@ class OaFulltextFetcher:
     def _fetch_bytes(self, url: str) -> Tuple[Optional[bytes], str]:
         request = urllib.request.Request(url, headers={"User-Agent": self.user_agent})
         try:
-            with urllib.request.urlopen(request, timeout=self.timeout) as response:  # nosec B310
+            with open_validated_request(
+                request,
+                timeout=self.timeout,
+                validator=is_allowed_remote_evidence_url_resolved,
+            ) as response:
                 payload = response.read(self.max_bytes + 1)
         except Exception as exc:
             return None, exc.__class__.__name__

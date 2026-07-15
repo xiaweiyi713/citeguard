@@ -47,10 +47,10 @@ jobs:
       - name: Run citation verification eval
         run: python scripts/eval_verification.py
 
-      - name: Validate support eval dataset
+      - name: Validate synthetic support seed provenance (not release readiness)
         run: python scripts/eval_support.py --validate-only --label-sidecar data/eval/support_eval_label_sidecar.json --min-sidecar-coverage 1.0 --min-human-reviewed 0 --min-high-risk-reviewed 0 --min-high-risk-reviewed-by-language zh=0
 
-      - name: Run deterministic support eval report quality gate
+      - name: Run deterministic synthetic-seed eval (release summary remains label-immature)
         run: python scripts/eval_support.py --report --split test --label-sidecar data/eval/support_eval_label_sidecar.json --min-sidecar-coverage 1.0 --min-human-reviewed 0 --min-high-risk-reviewed 0 --min-high-risk-reviewed-by-language zh=0 --quality-gate
 
       - name: Run deterministic support baseline comparison
@@ -68,8 +68,8 @@ jobs:
         if: matrix.python-version == '3.10'
         run: python -m pip install build twine && python scripts/release_package_gate.py --skip-install-smoke --require-build-tools --min-high-risk-reviewed-by-language zh=0
 
-      - name: Run heuristic demo evaluation
-        run: python scripts/evaluate.py --topic "citation hallucination in scientific writing" --support-mode heuristic
+      - name: Run legacy writing-agent heuristic demo evaluation
+        run: python legacy/scripts/evaluate.py --topic "citation hallucination in scientific writing" --support-mode heuristic
 
   mcp-smoke:
     runs-on: ubuntu-latest
@@ -84,7 +84,9 @@ jobs:
           python-version: "3.10"
 
       - name: Install package with MCP extra
-        run: python -m pip install --upgrade pip && python -m pip install -e ".[mcp]"
+        # `build` is required because the wheel install smoke below builds via
+        # the PEP 517 frontend rather than the legacy setup.py path.
+        run: python -m pip install --upgrade pip && python -m pip install -e ".[mcp]" build
 
       - name: Run MCP extra wheel install smoke
         run: python scripts/release_package_gate.py --skip-install-smoke --include-mcp-extra-smoke --require-mcp-extra-smoke

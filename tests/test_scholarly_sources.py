@@ -1,6 +1,7 @@
 """Tests for multi-source scholarly adapters."""
 
 import unittest
+from unittest import mock
 
 from citeguard.verification import CitationRecord
 from citeguard.retrieval import MetadataSourceRetriever
@@ -18,6 +19,7 @@ from citeguard.retrieval.scholarly_clients.evidence import (
     harvest_remote_evidence,
     harvest_remote_evidence_report,
     is_allowed_remote_evidence_url,
+    is_allowed_remote_evidence_url_resolved,
 )
 from citeguard.version import __version__
 
@@ -1168,7 +1170,18 @@ class ScholarlySourceTests(unittest.TestCase):
         self.assertFalse(is_allowed_remote_evidence_url("https://kns.cnki.net/kcms/detail/example"))
         self.assertFalse(is_allowed_remote_evidence_url("https://www.wanfangdata.com.cn/details/detail.do"))
         self.assertFalse(is_allowed_remote_evidence_url("file:///tmp/local.html"))
+        self.assertFalse(is_allowed_remote_evidence_url("http://localhost/admin"))
+        self.assertFalse(is_allowed_remote_evidence_url("http://127.0.0.1/admin"))
+        self.assertFalse(is_allowed_remote_evidence_url("http://169.254.169.254/latest/meta-data"))
         self.assertTrue(is_allowed_remote_evidence_url("https://example.org/paper"))
+
+    def test_remote_evidence_dns_must_resolve_only_to_public_addresses(self):
+        private = [(2, 1, 6, "", ("10.0.0.3", 443))]
+        public = [(2, 1, 6, "", ("8.8.8.8", 443))]
+        with mock.patch("socket.getaddrinfo", return_value=private):
+            self.assertFalse(is_allowed_remote_evidence_url_resolved("https://example.org/paper"))
+        with mock.patch("socket.getaddrinfo", return_value=public):
+            self.assertTrue(is_allowed_remote_evidence_url_resolved("https://example.org/paper"))
 
     def test_factory_passes_remote_evidence_setting_to_sources(self):
         source = build_live_metadata_source(

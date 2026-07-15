@@ -1,6 +1,7 @@
 # CiteGuard
 
 [![CI](https://github.com/xiaweiyi713/citeguard/actions/workflows/ci.yml/badge.svg)](https://github.com/xiaweiyi713/citeguard/actions/workflows/ci.yml)
+[![Live canary](https://github.com/xiaweiyi713/citeguard/actions/workflows/canary.yml/badge.svg)](https://github.com/xiaweiyi713/citeguard/actions/workflows/canary.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.9%2B-blue.svg)](pyproject.toml)
 [![PyPI](https://img.shields.io/pypi/v/citationguard.svg)](https://pypi.org/project/citationguard/)
@@ -87,17 +88,15 @@ CiteGuard 对照 **OpenAlex、Crossref、arXiv、Semantic Scholar** 回答两个
 
 ## 快速上手
 
-**核心库零第三方依赖**,运行于 Python ≥ 3.9。
+核心验证库运行于 Python ≥ 3.9；Python ≥ 3.10 的基础安装同时携带 MCP SDK，使 registry 的裸包安装可以直接启动 `citeguard-mcp`。
 
 > ℹ️ **包名说明**:本项目在 PyPI 的发布名是 **[`citationguard`](https://pypi.org/project/citationguard/)**——安装用 `pip install citationguard`,代码里仍然 `import citeguard`,命令行入口也仍是 `citeguard` / `citeguard-mcp`。PyPI 上的 `citeguard` 包是另一个组织的无关项目,请勿混淆。
 
 通过 PyPI 安装:
 
 ```bash
-python -m pip install citationguard
-python -m pip install "citationguard[mcp]"     # + MCP server(需要 Python >= 3.10)
+python -m pip install citationguard            # 含 MCP server(Python >= 3.10)
 python -m pip install "citationguard[models]"  # + 支撑性深度模式的 reranker/NLI 模型栈(较重)
-python -m pip install "citationguard[api]"     # + FastAPI 接口
 ```
 
 源码签出场景:`python -m pip install -e .`(extras 同上)。
@@ -113,7 +112,7 @@ citeguard verify \
   --year 2017 \
   --arxiv-id 1706.03762
 
-citeguard audit examples/citations.json                  # 批量:JSON 数组或 .jsonl
+citeguard audit examples/citations.json --jobs 4         # 批量:JSON 数组或 .jsonl
 citeguard audit examples/references.md --high-risk-only  # 提取并审计参考文献文件
 
 citeguard support \
@@ -141,7 +140,7 @@ CiteGuard 已收录进 [MCP 官方 registry](https://registry.modelcontextprotoc
 已发布包:
 
 ```bash
-python -m pip install "citationguard[mcp]"   # 需要 Python >= 3.10
+python -m pip install citationguard          # MCP server 需要 Python >= 3.10
 citeguard-mcp                            # stdio 传输
 ```
 
@@ -181,10 +180,12 @@ citeguard-mcp
 ### 作为 Python 库
 
 ```python
+import os
+
 from citeguard.retrieval.scholarly_clients import build_live_metadata_source
 from citeguard.verification import parse_citation, verify_citation, check_claim_support
 
-source = build_live_metadata_source(["openalex", "arxiv"], mailto="you@example.com")
+source = build_live_metadata_source(["openalex", "arxiv"], mailto=os.environ["CITEGUARD_MAILTO"])
 
 result = verify_citation(parse_citation(title="Attention Is All You Need", arxiv_id="1706.03762"), source)
 print(result.verdict.value, result.confidence)          # -> verified 0.7
@@ -204,7 +205,7 @@ print(support.verdict.value, support.engine)
 | `CITEGUARD_SOURCES` | `openalex,crossref,arxiv` | 查询哪些源(另支持 `semantic_scholar` / `s2`);未知源名直接报配置错误 |
 | `CITEGUARD_MAILTO` | — | OpenAlex/Crossref 礼貌池的真实联系邮箱;未设置则不发送 `mailto` |
 | `SEMANTIC_SCHOLAR_API_KEY` | — | 可选,改善 Semantic Scholar 访问 |
-| `CITEGUARD_CACHE` | `data/logs/verification_cache.sqlite` | 本地 SQLite 解析缓存 |
+| `CITEGUARD_CACHE` | 系统用户缓存目录 | 本地 SQLite 解析缓存 |
 | `CITEGUARD_FIXTURE_CITATIONS` | — | JSON/JSONL 引用 fixture,用于确定性离线运行 |
 | `CITEGUARD_HTTP_TIMEOUT` | `10` | 实时学术 API 调用超时(秒) |
 | `CITEGUARD_REMOTE_EVIDENCE` | `0` | 设为 `1` 时额外抓取落地页摘要片段 |
@@ -213,7 +214,7 @@ print(support.verdict.value, support.engine)
 
 完整运行时契约(重试/退避、证据超时、缓存路径、远程证据边界)见 [docs/configuration.md](docs/configuration.md)。
 
-支撑性深度模式首次使用时下载模型权重,可用 `python3 scripts/warmup_support_models.py` 预下载。未安装 `[models]` 时,支撑性检查运行带标注的 `heuristic` 引擎(永不输出 `supported` 或 `contradicted`);`citeguard status` 会报告 `support_models.engine=heuristic_fallback` 与 `next_action=install_or_configure_dependency`。
+支撑性深度模式首次使用时下载模型权重,可用 `citeguard models warmup` 预下载。未安装 `[models]` 时,支撑性检查运行带标注的 `heuristic` 引擎(永不输出 `supported` 或 `contradicted`);`citeguard status` 会报告 `support_models.engine=heuristic_fallback` 与 `next_action=install_or_configure_dependency`。
 
 ---
 
@@ -248,7 +249,7 @@ print(support.verdict.value, support.engine)
 - **支撑性判定默认是摘要级的,除非你提供全文证据。** 它判断摘要、采集到的元数据片段和你提供的合法本地 text/PDF 证据;弃权(`insufficient_evidence`)常见且符合设计。
 - **支撑性 eval 是合成种子 fixture**,按 train/dev/test 切分——是回归夹具,不是最终人工评审基准。
 
-**尚未实现:** 自动全文获取、跨论文全文多跳综合、反证判定(counter-evidence verdicting)、大规模人工评审基准。见 [ROADMAP.md](ROADMAP.md)。
+**尚未实现:** 对任意或受限来源的自动全文获取、跨论文全文多跳综合、反证判定(counter-evidence verdicting)、大规模人工评审基准。当前仅支持显式开启的开放获取全文和用户授权的本地/摘录证据。见 [ROADMAP.md](ROADMAP.md)。
 
 ---
 
@@ -259,10 +260,14 @@ python3 -m unittest discover -s tests -v   # 完整单测套件;MCP stdio 冒烟
 python3 scripts/smoke_mcp.py --require-sdk # MCP stdio 冒烟;MCP SDK 需要 Python 3.10+
 python3 scripts/eval_verification.py       # 离线确定性的存在性/元数据 eval
 python3 scripts/eval_support.py --report --split test --quality-gate
-python3 scripts/release_package_gate.py    # 完整发布门禁;发布前加 --require-build-tools
+python3 scripts/release_package_gate.py    # 开发/契约门禁，不授予发布声明资格
+python3 -m pip install -e ".[models]"
+python3 scripts/automated_release_review.py --output automated-release-review.json
+python3 scripts/release_package_gate.py --release-claim-mode software --automated-review-report automated-release-review.json --require-build-tools
 ```
 
 单测与 eval 全部离线,在 CI 中运行。eval 数据集位于 [`data/eval/`](data/eval/)。支撑性 eval 工作流——指标、质量门禁、标注溯源 sidecar、盲评标注包——见 [docs/support_eval.md](docs/support_eval.md);发布冒烟与发布流程见 [docs/release_checklist.md](docs/release_checklist.md)。
+生产模型自动评审可放行普通软件版本，但不会、也不能把维护者合成标签升级为人工评审基准；此类声明仍需真实独立标注和裁决。
 
 ---
 
@@ -277,11 +282,12 @@ citeguard/
   retrieval/      # 学术源适配器(OpenAlex/Crossref/arXiv/Semantic Scholar)+ 检索器
   verifiers/      # 存在性/元数据 + reranker+NLI 支撑性集成
   citation/ graph/ audit/                 # 共享模型与工具
-  orchestrator/ planner/ writer/ benchmark/ api/   # 源码签出实验与 benchmark/API 工具
+  benchmark/      # 支撑性评测指标、校准与实验工件(随包发布)
 skills/citeguard-verify/   # 可复用的 Codex/Claude/Cursor agent skill
 scripts/                   # demo + eval + 语料/模型工具
 data/eval/                 # 离线基准
 docs/                      # 发布文档、架构、benchmark 笔记、调研笔记
+legacy/                    # 历史写作 agent 原型(orchestrator/planner/writer/api),仅存在于源码签出,不随包发布
 tests/                     # unittest 套件
 ```
 
@@ -291,7 +297,7 @@ tests/                     # unittest 套件
 
 ## 文档
 
-- 安装与参考: [`docs/configuration.md`](docs/configuration.md) · [`docs/mcp_setup.md`](docs/mcp_setup.md) · [`docs/cli_reference.md`](docs/cli_reference.md) · [`docs/agent_output_contract.md`](docs/agent_output_contract.md) · [`docs/error_codes.md`](docs/error_codes.md) · [`docs/public_api_migration.md`](docs/public_api_migration.md)
+- 安装与参考: [`docs/claude_code_quickstart.md`](docs/claude_code_quickstart.md) · [`docs/troubleshooting.md`](docs/troubleshooting.md) · [`docs/configuration.md`](docs/configuration.md) · [`docs/mcp_setup.md`](docs/mcp_setup.md) · [`docs/cli_reference.md`](docs/cli_reference.md) · [`docs/agent_output_contract.md`](docs/agent_output_contract.md) · [`docs/error_codes.md`](docs/error_codes.md) · [`docs/public_api_migration.md`](docs/public_api_migration.md)
 - 基准评测: [`docs/support_eval.md`](docs/support_eval.md) · [`docs/benchmark_design.md`](docs/benchmark_design.md) · [`docs/benchmark_todo.md`](docs/benchmark_todo.md) · [`docs/support_labeling_guidelines.md`](docs/support_labeling_guidelines.md)
 - 发布与安全: [`docs/release_checklist.md`](docs/release_checklist.md) · [`docs/security_compliance.md`](docs/security_compliance.md)
 - 架构: [`docs/architecture.md`](docs/architecture.md) · 路线图: [`ROADMAP.md`](ROADMAP.md) · ChinaXiv 调研: [`docs/chinaxiv_spike.md`](docs/chinaxiv_spike.md)

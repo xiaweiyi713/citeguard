@@ -2,6 +2,35 @@
 
 ## Unreleased
 
+- Replaced the impossible tag-publish human-review threshold with a two-track
+  release policy: a production NLI/reranker/lexical automated review may
+  authorize an ordinary software release, while human-reviewed benchmark claims
+  remain blocked until real independent annotation and adjudication exist.
+- Added `scripts/automated_release_review.py`, which emits a digest-bound review
+  artifact, requires zero false/weak support overcalls and full contradiction
+  recall, verifies the citation-set aggregation fixture, and permanently records
+  `human_benchmark_claim_allowed=false`.
+- Hardened production support decisions against NLI contradiction preference,
+  source-outage-to-fabrication escalation, excerpt/full-text scope overreach,
+  and synthetic-label-to-human-benchmark provenance overreach.
+- Made wheel smoke builds use the PEP 517 `build` frontend and declared `wheel`
+  in the development extra, so the documented package smokes also work in
+  minimal `uv` environments that do not bundle `pip`.
+- The legacy falsification-first writing-agent prototype
+  (`citeguard.orchestrator`, `citeguard.planner`, `citeguard.writer`,
+  `citeguard.api`, the writing-benchmark builders
+  `citeguard/benchmark/baselines.py` and
+  `citeguard/benchmark/dataset_builder.py`, plus `scripts/run_agent.py` and
+  `scripts/evaluate.py`) moved out of the published package to the repo-root
+  `legacy/` directory; it now exists only in source checkouts. The `api`
+  optional extra (FastAPI/uvicorn) was removed with it, and wheel/sdist gates
+  now reject any writing-agent prototype path. Live support-eval helpers
+  (metrics, calibration, experiment artifacts) stay in `citeguard.benchmark`.
+- BEHAVIOR CHANGE: `verify_citation_tool` no longer accepts claim-support
+  inputs (`abstract`, `evidence_chunks`, `evidence_text`, `full_text`,
+  `full_text_file`); those belong to the claim-support tools. Existence and
+  metadata verification never used them.
+
 ## 0.1.2 - 2026-07-15
 
 - Identifier-authority resolution: when a citation carries a DOI/arXiv id, the

@@ -135,11 +135,14 @@ action (`keep`, `review_metadata`, `resolve_identifier_or_replace`,
 `disambiguate_identifier`, `inspect_source_health`, or
 `retry_or_check_source_health`). Use it for agent branching; keep
 `explanation` and `suggested_citation` for user-facing context.
+Confident metadata mismatches also expose `suggested_bibtex` and
+`suggested_gbt7714`; ambiguous, outage-limited, and suspect-record results keep
+these fields empty.
 
 ## audit
 
 ```bash
-citeguard audit examples/citations.json
+citeguard audit examples/citations.json --jobs 4
 citeguard audit examples/citations.jsonl --high-risk-only
 citeguard audit manuscript.md
 citeguard audit refs.json --high-risk-only
@@ -199,6 +202,10 @@ before accepting the batch, `next_action` is always one of the stable
 inconclusive rather than fabrication evidence. `recommended_next_steps.first_action`
 is a compact queue action such as `resolve_identity`; use `triage_plan.next_action`
 for stable machine branching.
+`--jobs` controls concurrent batch items from 1 to 16 (default 4); requests to
+each individual scholarly adapter remain serialized. `batch_execution` records
+the completed/total item snapshot, chosen worker count, order preservation, and
+recommended 100-row chunk size. It is not streaming progress.
 `--high-risk-only` to return only high-risk results while preserving the full
 summary and review-summary counts. The `filtered` block includes
 `returned_indexes` and `omitted_indexes`, both using original input indexes, so
@@ -407,7 +414,7 @@ sources fail before any candidate is found,
 ## support-audit
 
 ```bash
-citeguard support-audit examples/claim_citations.json
+citeguard support-audit examples/claim_citations.json --jobs 4
 citeguard support-audit examples/claim_citations.jsonl
 citeguard support-audit examples/claim_citations_full_text.json
 citeguard support-audit examples/claim_citations_full_text_file.json
@@ -421,6 +428,10 @@ citeguard support-audit examples/claim_citations.json --with-counterevidence
 
 Input can be JSON array or JSONL. Each JSON/JSONL item requires `claim` unless a
 default `--claim` is supplied. JSON/JSONL items may use either of two shapes:
+
+`--jobs` accepts 1–16 workers (default 4). Output includes the same completed
+`batch_execution` snapshot as citation audit output while preserving input
+order.
 
 - single-citation item: citation fields such as `title`, `raw_text`, `doi`, or
   `arxiv_id` at the top level.

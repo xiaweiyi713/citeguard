@@ -27,7 +27,7 @@ dependencies or unsafe live-source configuration.
 is `install_or_configure_dependency`, report that claim-support checks are using
 the conservative heuristic fallback rather than deep reranker/NLI support.
 Quote `support_models.install_hint` for dependency recovery: it recommends
-`citeguard[models]` for installed or published packages before the editable
+`citationguard[models]` for installed or published packages before the editable
 source-checkout fallback.
 
 ## Environment Variables
@@ -35,17 +35,21 @@ source-checkout fallback.
 | variable | default | meaning |
 |---|---:|---|
 | `CITEGUARD_SOURCES` | `openalex,crossref,arxiv` | Comma-separated live metadata sources. Valid names are `openalex`, `crossref`, `arxiv`, `semantic_scholar`, plus aliases `semantic-scholar`, `semanticscholar`, and `s2`. Unknown names are reported as `invalid_input` / `fix_configuration`. |
-| `CITEGUARD_CACHE` | `data/logs/verification_cache.sqlite` | SQLite cache path for live verification. Use `:memory:` for process-local tests. |
+| `CITEGUARD_CACHE` | OS user cache directory | SQLite cache path for live verification (`~/Library/Caches/citeguard/...` on macOS, `$XDG_CACHE_HOME/citeguard/...` on Linux). Use `:memory:` for process-local tests. |
+| `CITEGUARD_CACHE_TTL` | `86400` | Positive-result cache TTL in seconds. Cache keys are namespaced by source set, adapter configuration, and package version. |
+| `CITEGUARD_NEGATIVE_CACHE_TTL` | `900` | Shorter TTL in seconds for empty lookup/search results. |
 | `CITEGUARD_FIXTURE_CITATIONS` | empty | JSON or JSONL citation fixture path. When set, live sources are bypassed and `source_health.mode` is `fixture`. |
 | `CITEGUARD_MAILTO` | empty | Real contact email used in OpenAlex/Crossref User-Agent strings and `mailto` query params. Empty or placeholder values are not sent; set a real email before live OpenAlex/Crossref runs. |
 | `CITEGUARD_HTTP_TIMEOUT` | `10` | Positive integer timeout in seconds for live source HTTP requests. |
 | `CITEGUARD_HTTP_RETRIES` | `1` | Non-negative retry count for transient live source HTTP failures. |
 | `CITEGUARD_HTTP_RETRY_BACKOFF` | `0.2` | Non-negative base retry backoff in seconds. |
 | `CITEGUARD_HTTP_MIN_INTERVAL` | `0` | Non-negative minimum interval in seconds between uncached live-source HTTP requests from the same adapter. Increase this for slower, more polite live runs. |
+| `CITEGUARD_SOURCE_BUDGET` | `8.0` | Positive per-query multi-source fan-out budget in seconds. Invalid values are reported instead of silently replaced. |
 | `CITEGUARD_REMOTE_EVIDENCE` | `0` | Enables limited remote landing-page evidence harvesting when set to `1`, `true`, `yes`, or `on`. Disabled by default. |
 | `CITEGUARD_OA_FULLTEXT` | `0` | Fetches open-access paper bodies for full-text claim support when set to `1`; OA locations only, gated hosts stay blocked, never bypasses paywalls. Disabled by default. |
 | `CITEGUARD_DOI_REGISTRY` | `1` | Checks unresolved DOIs against the global doi.org Handle registry (covers all registrars, including China DOI/ISTIC) and reports `doi_registration` on `not_found` results. Set `0` to disable; automatically skipped in offline fixture mode. |
 | `CITEGUARD_EVIDENCE_TIMEOUT` | `2` | Positive integer timeout in seconds for optional remote evidence fetching. |
+| `CITEGUARD_ALLOWED_FILE_ROOTS` | server working directory | `os.pathsep`-separated roots from which MCP `full_text_file` evidence may be read. Symlinks are resolved before checking. |
 | `SEMANTIC_SCHOLAR_API_KEY` | empty | Optional Semantic Scholar API key. Status reports only whether it is configured. |
 | `CITEGUARD_RERANKER_MODEL` | packaged default | Optional reranker model name for deep claim-support mode. |
 | `CITEGUARD_NLI_MODEL` | packaged default | Optional NLI model name for deep claim-support mode. |
@@ -116,6 +120,10 @@ focused replay fixtures; inspect output and manifests keep total cache entry
 counts separate from selected counts. `cache clear` accepts the same filters and
 reports `remaining_entries`, so selective cleanup can be audited before a full
 clear.
+
+Cache rows expire automatically and are isolated by source/configuration
+namespace. Changing the configured source set cannot reuse a previous source's
+search result. Empty results expire sooner than positive matches.
 
 ## Safety Boundaries
 

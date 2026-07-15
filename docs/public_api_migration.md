@@ -18,21 +18,21 @@ contract.
 
 ## Experimental Source-Checkout Modules
 
-Some modules still exist in source checkouts for historical writing-agent
-experiments and benchmark utilities:
+The historical writing-agent experiments were never part of the stable
+surface, and they no longer live inside the `citeguard` package at all. The
+modules formerly importable as `citeguard.orchestrator`, `citeguard.planner`,
+`citeguard.writer`, and `citeguard.api` — together with the writing-benchmark
+builders formerly at `citeguard.benchmark.baselines` and
+`citeguard.benchmark.dataset_builder` — moved to the repo-root `legacy/`
+directory (see `legacy/README.md`). They exist only in source checkouts, are
+excluded from wheels and sdists, and are not the stable v0.1 product contract.
+The `citeguard.benchmark` subpackage keeps only the shipped support-eval
+helpers (metrics, calibration, experiment artifacts).
 
-- `citeguard.orchestrator`
-- `citeguard.planner`
-- `citeguard.writer`
-- `citeguard.api`
-- selected `citeguard.benchmark` helpers
-
-These modules are kept importable for local experiments and compatibility tests,
-but they are not the stable v0.1 product contract. New installed-package user
-code, README snippets, scripts, examples, and agent skills should use the
-auditor package surface listed above: `citeguard.verification`,
-`citeguard.retrieval`, `citeguard.mcp`, `citeguard.cli`, and
-`citeguard.runtime`.
+New installed-package user code, README snippets, scripts, examples, and
+agent skills should use the auditor package surface listed above:
+`citeguard.verification`, `citeguard.retrieval`, `citeguard.mcp`,
+`citeguard.cli`, and `citeguard.runtime`.
 
 ## Migration Rules
 

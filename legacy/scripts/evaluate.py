@@ -11,7 +11,7 @@ ensure_project_root()
 
 from citeguard.benchmark import EvaluationRecord, MetricsCalculator
 from citeguard.graph import CitationRecord
-from citeguard.orchestrator import AgentTask, CiteGuardAgent
+from legacy.orchestrator import AgentTask, CiteGuardAgent
 from citeguard.retrieval.scholarly_clients import InMemoryMetadataSource
 from citeguard.verifiers import build_production_support_backend, SupportVerifier
 

@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import sqlite3
+import threading
 import time
 from dataclasses import asdict
 from pathlib import Path
@@ -13,8 +15,12 @@ from citeguard.citation import normalize_text
 from citeguard.graph import CitationRecord
 from citeguard.retrieval.scholarly_clients.base import MetadataSource
 from citeguard.retrieval.scholarly_clients.utils import canonical_record_key, record_match_score
+from citeguard.version import __version__
 
-CACHE_SCHEMA_VERSION = 2
+CACHE_SCHEMA_VERSION = 3
+CACHE_KEY_VERSION = 1
+DEFAULT_CACHE_TTL_SECONDS = 24 * 60 * 60
+DEFAULT_NEGATIVE_CACHE_TTL_SECONDS = 15 * 60
 
 
 class CachingMetadataSource(MetadataSource):
@@ -22,17 +28,33 @@ class CachingMetadataSource(MetadataSource):
 
     name = "cached"
 
-    def __init__(self, inner: MetadataSource, db_path: str = ":memory:") -> None:
+    def __init__(
+        self,
+        inner: MetadataSource,
+        db_path: str = ":memory:",
+        *,
+        namespace: str = "",
+        ttl_seconds: float = DEFAULT_CACHE_TTL_SECONDS,
+        negative_ttl_seconds: float = DEFAULT_NEGATIVE_CACHE_TTL_SECONDS,
+        clock=time.time,
+    ) -> None:
         self.inner = inner
         self.db_path = db_path
-        self._conn = sqlite3.connect(db_path)
-        initialize_cache_schema(self._conn)
+        self.namespace = namespace or _source_namespace(inner)
+        self.namespace_digest = hashlib.sha256(self.namespace.encode("utf-8")).hexdigest()[:16]
+        self.ttl_seconds = max(0.0, float(ttl_seconds))
+        self.negative_ttl_seconds = max(0.0, float(negative_ttl_seconds))
+        self._clock = clock
+        self._lock = threading.RLock()
+        self._conn = sqlite3.connect(db_path, check_same_thread=False)
+        with self._lock:
+            initialize_cache_schema(self._conn)
 
     def all_records(self) -> List[CitationRecord]:
         return self.inner.all_records()
 
     def search(self, query: str, top_k: int = 5) -> List[CitationRecord]:
-        key = f"search:{normalize_text(query)}:{top_k}"
+        key = f"search:{self.namespace_digest}:{normalize_text(query)}:{top_k}"
         cached = self._get(key)
         if cached is not None:
             return [CitationRecord(**item) for item in json.loads(cached)]
@@ -47,7 +69,7 @@ class CachingMetadataSource(MetadataSource):
         return records
 
     def lookup(self, candidate: CitationRecord) -> Optional[CitationRecord]:
-        key = f"lookup:{canonical_record_key(candidate)}"
+        key = f"lookup:{self.namespace_digest}:{canonical_record_key(candidate)}"
         cached = self._get(key)
         if cached is not None:
             payload = json.loads(cached)
@@ -62,21 +84,52 @@ class CachingMetadataSource(MetadataSource):
         )
         return match
 
+    def lookup_identifier(self, candidate: CitationRecord) -> Optional[CitationRecord]:
+        key = f"lookup:{self.namespace_digest}:identifier:{canonical_record_key(candidate)}"
+        cached = self._get(key)
+        if cached is not None:
+            payload = json.loads(cached)
+            return CitationRecord(**payload) if payload else None
+        match = self.inner.lookup_identifier(candidate)
+        if _source_has_failure(self.inner):
+            return match
+        self._set(
+            key,
+            json.dumps(asdict(match) if match else None),
+            metadata=_lookup_cache_metadata(candidate, match, self.inner, identifier_only=True),
+        )
+        return match
+
     def _get(self, key: str) -> Optional[str]:
-        row = self._conn.execute("SELECT value FROM cache WHERE key = ?", (key,)).fetchone()
-        return row[0] if row else None
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT value, metadata, updated_at FROM cache WHERE key = ?", (key,)
+            ).fetchone()
+            if not row:
+                return None
+            metadata = _parse_entry_metadata(row[1])
+            ttl = self.negative_ttl_seconds if int(metadata.get("record_count", 0) or 0) == 0 else self.ttl_seconds
+            if ttl == 0 or self._clock() - float(row[2] or 0) >= ttl:
+                self._conn.execute("DELETE FROM cache WHERE key = ?", (key,))
+                self._conn.commit()
+                return None
+            return row[0]
 
     def _set(self, key: str, value: str, metadata: Optional[Dict[str, Any]] = None) -> None:
-        now = time.time()
-        row = self._conn.execute("SELECT created_at FROM cache WHERE key = ?", (key,)).fetchone()
-        created_at = row[0] if row else now
-        entry_metadata = dict(metadata or {})
-        entry_metadata.setdefault("timestamp", now)
-        self._conn.execute(
-            "INSERT OR REPLACE INTO cache (key, value, metadata, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
-            (key, value, json.dumps(entry_metadata, sort_keys=True), created_at, now),
-        )
-        self._conn.commit()
+        now = self._clock()
+        with self._lock:
+            row = self._conn.execute("SELECT created_at FROM cache WHERE key = ?", (key,)).fetchone()
+            created_at = row[0] if row else now
+            entry_metadata = dict(metadata or {})
+            entry_metadata.setdefault("timestamp", now)
+            entry_metadata.setdefault("cache_key_version", CACHE_KEY_VERSION)
+            entry_metadata.setdefault("cache_namespace", self.namespace)
+            entry_metadata.setdefault("cache_namespace_digest", self.namespace_digest)
+            self._conn.execute(
+                "INSERT OR REPLACE INTO cache (key, value, metadata, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
+                (key, value, json.dumps(entry_metadata, sort_keys=True), created_at, now),
+            )
+            self._conn.commit()
 
 
 def _source_has_failure(source: MetadataSource) -> bool:
@@ -111,6 +164,10 @@ def initialize_cache_schema(conn: sqlite3.Connection) -> None:
     conn.execute(
         "INSERT OR REPLACE INTO cache_metadata (key, value) VALUES (?, ?)",
         ("schema_version", str(CACHE_SCHEMA_VERSION)),
+    )
+    conn.execute(
+        "INSERT OR REPLACE INTO cache_metadata (key, value) VALUES (?, ?)",
+        ("cache_key_version", str(CACHE_KEY_VERSION)),
     )
     conn.commit()
 
@@ -297,12 +354,12 @@ def _records_from_cache_value(value: str, key: str, metadata: Optional[str], upd
             record = CitationRecord(**item)
         except TypeError:
             continue
-        metadata = dict(record.metadata)
-        metadata.setdefault("cache_key", key)
+        record_metadata = dict(record.metadata)
+        record_metadata.setdefault("cache_key", key)
         if updated_at:
-            metadata.setdefault("cache_updated_at", updated_at)
+            record_metadata.setdefault("cache_updated_at", updated_at)
         record_provenance = records_by_key.get(canonical_record_key(record), {})
-        _apply_cache_provenance(metadata, entry_metadata, record_provenance, key, updated_at)
+        _apply_cache_provenance(record_metadata, entry_metadata, record_provenance, key, updated_at)
         records.append(
             CitationRecord(
                 citation_id=record.citation_id,
@@ -315,7 +372,7 @@ def _records_from_cache_value(value: str, key: str, metadata: Optional[str], upd
                 arxiv_id=record.arxiv_id,
                 url=record.url,
                 source=record.source or "cache",
-                metadata=metadata,
+                metadata=record_metadata,
             )
         )
     return records
@@ -339,10 +396,36 @@ def _search_cache_metadata(
     }
 
 
+def _source_namespace(source: MetadataSource) -> str:
+    """Build a stable namespace from adapter identity and package version."""
+
+    explicit = getattr(source, "cache_namespace", "")
+    if explicit:
+        identity: Dict[str, Any] = {"explicit": str(explicit)}
+    else:
+        identity = {
+            "class": f"{source.__class__.__module__}.{source.__class__.__qualname__}",
+            "name": str(getattr(source, "name", "")),
+        }
+        children = getattr(source, "sources", None)
+        if isinstance(children, list):
+            identity["sources"] = [_source_namespace(child) for child in children]
+    return json.dumps(
+        {
+            "cache_key_version": CACHE_KEY_VERSION,
+            "citationguard_version": __version__,
+            "source": identity,
+        },
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+
+
 def _lookup_cache_metadata(
     candidate: CitationRecord,
     match: Optional[CitationRecord],
     source: MetadataSource,
+    identifier_only: bool = False,
 ) -> Dict[str, Any]:
     records = [_record_cache_metadata(candidate, match)] if match else []
     return {
@@ -357,6 +440,7 @@ def _lookup_cache_metadata(
         },
         "record_count": len(records),
         "records": records,
+        "identifier_only": identifier_only,
     }
 
 

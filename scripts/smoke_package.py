@@ -33,16 +33,23 @@ _SDIST_RELEASE_FILES = {
     "CHANGELOG.md",
     "CITATION.cff",
     "LICENSE",
+    "requirements-dev.txt",
     "citeguard/__init__.py",
     "citeguard/__main__.py",
     "citeguard/mcp/server.py",
+    "citeguard/mcp/input.py",
+    "citeguard/runtime_config.py",
+    "citeguard/runtime_health.py",
+    "citeguard/skill_install.py",
     "citeguard/retrieval/scholarly_clients/factory.py",
     "citeguard/verification/verify.py",
+    "citeguard/verification/support_pattern_registry.json",
     "docs/chinaxiv_spike.md",
     "docs/benchmark_design.md",
     "docs/benchmark_todo.md",
     "docs/cli_reference.md",
     "docs/configuration.md",
+    "docs/claude_code_quickstart.md",
     "docs/mcp_setup.md",
     "docs/error_codes.md",
     "docs/github_launch.md",
@@ -51,6 +58,7 @@ _SDIST_RELEASE_FILES = {
     "docs/releases/v0.1.0.md",
     "docs/security_compliance.md",
     "docs/support_labeling_guidelines.md",
+    "docs/troubleshooting.md",
     "examples/citations.json",
     "examples/citations.jsonl",
     "examples/claim_citations.json",
@@ -65,13 +73,19 @@ _SDIST_RELEASE_FILES = {
     "configs/verifier.yaml",
     "data/eval/support_eval.json",
     "data/eval/support_eval_label_sidecar.json",
+    "data/eval/skill_trigger_eval.json",
     "skills/citeguard-verify/SKILL.md",
     "skills/citeguard-verify/agents/openai.yaml",
-    "skills/citeguard-verify/references/examples.md",
+    "skills/citeguard-verify/references/tool-payloads.md",
+    "skills/citeguard-verify/references/result-policy.md",
+    "skills/citeguard-maintain/SKILL.md",
+    "skills/citeguard-maintain/agents/openai.yaml",
     "scripts/smoke_mcp.py",
     "scripts/smoke_package.py",
     "scripts/smoke_published_package.py",
     "scripts/release_package_gate.py",
+    "scripts/automated_release_review.py",
+    "scripts/eval_skill_trigger.py",
     "scripts/prepare_support_label_sidecar.py",
     "scripts/compare_support_baselines.py",
 }
@@ -132,10 +146,10 @@ def main(argv: Optional[List[str]] = None) -> int:
     )
     args = parser.parse_args(argv)
 
-    if args.mcp_stdio_smoke and (args.extra != "mcp" or not args.with_deps):
-        raise RuntimeError("--mcp-stdio-smoke requires --extra mcp --with-deps")
+    if args.mcp_stdio_smoke and not args.with_deps:
+        raise RuntimeError("--mcp-stdio-smoke requires --with-deps")
 
-    if args.extra == "mcp" and args.with_deps:
+    if args.mcp_stdio_smoke or (args.extra == "mcp" and args.with_deps):
         python_version = _python_version_tuple(args.python)
         if python_version < (3, 10):
             raise RuntimeError("MCP extra install smoke requires Python 3.10+ because the upstream MCP SDK does.")
@@ -174,7 +188,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         _run([str(python), "-c", _IMPORT_SMOKE], cwd=smoke_cwd)
         _run([str(python), "-c", _LEGACY_NAMESPACE_ABSENT_SMOKE], cwd=smoke_cwd)
         _run([str(python), "-c", _ENTRY_POINT_SMOKE], cwd=smoke_cwd)
-        if args.extra == "mcp" and args.with_deps:
+        if args.mcp_stdio_smoke or (args.extra == "mcp" and args.with_deps):
             _run([str(python), "-c", _MCP_EXTRA_SMOKE], cwd=smoke_cwd)
         if args.mcp_stdio_smoke:
             _run(
@@ -221,13 +235,22 @@ def _package_spec_from_sdist(sdist_path: Path, extra: str) -> str:
 
 
 def _build_wheel(python: str, project_root: Path, wheel_dir: Path, no_build_isolation: bool) -> Path:
-    cmd = [python, "-m", "pip", "wheel", "--no-deps", "--wheel-dir", str(wheel_dir)]
+    # Build from a clean copy so a stale repository-local build/lib tree cannot
+    # leak deleted modules into a release artifact.
+    copied_project = wheel_dir / "project"
+    output_dir = wheel_dir / "dist"
+    shutil.copytree(
+        project_root,
+        copied_project,
+        ignore=shutil.ignore_patterns(*_SDIST_COPY_IGNORE_PATTERNS),
+    )
+    output_dir.mkdir(parents=True, exist_ok=True)
+    cmd = [python, "-m", "build", "--wheel", "--outdir", str(output_dir)]
     if no_build_isolation:
-        cmd.append("--no-build-isolation")
-    cmd.append(str(project_root))
-    _run(cmd)
+        cmd.append("--no-isolation")
+    _run(cmd, cwd=copied_project)
 
-    wheels = sorted(wheel_dir.glob("citationguard-*.whl"))
+    wheels = sorted(output_dir.glob("citationguard-*.whl"))
     if len(wheels) != 1:
         raise RuntimeError(f"expected exactly one CiteGuard wheel in {wheel_dir}, found: {wheels}")
     return wheels[0]
@@ -268,15 +291,35 @@ def _assert_wheel_contains_core_files(wheel_path: Path) -> None:
         "citeguard/retrieval/__init__.py",
         "citeguard/verification/__init__.py",
         "citeguard/verification/verify.py",
+        "citeguard/benchmark/__init__.py",
+        "citeguard/benchmark/metrics.py",
+        "citeguard/benchmark/support_calibration.py",
+        "citeguard/skill_install.py",
+        "citeguard/verification/support_pattern_registry.json",
     }
     with zipfile.ZipFile(wheel_path) as wheel:
         names = set(wheel.namelist())
 
     _assert_archive_excludes_generated_files(names, archive_label="wheel")
     _assert_archive_excludes_legacy_src_namespace(names, archive_label="wheel")
+    _assert_archive_excludes_legacy_agent_scripts(names, archive_label="wheel")
+    _assert_archive_excludes_writing_agent_prototype(names, archive_label="wheel")
     missing = sorted(required - names)
     if missing:
         raise RuntimeError(f"wheel is missing expected package files: {missing}")
+    bundled_skill_files = {
+        "share/citationguard/skills/citeguard-verify/SKILL.md",
+        "share/citationguard/skills/citeguard-verify/agents/openai.yaml",
+        "share/citationguard/skills/citeguard-verify/references/tool-payloads.md",
+        "share/citationguard/skills/citeguard-verify/references/result-policy.md",
+    }
+    missing_skill_files = sorted(
+        expected
+        for expected in bundled_skill_files
+        if not any(name.endswith(expected) for name in names)
+    )
+    if missing_skill_files:
+        raise RuntimeError(f"wheel is missing bundled agent skill files: {missing_skill_files}")
     if not any(name.endswith(".dist-info/entry_points.txt") for name in names):
         raise RuntimeError("wheel is missing console-script entry point metadata")
     _assert_wheel_metadata_contract(wheel_path)
@@ -289,6 +332,7 @@ def _assert_sdist_contains_release_files(sdist_path: Path) -> None:
     _assert_archive_excludes_generated_files(names, archive_label="sdist")
     _assert_archive_excludes_legacy_src_namespace(names, archive_label="sdist")
     _assert_archive_excludes_legacy_agent_scripts(names, archive_label="sdist")
+    _assert_archive_excludes_writing_agent_prototype(names, archive_label="sdist")
     _assert_archive_excludes_historical_planning_docs(names, archive_label="sdist")
     missing = sorted(_expected_sdist_release_files() - names)
     if missing:
@@ -390,7 +434,6 @@ def _assert_distribution_metadata_contract(metadata_text: str, archive_label: st
     classifiers = set(metadata.get_all("Classifier") or [])
     required_classifiers = {
         "Intended Audience :: Science/Research",
-        "License :: OSI Approved :: MIT License",
         "Programming Language :: Python :: 3",
         "Programming Language :: Python :: 3.10",
         "Topic :: Scientific/Engineering :: Artificial Intelligence",
@@ -403,16 +446,18 @@ def _assert_distribution_metadata_contract(metadata_text: str, archive_label: st
         errors.append(f"missing classifiers: {missing_classifiers}")
 
     extras = set(metadata.get_all("Provides-Extra") or [])
-    missing_extras = sorted({"api", "mcp", "models", "pdf"} - extras)
+    missing_extras = sorted({"mcp", "models", "pdf"} - extras)
     if missing_extras:
         errors.append(f"missing optional extras: {missing_extras}")
+    if "api" in extras:
+        errors.append("stale api extra: the FastAPI surface moved to legacy/ and is not published")
 
     if require_dependency_metadata:
         requires_dist = metadata.get_all("Requires-Dist") or []
         if not any("pypdf" in item and "extra ==" in item and "pdf" in item for item in requires_dist):
             errors.append("missing pdf extra pypdf dependency in Requires-Dist")
-        if not any("mcp" in item and "extra ==" in item and "mcp" in item for item in requires_dist):
-            errors.append("missing mcp extra dependency in Requires-Dist")
+        if not any("mcp" in item and "python_version" in item and "3.10" in item for item in requires_dist):
+            errors.append("missing base MCP dependency for Python 3.10+ in Requires-Dist")
 
     project_urls = metadata.get_all("Project-URL") or []
     required_url_labels = {"Homepage", "Repository", "Issues", "Changelog", "Documentation"}
@@ -434,12 +479,16 @@ def _assert_distribution_metadata_contract(metadata_text: str, archive_label: st
 
 def _assert_sdist_requires_contract(requires_text: str) -> None:
     required = {
-        "[api]": ["fastapi", "uvicorn"],
-        "[mcp]": ["mcp>=1.2"],
+        "[mcp]": [],
         "[models]": ["sentence-transformers", "transformers", "torch", "safetensors"],
         "[pdf]": ["pypdf"],
     }
     errors = []
+    normalized_requires = requires_text.replace("'", '"')
+    # Setuptools may serialize a marked base dependency into a dedicated
+    # ``[:python_version ...]`` section rather than the unsectioned prefix.
+    if "mcp>=1.2" not in normalized_requires or 'python_version >= "3.10"' not in normalized_requires:
+        errors.append("missing Python 3.10+ base mcp dependency")
     for section, packages in required.items():
         if section not in requires_text:
             errors.append(f"missing {section} section")
@@ -448,6 +497,8 @@ def _assert_sdist_requires_contract(requires_text: str) -> None:
         for package in packages:
             if package not in section_text:
                 errors.append(f"missing {package} in {section}")
+    if "[api]" in requires_text:
+        errors.append("stale [api] section: the FastAPI surface moved to legacy/ and is not published")
     if errors:
         raise RuntimeError(f"sdist dependency metadata contract failed: {'; '.join(errors)}")
 
@@ -485,11 +536,33 @@ def _assert_archive_excludes_legacy_agent_scripts(names: set[str], archive_label
         raise RuntimeError(f"{archive_label} includes legacy writing-agent prototype scripts: {legacy_scripts}")
 
 
+def _assert_archive_excludes_writing_agent_prototype(names: set[str], archive_label: str) -> None:
+    prototype_prefixes = (
+        "legacy/",
+        "citeguard/orchestrator/",
+        "citeguard/planner/",
+        "citeguard/writer/",
+        "citeguard/api/",
+    )
+    prototype_files = {
+        "citeguard/benchmark/baselines.py",
+        "citeguard/benchmark/dataset_builder.py",
+    }
+    prototype_paths = sorted(
+        name
+        for name in names
+        if name.startswith(prototype_prefixes) or name in prototype_files
+    )
+    if prototype_paths:
+        raise RuntimeError(f"{archive_label} includes writing-agent prototype modules: {prototype_paths[:20]}")
+
+
 def _assert_archive_excludes_historical_planning_docs(names: set[str], archive_label: str) -> None:
     historical_docs = sorted(
         name
         for name in names
-        if name == "docs/proposal.md" or name.startswith("docs/superpowers/") or name.startswith("docs/issues/")
+        if name in {"docs/proposal.md", "docs/improvement_proposal_2026-07.md"}
+        or name.startswith(("docs/superpowers/", "docs/issues/", "docs/plans/"))
     )
     if historical_docs:
         raise RuntimeError(f"{archive_label} includes historical planning docs: {historical_docs[:20]}")
@@ -624,10 +697,11 @@ assert scripts["citeguard"] == "citeguard.cli:main"
 assert scripts["citeguard-mcp"] == "citeguard.mcp.server:main"
 metadata = distribution("citationguard").metadata
 extras = set(metadata.get_all("Provides-Extra") or [])
-assert {"mcp", "models", "api", "pdf"}.issubset(extras)
+assert {"mcp", "models", "pdf"}.issubset(extras)
+assert "api" not in extras, "stale api extra: the FastAPI surface moved to legacy/"
 requires_dist = metadata.get_all("Requires-Dist") or []
 assert any("pypdf" in item and "extra ==" in item and "pdf" in item for item in requires_dist)
-assert any("mcp" in item and "extra ==" in item and "mcp" in item for item in requires_dist)
+assert any("mcp" in item and "python_version" in item and "3.10" in item for item in requires_dist)
 """
 
 
@@ -640,7 +714,7 @@ import citeguard.mcp.server as server
 assert callable(server.main)
 metadata = distribution("citationguard").metadata
 requires_dist = metadata.get_all("Requires-Dist") or []
-assert any("mcp" in item and "extra ==" in item and "mcp" in item for item in requires_dist)
+assert any("mcp" in item and "python_version" in item and "3.10" in item for item in requires_dist)
 """
 
 

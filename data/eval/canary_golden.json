@@ -8,7 +8,7 @@
     {
       "id": "g02",
       "fields": {"title": "Attention Is All You Need", "authors": ["Ashish Vaswani"], "year": 2017},
-      "expect": {"must_not": ["metadata_mismatch"]}
+      "expect": {"verdict_in": ["verified"], "must_not": ["metadata_mismatch"], "canonical_year": 2017}
     },
     {
       "id": "g03",

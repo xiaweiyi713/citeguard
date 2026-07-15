@@ -1,5 +1,6 @@
 """Tests for the public citeguard package facade."""
 
+import importlib.util
 import json
 import subprocess
 import sys
@@ -7,6 +8,29 @@ import unittest
 
 
 class PublicPackageTests(unittest.TestCase):
+
+    def test_writing_agent_prototype_modules_absent_from_package(self):
+        for module_name in [
+            "citeguard.orchestrator",
+            "citeguard.planner",
+            "citeguard.writer",
+            "citeguard.api",
+            "citeguard.benchmark.baselines",
+            "citeguard.benchmark.dataset_builder",
+        ]:
+            with self.subTest(module_name=module_name):
+                self.assertIsNone(
+                    importlib.util.find_spec(module_name),
+                    f"{module_name} moved to the repo-root legacy/ prototype directory "
+                    "and must not be importable from the citeguard package",
+                )
+
+        import citeguard.benchmark as benchmark
+
+        for moved_export in ["BenchmarkExample", "CiteGuardBenchBuilder", "DirectWriteBaseline", "RAGWriteBaseline"]:
+            with self.subTest(moved_export=moved_export):
+                self.assertFalse(hasattr(benchmark, moved_export))
+                self.assertNotIn(moved_export, benchmark.__all__)
 
     def test_top_level_exports_core_verification_api(self):
         from citeguard import (

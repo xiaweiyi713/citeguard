@@ -380,6 +380,41 @@ records can be traced back to reviewer batches and their packet digests. Review
 contradiction, hard-negative, and full-text-required cases first because those
 most directly test false support and overclaiming.
 
+## Human-Benchmark Review Packets
+
+The ordinary software publish workflow now uses
+`scripts/automated_release_review.py`; its model outputs are release checks,
+not annotations, and must never be merged into this sidecar. If a future
+release requests `--release-claim-mode human-benchmark`, the following
+deterministic pair is a starting packet plan covering 20 independently reviewed
+high-risk cases (including 3 Chinese cases) and a 10-case dual-review subset.
+Generate both from the untouched sidecar so the reviewers cannot see one
+another's decisions:
+
+```bash
+python scripts/prepare_support_label_sidecar.py \
+  --existing-sidecar data/eval/support_eval_label_sidecar.json \
+  --annotation-packet --priority high --unreviewed-only --limit 20 \
+  --review-phase first_review \
+  --packet-purpose "Independent first review for release-label gate" \
+  --output experiments/support-label-release-first.json \
+  --instructions-output experiments/support-label-release-first.md
+
+python scripts/prepare_support_label_sidecar.py \
+  --existing-sidecar data/eval/support_eval_label_sidecar.json \
+  --annotation-packet --priority high --unreviewed-only --limit 10 \
+  --review-phase second_review \
+  --packet-purpose "Independent second review for release-label gate" \
+  --output experiments/support-label-release-second.json \
+  --instructions-output experiments/support-label-release-second.md
+```
+
+The second packet must be a subset of the first. Archive both packet IDs and
+digests, merge the completed first packet, then merge the completed second
+packet. Resolve every disagreement with a separate adjudicator. The raw
+dual-agreement threshold remains an observed quality measure; do not rewrite
+independent annotations merely to make it pass.
+
 ## Disagreement Handling
 
 Do not silently collapse disagreements.

@@ -129,8 +129,8 @@ async def _run_smoke(command: str, server_args: List[str], require_sdk: bool = F
     if mcp_client is None:
         message = (
             'MCP SDK is not installed. Install published packages with '
-            '`python -m pip install "citationguard[mcp]"`, or use '
-            '`python -m pip install -e ".[mcp]"` from a source checkout.'
+            '`python -m pip install citationguard`, or use '
+            '`python -m pip install -e .` from a source checkout.'
         )
         if require_sdk:
             print(f"FAIL: {message}")
@@ -153,6 +153,7 @@ async def _run_smoke(command: str, server_args: List[str], require_sdk: bool = F
             {
                 "CITEGUARD_FIXTURE_CITATIONS": str(fixture_path),
                 "CITEGUARD_CACHE": ":memory:",
+                "CITEGUARD_ALLOWED_FILE_ROOTS": str(tmpdir),
                 "TOKENIZERS_PARALLELISM": "false",
             }
         )
@@ -863,15 +864,19 @@ def _require_full_text_file_support_payload(payload: dict) -> None:
 
 def _require_support_audit_full_text_payload(payload: dict) -> None:
     summary = payload.get("summary")
-    if not isinstance(summary, dict) or summary.get("weakly_supported") != 1:
-        raise RuntimeError(f"Expected one weakly_supported full-text support-audit item, got: {payload!r}")
     results = payload.get("results")
     if not isinstance(results, list) or len(results) != 1:
         raise RuntimeError(f"Expected one full-text support-audit result, got: {payload!r}")
+    verdict = results[0].get("verdict") if isinstance(results[0], dict) else ""
+    if verdict not in {"supported", "weakly_supported"}:
+        raise RuntimeError(f"Expected a supported full-text support-audit item, got: {payload!r}")
+    if not isinstance(summary, dict) or summary.get(verdict) != 1:
+        raise RuntimeError(f"Expected the full-text verdict in the support-audit summary, got: {payload!r}")
     _require_full_text_support_payload(results[0])
     review_summary = _require_review_summary(payload, total=1)
-    if review_summary.get("medium_risk_count") != 1:
-        raise RuntimeError(f"Expected full-text support-audit medium-risk review summary, got: {payload!r}")
+    expected_risk_key = "low_risk_count" if verdict == "supported" else "medium_risk_count"
+    if review_summary.get(expected_risk_key) != 1:
+        raise RuntimeError(f"Expected model-appropriate full-text risk summary, got: {payload!r}")
     risk_ranking = payload.get("risk_ranking")
     if not isinstance(risk_ranking, list) or len(risk_ranking) != 1:
         raise RuntimeError(f"Expected one full-text support-audit risk row, got: {payload!r}")
@@ -880,6 +885,8 @@ def _require_support_audit_full_text_payload(payload: dict) -> None:
         raise RuntimeError(f"Expected full-text support-audit risk evidence_scope, got: {payload!r}")
     if risk_item.get("evidence_source_field") != "user_full_text_excerpt_1":
         raise RuntimeError(f"Expected full-text support-audit risk source field, got: {payload!r}")
+    if verdict == "supported" and "full-text evidence" not in str(risk_item.get("recommendation", "")):
+        raise RuntimeError(f"Expected scope-aware full-text recommendation, got: {payload!r}")
     _require_support_next_action(risk_item)
 
 
@@ -947,7 +954,7 @@ def _require_support_audit_nested_full_text_file_payload(payload: dict) -> None:
     review_summary = _require_review_summary(payload, total=1)
     if risk_item.get("verdict") == "supported":
         expected_queue = "safe_to_keep_indexes"
-        expected_next_action = "keep_claim"
+        expected_next_action = "keep"
     else:
         expected_queue = "evidence_review_indexes"
         expected_next_action = "tighten_claim_or_inspect_full_text"

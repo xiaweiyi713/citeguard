@@ -8,7 +8,8 @@ version = "0.1.2"
 description = "A skeptical citation auditor for agent writing workflows."
 readme = "README.md"
 requires-python = ">=3.9"
-license = { file = "LICENSE" }
+license = "MIT"
+license-files = ["LICENSE"]
 authors = [
   { name = "Wenyao Xu" }
 ]
@@ -26,7 +27,6 @@ keywords = [
 classifiers = [
   "Development Status :: 3 - Alpha",
   "Intended Audience :: Science/Research",
-  "License :: OSI Approved :: MIT License",
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3.9",
   "Programming Language :: Python :: 3.10",
@@ -37,7 +37,13 @@ classifiers = [
   "Topic :: Text Processing :: Linguistic",
   "Typing :: Typed",
 ]
-dependencies = []
+dependencies = [
+  # The published package exposes citeguard-mcp as a primary entry point and
+  # MCP Registry clients install the base distribution rather than an extra.
+  # Keep Python 3.9 usable for the library while installing the SDK wherever
+  # its supported Python runtime is available.
+  "mcp>=1.2; python_version >= '3.10'",
+]
 
 [project.urls]
 Homepage = "https://github.com/xiaweiyi713/citeguard"
@@ -47,9 +53,12 @@ Changelog = "https://github.com/xiaweiyi713/citeguard/blob/main/CHANGELOG.md"
 Documentation = "https://github.com/xiaweiyi713/citeguard#readme"
 
 [project.optional-dependencies]
-api = [
-  "fastapi>=0.115,<1.0",
-  "uvicorn>=0.30,<1.0",
+dev = [
+  "build>=1.2,<2",
+  "mypy>=1.10,<2",
+  "ruff>=0.9,<1",
+  "twine>=5,<7",
+  "wheel>=0.44,<1",
 ]
 models = [
   "sentence-transformers>=3.1,<6.0",
@@ -57,9 +66,9 @@ models = [
   "torch>=2.3,<3.0",
   "safetensors>=0.4",
 ]
-mcp = [
-  "mcp>=1.2",
-]
+# Compatibility alias: citationguard[mcp] remains accepted, while MCP is now
+# installed by the base distribution on Python 3.10+.
+mcp = []
 pdf = [
   "pypdf>=4,<6",
 ]
@@ -70,22 +79,6 @@ citeguard-mcp = "citeguard.mcp.server:main"
 
 [tool.mypy]
 ignore_missing_imports = true
-
-# Typed debt: these modules still fail mypy. Clean them up one at a time and
-# remove them from this list; do not add new modules here.
-[[tool.mypy.overrides]]
-module = [
-  "citeguard.audit.report_builder",
-  "citeguard.benchmark.support_calibration",
-  "citeguard.cli",
-  "citeguard.mcp.server",
-  "citeguard.orchestrator.graph",
-  "citeguard.verification.cache",
-  "citeguard.verification.extract",
-  "citeguard.verification.support_eval",
-  "citeguard.verifiers.support_backends",
-]
-ignore_errors = true
 
 [tool.ruff]
 target-version = "py39"
@@ -99,6 +92,7 @@ select = ["E4", "E7", "E9", "F"]
 # scripts/ bootstrap sys.path before importing citeguard from a source checkout.
 "scripts/*.py" = ["E402"]
 "tests/*.py" = ["E402"]
+"legacy/scripts/*.py" = ["E402"]
 
 [tool.setuptools.packages.find]
 include = ["citeguard", "citeguard.*"]
@@ -107,4 +101,9 @@ include = ["citeguard", "citeguard.*"]
 include-package-data = true
 
 [tool.setuptools.package-data]
-citeguard = ["py.typed"]
+citeguard = ["py.typed", "verification/*.json"]
+
+[tool.setuptools.data-files]
+"share/citationguard/skills/citeguard-verify" = ["skills/citeguard-verify/SKILL.md"]
+"share/citationguard/skills/citeguard-verify/agents" = ["skills/citeguard-verify/agents/openai.yaml"]
+"share/citationguard/skills/citeguard-verify/references" = ["skills/citeguard-verify/references/*.md"]

@@ -1,6 +1,7 @@
 """Multi-source fan-out must be concurrent and budget-bounded."""
 
 import time
+import threading
 import unittest
 
 from citeguard.graph import CitationRecord
@@ -72,6 +73,37 @@ class ConcurrencyTests(unittest.TestCase):
         results = multi.search("parallel fan out paper", top_k=5)
         self.assertTrue(any(record.citation_id == "a" for record in results))
         self.assertIn("boom", multi.last_failures)
+
+    def test_repeated_timeout_never_overlaps_the_same_source(self):
+        class _TrackedSlowSource(_SlowSource):
+            def __init__(self):
+                super().__init__([REC_A], "tracked", 0.35)
+                self.active = 0
+                self.max_active = 0
+                self.lock = threading.Lock()
+
+            def search(self, query, top_k=5):
+                with self.lock:
+                    self.active += 1
+                    self.max_active = max(self.max_active, self.active)
+                try:
+                    return super().search(query, top_k=top_k)
+                finally:
+                    with self.lock:
+                        self.active -= 1
+
+        source = _TrackedSlowSource()
+        multi = MultiSourceMetadataSource([source], budget_seconds=0.1)
+
+        multi.search("first")
+        started = time.perf_counter()
+        multi.search("second")
+        second_elapsed = time.perf_counter() - started
+        time.sleep(0.4)
+
+        self.assertLess(second_elapsed, 0.2)
+        self.assertEqual(source.max_active, 1)
+        self.assertEqual(multi.last_failure_details[0]["kind"], "timeout")
 
 
 if __name__ == "__main__":

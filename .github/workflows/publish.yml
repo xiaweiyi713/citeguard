@@ -20,12 +20,41 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+          cache: pip
+
+      - name: Cache support models
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/huggingface
+          key: citeguard-support-models-${{ runner.os }}-${{ hashFiles('uv.lock', 'pyproject.toml') }}
 
       - name: Install build tooling
-        run: python -m pip install --upgrade pip "setuptools>=68" wheel build
+        run: python -m pip install --upgrade pip "setuptools>=68" wheel build twine
 
       - name: Run unit tests
         run: python -m pip install -e . && python -m unittest discover -s tests
+
+      - name: Install production model reviewers
+        run: python -m pip install -e ".[models]"
+
+      - name: Run automated release review
+        run: >-
+          python scripts/automated_release_review.py
+          --output automated-release-review.json
+
+      - name: Enforce software-release gate
+        run: >-
+          python scripts/release_package_gate.py
+          --skip-install-smoke
+          --require-build-tools
+          --release-claim-mode software
+          --automated-review-report automated-release-review.json
+
+      - name: Preserve automated review evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: automated-release-review
+          path: automated-release-review.json
 
       - name: Build distributions
         run: python -m build

@@ -1,6 +1,6 @@
 # Contributing to CiteGuard
 
-Thanks for considering a contribution. CiteGuard is currently an early-stage research prototype, so the best contributions are the ones that improve rigor, reproducibility, and failure transparency.
+Thanks for considering a contribution. CiteGuard is an alpha agent-facing citation auditor; the best contributions improve rigor, reproducibility, installation reliability, and failure transparency.
 
 ## Good First Contributions
 
@@ -18,7 +18,7 @@ Thanks for considering a contribution. CiteGuard is currently an early-stage res
 
 ```bash
 python -m pip install --upgrade pip
-python -m pip install -e .
+python -m pip install -e ".[dev]"
 ```
 
 4. If you want model-backed support verification, install the optional model stack:
@@ -31,6 +31,8 @@ python -m pip install -r requirements-optional.txt
 
 ```bash
 python3 -m unittest discover -s tests -v
+python -m ruff check .
+python -m mypy citeguard/
 ```
 
 ## Coding Guidelines
@@ -41,6 +43,18 @@ python3 -m unittest discover -s tests -v
 - Make assumptions explicit, especially around retrieval sources, thresholds, and evidence provenance.
 - Avoid introducing heavyweight dependencies into the base install unless they are clearly required.
 
+## Documentation Contract
+
+Documentation is release-gated: `tests/test_release_metadata.py` fails CI when
+docs and behavior drift apart (a missed version bump, an error code documented
+but not registered, a claim the tool cannot back). Before editing docs — or if a
+release-metadata test fails and the reason is not obvious — read
+[docs/documentation_contract.md](docs/documentation_contract.md). It lists the
+rules the gates enforce and how to tell a real catch from a stale one.
+
+Rewriting prose for clarity is welcome; only a small set of claim-bearing
+phrases is pinned.
+
 ## Pull Requests
 
 - Keep pull requests focused and well-scoped.
@@ -48,6 +62,6 @@ python3 -m unittest discover -s tests -v
 - If your change affects verifier thresholds, evidence extraction, or benchmark behavior, include before/after results.
 - If your change touches scholarly sources, note any source-specific limitations or rate-limit assumptions.
 
-## Research Caveat
+## Product Caveat
 
-This repository is a research prototype, not a production citation service. Contributions that make uncertainty visible are more valuable than contributions that only make outputs look smoother.
+This repository is alpha software, not a hosted production citation service. Claim-support evaluation remains label-maturity limited; contributions that make uncertainty visible are more valuable than changes that only make outputs look smoother.

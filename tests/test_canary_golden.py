@@ -95,7 +95,10 @@ class CanaryDatasetTests(unittest.TestCase):
             g02["fields"],
             {"title": "Attention Is All You Need", "authors": ["Ashish Vaswani"], "year": 2017},
         )
-        self.assertEqual(g02["expect"], {"must_not": ["metadata_mismatch"]})
+        self.assertEqual(
+            g02["expect"],
+            {"verdict_in": ["verified"], "must_not": ["metadata_mismatch"], "canonical_year": 2017},
+        )
 
         for case_id in ("g04", "g05"):
             with self.subTest(case=case_id):

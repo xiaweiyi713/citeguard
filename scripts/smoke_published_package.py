@@ -536,7 +536,8 @@ for required in (
 ):
     assert required in classifiers, required
 extras = set(metadata.get_all("Provides-Extra") or [])
-assert {"mcp", "models", "api", "pdf"}.issubset(extras), extras
+assert {"mcp", "models", "pdf"}.issubset(extras), extras
+assert "api" not in extras, "stale api extra: the FastAPI surface moved to legacy/"
 project_urls = metadata.get_all("Project-URL") or []
 url_labels = {item.split(",", 1)[0].strip() for item in project_urls if "," in item}
 assert {"Homepage", "Repository", "Issues", "Changelog", "Documentation"}.issubset(url_labels), url_labels
@@ -570,7 +571,8 @@ assert scripts["citeguard"] == "citeguard.cli:main"
 assert scripts["citeguard-mcp"] == "citeguard.mcp.server:main"
 metadata = distribution("citationguard").metadata
 extras = set(metadata.get_all("Provides-Extra") or [])
-assert {"mcp", "models", "api", "pdf"}.issubset(extras)
+assert {"mcp", "models", "pdf"}.issubset(extras)
+assert "api" not in extras, "stale api extra: the FastAPI surface moved to legacy/"
 """
 
 

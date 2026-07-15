@@ -6,7 +6,7 @@ import json
 import re
 import zipfile
 from pathlib import Path
-from typing import Iterable, List, Set, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
 from xml.etree import ElementTree
 
 from .parse import extract_arxiv_id, extract_doi, extract_year, parse_gbt7714_reference
@@ -135,7 +135,7 @@ def _resolve_format(path: str, source_format: str) -> str:
 
 
 def _extract_bibtex(text: str) -> List[dict]:
-    candidates = []
+    candidates: List[Dict[str, Any]] = []
     string_macros = _parse_bibtex_strings(text)
     for match in BIBTEX_ENTRY_RE.finditer(text):
         key = match.group(1).strip()
@@ -156,8 +156,8 @@ def _extract_bibtex(text: str) -> List[dict]:
     return candidates
 
 
-def _parse_bibtex_strings(text: str) -> dict:
-    macros = {}
+def _parse_bibtex_strings(text: str) -> Dict[str, str]:
+    macros: Dict[str, str] = {}
     for match in BIBTEX_STRING_RE.finditer(text):
         name = match.group(1).strip().lower()
         body = _strip_bibtex_entry_tail(match.group(2))
@@ -175,8 +175,8 @@ def _strip_bibtex_entry_tail(body: str) -> str:
     return body
 
 
-def _parse_bibtex_fields(body: str, string_macros: dict = None) -> dict:
-    fields = {}
+def _parse_bibtex_fields(body: str, string_macros: Optional[Dict[str, str]] = None) -> Dict[str, str]:
+    fields: Dict[str, str] = {}
     active_macros = string_macros or {}
     index = 0
     length = len(body)
@@ -195,8 +195,12 @@ def _parse_bibtex_fields(body: str, string_macros: dict = None) -> dict:
     return fields
 
 
-def _read_bibtex_value(text: str, start: int, string_macros: dict = None) -> tuple:
-    parts = []
+def _read_bibtex_value(
+    text: str,
+    start: int,
+    string_macros: Optional[Dict[str, str]] = None,
+) -> Tuple[str, int]:
+    parts: List[str] = []
     active_macros = string_macros or {}
     index = start
     length = len(text)
@@ -213,7 +217,11 @@ def _read_bibtex_value(text: str, start: int, string_macros: dict = None) -> tup
     return " ".join(part.strip() for part in parts if part.strip()), index
 
 
-def _read_bibtex_value_atom(text: str, start: int, string_macros: dict = None) -> tuple:
+def _read_bibtex_value_atom(
+    text: str,
+    start: int,
+    string_macros: Optional[Dict[str, str]] = None,
+) -> Tuple[str, int]:
     active_macros = string_macros or {}
     index = start
     length = len(text)
@@ -302,12 +310,12 @@ def _latex_bibliography_paths(text: str, source_path: str) -> List[Path]:
 
 def _extract_reference_lines(text: str) -> List[dict]:
     lines = text.splitlines()
-    items = []
+    items: List[Dict[str, Any]] = []
     in_refs = False
     saw_reference_heading = False
-    current = []
-    current_start = None
-    current_end = None
+    current: List[str] = []
+    current_start: Optional[int] = None
+    current_end: Optional[int] = None
 
     for line_number, line in enumerate(lines, start=1):
         if REFERENCE_HEADING_RE.match(line):
@@ -360,11 +368,11 @@ def _extract_reference_lines(text: str) -> List[dict]:
 
 
 def _extract_loose_reference_list(lines: List[str]) -> List[dict]:
-    items = []
-    current = []
+    items: List[Dict[str, Any]] = []
+    current: List[str] = []
     current_indent = 0
-    current_start = None
-    current_end = None
+    current_start: Optional[int] = None
+    current_end: Optional[int] = None
     for line_number, line in enumerate(lines, start=1):
         stripped = line.strip()
         if not stripped:
@@ -435,10 +443,15 @@ def _is_loose_reference_syntax_line(text: str) -> bool:
     return text in {"}", ")"}
 
 
-def _flush_reference_item(items: List[dict], parts: List[str], line_start: int = None, line_end: int = None) -> None:
+def _flush_reference_item(
+    items: List[dict],
+    parts: List[str],
+    line_start: Optional[int] = None,
+    line_end: Optional[int] = None,
+) -> None:
     text = _clean_reference_text(" ".join(parts))
     if _looks_like_citation(text):
-        item = {"raw_text": text}
+        item: Dict[str, Any] = {"raw_text": text}
         if line_start is not None:
             item["source_line_start"] = line_start
         if line_end is not None:
@@ -450,10 +463,10 @@ def _candidate(
     raw_text: str,
     source_type: str,
     source_id: str = "",
-    source_line_start: int = None,
-    source_line_end: int = None,
+    source_line_start: Optional[int] = None,
+    source_line_end: Optional[int] = None,
 ) -> dict:
-    item = {
+    item: Dict[str, Any] = {
         "raw_text": raw_text,
         "source_type": source_type,
     }

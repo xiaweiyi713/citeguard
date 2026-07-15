@@ -150,6 +150,36 @@ class VerifierTests(unittest.TestCase):
         self.assertTrue(assessment.passed)
         self.assertEqual(assessment.details["decision_path"], "paired_reranker_nli")
 
+    def test_pairing_policy_rejects_when_nli_prefers_contradiction(self):
+        assessment = combine_support_assessments(
+            [
+                SupportAssessment(
+                    backend_name="transformers_nli",
+                    score=0.31,
+                    passed=False,
+                    rationale="nli",
+                    details={"probabilities": {"entailment": 0.31, "contradiction": 0.44, "neutral": 0.25}},
+                ),
+                SupportAssessment(
+                    backend_name="sentence_transformer_reranker",
+                    score=0.95,
+                    passed=True,
+                    rationale="reranker",
+                    details={},
+                ),
+                SupportAssessment(
+                    backend_name="heuristic_support",
+                    score=0.30,
+                    passed=True,
+                    rationale="heuristic",
+                    details={},
+                ),
+            ]
+        )
+
+        self.assertFalse(assessment.passed)
+        self.assertEqual(assessment.details["decision_path"], "paired_reranker_nli_reject")
+
     def test_model_backend_failures_return_structured_model_unavailable_assessment(self):
         class FailingNLI(TransformersNLIBackend):
             def is_available(self):
