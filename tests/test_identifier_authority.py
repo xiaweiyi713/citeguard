@@ -270,3 +270,48 @@ class ArxivVersionSuffixTests(unittest.TestCase):
         self.assertEqual(result.confidence, 1.0)
         diff_by_field = {d.field: d.matches for d in result.field_diffs}
         self.assertTrue(diff_by_field.get("arxiv_id", False))
+
+
+class IdentifierHitFailureAttributionTests(unittest.TestCase):
+    """A definitive identifier hit must not inherit the title search's failures.
+
+    resolve_citation still runs a title search after the authority answers, to
+    collect alternatives. When that supplementary search failed, its failure was
+    attributed to the authority source, producing results that claimed
+    `identifier_lookup.status=hit` and `sources_failed=["arxiv"]` at once and
+    borrowed an unearned `outage_limited` excuse. Found by auditing a real
+    bibliography.
+    """
+
+    def test_identifier_hit_drops_authority_from_sources_failed(self):
+        class _FailingSearchArxiv(_NamedMemory):
+            def __init__(self, hit):
+                super().__init__([], "arxiv")
+                self._hit = hit
+                self.http_client = _ScriptedHTTP([])  # every get_text -> ("", "timeout")
+
+            def lookup_identifier(self, candidate):
+                return self._hit
+
+            def search(self, query, top_k=5):
+                # The supplementary title search fails on the same adapter.
+                self.http_client.get_text("http://export.arxiv.org/api/query", params={"q": query})
+                return []
+
+        arxiv = _FailingSearchArxiv(AIAYN_TRUE)
+        openalex = _NamedMemory([AIAYN_JUNK], "openalex")
+        candidate = parse_citation(
+            title="Attention Is All You Need", arxiv_id="1706.03762", year=2017
+        )
+
+        result = verify_citation(candidate, MultiSourceMetadataSource([openalex, arxiv]))
+        payload = result.to_dict()
+
+        self.assertEqual(payload["identifier_lookup"]["status"], "hit")
+        self.assertNotIn(
+            "arxiv",
+            payload["sources_failed"],
+            "the authority answered definitively; its title-search failure is not a source failure",
+        )
+        self.assertFalse(payload["outage_limited"])
+        self.assertEqual(result.verdict, Verdict.VERIFIED)

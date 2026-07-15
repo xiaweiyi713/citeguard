@@ -193,6 +193,21 @@ def resolve_citation(candidate: CitationRecord, source: MetadataSource) -> Resol
     inner = getattr(source, "inner", source)
     failed.extend(getattr(inner, "last_failures", []))
     failure_details.extend(getattr(inner, "last_failure_details", []))
+
+    if identifier_hit and identifier_info:
+        # The identifier authority answered definitively, so this citation is
+        # resolved regardless of what the broader title search hit. Failures
+        # from that supplementary search must not be reported as failures of
+        # the authority source: doing so produced results that claimed
+        # `identifier_lookup.status=hit` and `sources_failed=["arxiv"]` at the
+        # same time, and borrowed an `outage_limited` excuse the verdict had
+        # not earned.
+        authority_name = str(identifier_info.get("source", ""))
+        failed = [name for name in failed if name != authority_name]
+        failure_details = [
+            detail for detail in failure_details if detail.get("source") != authority_name
+        ]
+
     failure_details = _dedupe_failure_details(failure_details)
     failed.extend(
         str(detail.get("source", ""))
