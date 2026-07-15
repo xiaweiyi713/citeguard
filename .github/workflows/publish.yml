@@ -4,6 +4,9 @@ on:
   push:
     tags:
       - "v*"
+  # Allows re-running a publish after fixing configuration (for example a
+  # missing PyPI trusted publisher) without deleting and re-pushing the tag.
+  workflow_dispatch:
 
 jobs:
   build:
