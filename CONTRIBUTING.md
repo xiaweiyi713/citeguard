@@ -43,6 +43,18 @@ python -m mypy citeguard/
 - Make assumptions explicit, especially around retrieval sources, thresholds, and evidence provenance.
 - Avoid introducing heavyweight dependencies into the base install unless they are clearly required.
 
+## Documentation Contract
+
+Documentation is release-gated: `tests/test_release_metadata.py` fails CI when
+docs and behavior drift apart (a missed version bump, an error code documented
+but not registered, a claim the tool cannot back). Before editing docs — or if a
+release-metadata test fails and the reason is not obvious — read
+[docs/documentation_contract.md](docs/documentation_contract.md). It lists the
+rules the gates enforce and how to tell a real catch from a stale one.
+
+Rewriting prose for clarity is welcome; only a small set of claim-bearing
+phrases is pinned.
+
 ## Pull Requests
 
 - Keep pull requests focused and well-scoped.
