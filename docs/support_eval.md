@@ -46,6 +46,29 @@ overclaims, supplemental-material full-text boundaries, Semantic Scholar rate-li
 a Chinese citation-set weak aggregation boundary, and a source-limited
 citation-set fabrication boundary.
 
+## First production-backend run (2026-07-16)
+
+The deep support engine (reranker + NLI ensemble, the `[models]` extra) was
+run for the first time against the synthetic seed test split (19 cases, not a
+human-reviewed benchmark). Headline numbers, archived under
+`experiments/production-first-run/`:
+
+| metric | value |
+|---|---|
+| supported precision | 1.0000 |
+| false-support rate / overcalls | 0.0 / 0 |
+| contradiction recall | 1.0000 |
+| supported recall | 0.6667 |
+| abstention rate | 0.3158 |
+| accuracy / macro F1 | 0.7895 / 0.8375 |
+
+The safety-side metrics (no false support, all contradictions caught) match
+the falsification-first design intent; the cost is conservative recall and a
+high abstention rate. The single review-queue miss (`s24`, gold `supported`
+predicted `contradicted`) is a paraphrase-style technical claim — exactly the
+kind of case human annotation should prioritize. These are synthetic-seed
+numbers and must not be quoted as a human-reviewed benchmark.
+
 ## Quality gates
 
 `--quality-gate` turns the report into a conservative
