@@ -93,11 +93,11 @@ class CanaryDatasetTests(unittest.TestCase):
         g02 = self.by_id["g02"]
         self.assertEqual(
             g02["fields"],
-            {"title": "Attention Is All You Need", "authors": ["Ashish Vaswani"], "year": 2017},
+            {"title": "Deep Residual Learning for Image Recognition", "authors": ["Kaiming He"], "year": 2016},
         )
         self.assertEqual(
             g02["expect"],
-            {"verdict_in": ["verified"], "must_not": ["metadata_mismatch"], "canonical_year": 2017},
+            {"verdict_in": ["verified"], "must_not": ["metadata_mismatch"], "canonical_year": 2016},
         )
 
         for case_id in ("g04", "g05"):
