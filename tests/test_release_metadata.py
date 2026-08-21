@@ -910,7 +910,7 @@ class ReleaseMetadataTests(unittest.TestCase):
         self.assertNotIn(f'"{INTERNAL_PACKAGE}"', pyproject)
         self.assertNotIn(f'"{INTERNAL_PACKAGE}.*"', pyproject)
         self.assertIn("mcp = [", pyproject)
-        self.assertIn('"mcp>=1.2; python_version >= \'3.10\'"', pyproject)
+        self.assertIn('"mcp>=1.2,<2; python_version >= \'3.10\'"', pyproject)
         self.assertIn("pdf = [", pyproject)
         self.assertIn('"pypdf>=4,<6"', pyproject)
         self.assertIn("models = [", pyproject)
@@ -1148,7 +1148,7 @@ Classifier: Typing :: Typed
 Provides-Extra: mcp
 Provides-Extra: models
 Provides-Extra: pdf
-Requires-Dist: mcp>=1.2; python_version >= "3.10"
+Requires-Dist: mcp<2,>=1.2; python_version >= "3.10"
 Requires-Dist: pypdf<6,>=4; extra == "pdf"
 Project-URL: Homepage, https://github.com/xiaweiyi713/citeguard
 Project-URL: Repository, https://github.com/xiaweiyi713/citeguard
