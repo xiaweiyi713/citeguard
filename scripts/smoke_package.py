@@ -487,8 +487,8 @@ def _assert_sdist_requires_contract(requires_text: str) -> None:
     normalized_requires = requires_text.replace("'", '"')
     # Setuptools may serialize a marked base dependency into a dedicated
     # ``[:python_version ...]`` section rather than the unsectioned prefix.
-    if "mcp>=1.2" not in normalized_requires or 'python_version >= "3.10"' not in normalized_requires:
-        errors.append("missing Python 3.10+ base mcp dependency")
+    if "mcp<2,>=1.2" not in normalized_requires or 'python_version >= "3.10"' not in normalized_requires:
+        errors.append("missing bounded Python 3.10+ base mcp dependency")
     for section, packages in required.items():
         if section not in requires_text:
             errors.append(f"missing {section} section")

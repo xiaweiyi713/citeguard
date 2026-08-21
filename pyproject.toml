@@ -42,7 +42,10 @@ dependencies = [
   # MCP Registry clients install the base distribution rather than an extra.
   # Keep Python 3.9 usable for the library while installing the SDK wherever
   # its supported Python runtime is available.
-  "mcp>=1.2; python_version >= '3.10'",
+  # FastMCP remains in the MCP Python SDK's 1.x line. Version 2 renamed the
+  # server API, so accepting it would make the published `citeguard-mcp`
+  # entry point fail at import time.
+  "mcp>=1.2,<2; python_version >= '3.10'",
 ]
 
 [project.urls]
