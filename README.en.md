@@ -152,6 +152,7 @@ citeguard verify \
 citeguard audit examples/citations.json --jobs 4         # batch: JSON array or .jsonl
 citeguard audit examples/references.md --high-risk-only  # extract + audit a bibliography file
 citeguard audit-document manuscript.tex --allowed-root . # bounded audit with exact locators and review queue
+citeguard audit-document examples/manuscript.md --html report.html
 
 citeguard support \
   --claim "The Transformer relies entirely on attention." \

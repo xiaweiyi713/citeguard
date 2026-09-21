@@ -127,6 +127,7 @@ citeguard verify \
 citeguard audit examples/citations.json --jobs 4         # 批量:JSON 数组或 .jsonl
 citeguard audit examples/references.md --high-risk-only  # 提取并审计参考文献文件
 citeguard audit-document manuscript.tex --allowed-root . # 受限文稿审计，返回精确位置与待复核队列
+citeguard audit-document examples/manuscript.md --html report.html
 
 citeguard support \
   --claim "The Transformer relies entirely on attention." \

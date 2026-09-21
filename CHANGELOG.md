@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Agent skill and README now describe manuscript first-screen categories,
+  uncalibrated `scores`, `query_records`, and `audit-document --html`.
 - Manuscript HTML reports now answer the first-screen questions: how many
   citations were audited, which items to check first, and whether the problem
   is metadata, insufficient evidence, contradiction, or a source outage.
