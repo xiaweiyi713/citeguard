@@ -60,6 +60,11 @@ compatibility. That number is **not** a calibrated probability. The additive
 Do not mix model logits, lexical overlap, and statistical probability. A value
 of `0.85` is an uncalibrated score, not "85% likely correct."
 
+Support results also include `supporting_spans` and `conflicting_spans`. These
+are the evidence windows inspected for the claim. A non-empty supporting span
+list is not a complete-paper review; `scores.evidence_coverage.complete_paper_reviewed`
+stays false unless a later contract says otherwise.
+
 ## Identifier authority (`identifier_lookup`)
 
 Single verification results include `identifier_lookup` (`null` when the input

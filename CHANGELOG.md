@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Full-text evidence is split into region-tagged units (methods, experiments,
+  limitations, references, and so on) with character locators. Support results
+  keep both supporting and conflicting spans, and never treat one located span
+  as a complete-paper review.
+- Added an uncalibrated threshold sweep over the real-source hard-case slice
+  (`python scripts/eval_hard_cases.py`). Groups below 20 cases stay
+  uncalibrated; production thresholds are unchanged.
 - Public citation and support results now include an additive `scores` block that
   separates identity-match scores, support-judgment scores, and evidence
   coverage. Legacy `confidence` is unchanged and is labeled an uncalibrated

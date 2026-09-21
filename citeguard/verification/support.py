@@ -86,6 +86,8 @@ class SupportResult:
     lang: str = ""
     evidence_scope: str = "abstract"
     model_failure_details: List[Dict[str, Any]] = field(default_factory=list)
+    supporting_spans: List[Dict[str, Any]] = field(default_factory=list)
+    conflicting_spans: List[Dict[str, Any]] = field(default_factory=list)
 
     def to_dict(self) -> Dict[str, Any]:
         evidence = _public_evidence(self.evidence)
@@ -111,6 +113,8 @@ class SupportResult:
                 support_score=self.confidence,
                 evidence_coverage=self.evidence_scope or "none",
             ),
+            "supporting_spans": [dict(item) for item in self.supporting_spans],
+            "conflicting_spans": [dict(item) for item in self.conflicting_spans],
         }
         data.update(_counterevidence_review_for_result(self))
         return data

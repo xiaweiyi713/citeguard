@@ -119,6 +119,8 @@ class SupportModelTests(unittest.TestCase):
         self.assertEqual(scores["identity_match"]["score"], 1.0)
         self.assertEqual(scores["evidence_coverage"]["scope"], "abstract")
         self.assertFalse(scores["evidence_coverage"]["complete_paper_reviewed"])
+        self.assertEqual(data["supporting_spans"], [])
+        self.assertEqual(data["conflicting_spans"], [])
 
     def test_support_result_to_dict_carries_next_action_for_unresolved_source_outage(self):
         result = SupportResult(

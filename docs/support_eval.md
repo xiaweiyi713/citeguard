@@ -62,6 +62,13 @@ quota in `human_support_benchmark_campaign.json`.
 python -m unittest tests.test_support_hard_cases
 ```
 
+Sweep uncalibrated acceptance thresholds (false-support vs supported recall)
+without changing production policy:
+
+```bash
+python scripts/eval_hard_cases.py
+```
+
 ## First production-backend run (2026-07-16)
 
 The deep support engine (reranker + NLI ensemble, the `[models]` extra) was
