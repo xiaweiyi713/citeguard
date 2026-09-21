@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Public citation and support results now include an additive `scores` block that
+  separates identity-match scores, support-judgment scores, and evidence
+  coverage. Legacy `confidence` is unchanged and is labeled an uncalibrated
+  score, not a probability.
 - Identifier hits now keep a `query_records` log so a successful authority
   lookup and a failed supplementary title search can be reported as two facts
   without putting the authority into `sources_failed`. Reason codes distinguish

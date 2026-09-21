@@ -110,6 +110,15 @@ class SupportModelTests(unittest.TestCase):
         self.assertEqual(data["next_action"], "keep_claim")
         self.assertFalse(data["counterevidence_review"])
         self.assertEqual(data["counterevidence_reason"], "")
+        scores = data["scores"]
+        self.assertEqual(scores["calibration_status"], "uncalibrated")
+        self.assertEqual(scores["confidence_meaning"], "uncalibrated_score")
+        self.assertTrue(scores["not_a_probability"])
+        self.assertEqual(scores["primary"], "support_judgment")
+        self.assertEqual(scores["support_judgment"]["score"], 0.8)
+        self.assertEqual(scores["identity_match"]["score"], 1.0)
+        self.assertEqual(scores["evidence_coverage"]["scope"], "abstract")
+        self.assertFalse(scores["evidence_coverage"]["complete_paper_reviewed"])
 
     def test_support_result_to_dict_carries_next_action_for_unresolved_source_outage(self):
         result = SupportResult(

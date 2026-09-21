@@ -42,6 +42,24 @@ Common `next_action` values include
 `inspect_full_text_or_find_stronger_citation`, and
 `rewrite_or_replace_evidence`.
 
+## Score semantics (`scores`)
+
+Public citation and support results keep the legacy `confidence` number for
+compatibility. That number is **not** a calibrated probability. The additive
+`scores` block says what it is:
+
+- `confidence_meaning=uncalibrated_score` and `not_a_probability=true`
+- `calibration_status=uncalibrated` until a labeled slice is large enough
+- `identity_match.score`: is the retrieved record the cited paper?
+- `support_judgment.score`: does the inspected evidence support the claim?
+  Null on citation-only verification.
+- `evidence_coverage.scope`: `none`, `metadata`, `abstract`, `full_text`, or
+  mixed. `complete_paper_reviewed` is false unless a later contract says a
+  full-paper review actually happened. Finding one supporting span is not that.
+
+Do not mix model logits, lexical overlap, and statistical probability. A value
+of `0.85` is an uncalibrated score, not "85% likely correct."
+
 ## Identifier authority (`identifier_lookup`)
 
 Single verification results include `identifier_lookup` (`null` when the input
