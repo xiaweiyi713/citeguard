@@ -18,6 +18,9 @@ python -m pip install -e ".[mcp]"
 
 The MCP server requires Python 3.10 or newer because the upstream MCP SDK does.
 The core CLI/library still supports Python 3.9.
+CiteGuard currently uses the v1 FastMCP API and installs `mcp>=1.28,<2`;
+do not override that upper bound with MCP SDK v2 until the server and its
+stdio acceptance suite have been deliberately migrated.
 
 ## Run
 
