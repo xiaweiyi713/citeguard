@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Query provenance now covers identifier lookup, title search, abstract fetch,
+  and full-text fetch. Title-search misses after an identifier hit stay out of
+  `sources_failed`. Batch audits keep the same core verdicts under one worker,
+  several workers, and cache replay.
 - Agent skill and README now describe manuscript first-screen categories,
   uncalibrated `scores`, `query_records`, and `audit-document --html`.
 - Manuscript HTML reports now answer the first-screen questions: how many

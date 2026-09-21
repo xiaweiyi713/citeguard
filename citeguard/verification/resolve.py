@@ -166,6 +166,7 @@ def resolve_citation(candidate: CitationRecord, source: MetadataSource) -> Resol
 
     results: List[CitationRecord] = []
     identifier_info: Optional[Dict[str, Any]] = None
+    authority_record: Optional[CitationRecord] = None
     query_records: List[Dict[str, Any]] = []
     authority = _identifier_authority(candidate, source)
     if authority is not None:
@@ -222,6 +223,14 @@ def resolve_citation(candidate: CitationRecord, source: MetadataSource) -> Resol
             candidate.citation_id,
             search_failure_details,
             identifier_info=identifier_info,
+            checked=checked,
+            results=results,
+            ran_search=bool(query),
+            identifier_record_id=(
+                authority_record.citation_id
+                if identifier_hit and authority_record is not None
+                else ""
+            ),
         )
     )
 
@@ -366,15 +375,34 @@ def _query_reason_code(status: str, detail: Optional[Dict[str, Any]] = None) -> 
     return code or "source_unavailable"
 
 
-def _identifier_query_record(citation_id: str, info: Dict[str, Any]) -> Dict[str, Any]:
-    status = str(info.get("status") or "failed")
+def _query_record(
+    citation_id: str,
+    source: str,
+    operation: str,
+    status: str,
+    reason_code: str,
+) -> Dict[str, Any]:
     return {
         "citation_id": citation_id,
-        "source": str(info.get("source") or ""),
-        "operation": "identifier_lookup",
+        "source": source,
+        "operation": operation,
         "status": status,
-        "reason_code": _query_reason_code(status, info.get("failure_detail") if isinstance(info.get("failure_detail"), dict) else None),
+        "reason_code": reason_code,
     }
+
+
+def _identifier_query_record(citation_id: str, info: Dict[str, Any]) -> Dict[str, Any]:
+    status = str(info.get("status") or "failed")
+    return _query_record(
+        citation_id,
+        str(info.get("source") or ""),
+        "identifier_lookup",
+        status,
+        _query_reason_code(
+            status,
+            info.get("failure_detail") if isinstance(info.get("failure_detail"), dict) else None,
+        ),
+    )
 
 
 def _title_search_query_records(
@@ -382,6 +410,10 @@ def _title_search_query_records(
     details: List[Dict[str, Any]],
     *,
     identifier_info: Optional[Dict[str, Any]],
+    checked: Optional[List[str]] = None,
+    results: Optional[List[CitationRecord]] = None,
+    ran_search: bool = False,
+    identifier_record_id: str = "",
 ) -> List[Dict[str, Any]]:
     records: List[Dict[str, Any]] = []
     identifier_status = str((identifier_info or {}).get("status") or "")
@@ -398,12 +430,27 @@ def _title_search_query_records(
             continue
         seen.add(key)
         records.append(
-            {
-                "citation_id": citation_id,
-                "source": source_name,
-                "operation": "title_search",
-                "status": "failed",
-                "reason_code": _query_reason_code("failed", detail),
-            }
+            _query_record(
+                citation_id,
+                source_name,
+                "title_search",
+                "failed",
+                _query_reason_code("failed", detail),
+            )
         )
+    if not ran_search:
+        return records
+    recorded = {item["source"] for item in records}
+    search_hit_sources = set()
+    for record in results or []:
+        if identifier_record_id and record.citation_id == identifier_record_id:
+            continue
+        search_hit_sources.update(record_source_names(record))
+    for source_name in checked or []:
+        if not source_name or source_name in recorded:
+            continue
+        if source_name in search_hit_sources:
+            records.append(_query_record(citation_id, source_name, "title_search", "hit", "ok"))
+        else:
+            records.append(_query_record(citation_id, source_name, "title_search", "miss", "no_match"))
     return records

@@ -717,6 +717,12 @@ class AssessSupportTests(unittest.TestCase):
         self.assertEqual(result.evidence_scope, "full_text")
         self.assertEqual(result.evidence["source_field"], "oa_full_text_1")
         self.assertEqual(result.resolution["oa_fulltext"]["status"], "fetched")
+        operations = {
+            (item["operation"], item["status"], item["reason_code"])
+            for item in result.to_dict()["query_records"]
+        }
+        self.assertIn(("abstract_fetch", "hit", "ok"), operations)
+        self.assertIn(("fulltext_fetch", "hit", "ok"), operations)
 
     def test_oa_fetch_failure_never_blocks_abstract_level_support(self):
         record = CitationRecord(
@@ -748,6 +754,12 @@ class AssessSupportTests(unittest.TestCase):
         self.assertNotEqual(result.verdict, SupportVerdict.CONTRADICTED)
         self.assertEqual(result.resolution["oa_fulltext"]["status"], "unavailable")
         self.assertIn(result.evidence_scope, ("abstract", "title", "mixed"))
+        operations = {
+            (item["operation"], item["status"], item["reason_code"])
+            for item in result.to_dict()["query_records"]
+        }
+        self.assertIn(("abstract_fetch", "hit", "ok"), operations)
+        self.assertIn(("fulltext_fetch", "failed", "source_unavailable"), operations)
 
 
 if __name__ == "__main__":

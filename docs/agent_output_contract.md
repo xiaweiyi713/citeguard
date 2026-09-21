@@ -75,6 +75,16 @@ home source), `miss` (home source answered but the id was not found), `failed`
 (authority lookup errored; the result is source-limited, not fabrication
 evidence), or `unavailable` (home source not configured).
 
+## Query provenance (`query_records`)
+
+Citation and support results include `query_records`: one row per attempted
+query with `citation_id`, `source`, `operation`, `status`, and `reason_code`.
+Operations are `identifier_lookup`, `title_search`, `abstract_fetch`, and
+`fulltext_fetch`. `reason_code` is one of `ok`, `no_match`, `timeout`,
+`rate_limited`, `unconfigured`, or a source-failure kind. A title-search miss
+after an identifier hit is a separate fact; it does not put the authority
+source into `sources_failed`.
+
 ## Batch `review_summary`
 
 Batch `audit` and `support-audit` reports
