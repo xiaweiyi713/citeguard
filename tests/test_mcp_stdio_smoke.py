@@ -7,17 +7,27 @@ from pathlib import Path
 import unittest
 from unittest import mock
 
+from citeguard.graph import CitationRecord
+from citeguard.retrieval.scholarly_clients import InMemoryMetadataSource
 from citeguard.runtime import SOURCE_HEALTH_SCHEMA_VERSION
-from citeguard.verification import CACHE_SCHEMA_VERSION
+from citeguard.verification import CACHE_SCHEMA_VERSION, search_counterevidence_candidates
 from scripts.smoke_mcp import (
+    _require_counterevidence_payload,
+    _require_document_audit_payload,
     _require_not_found_safety_payload,
     _require_status_payload,
+    _require_tool_description,
     _server_command,
     main as run_smoke,
 )
 
 
 class MCPStdioSmokeCommandTests(unittest.TestCase):
+    def test_tool_description_contract_normalizes_sdk_whitespace(self):
+        tool = mock.Mock(description="The response never\n  edits the document.")
+
+        _require_tool_description({"audit_document_tool": tool}, "audit_document_tool", ["never edits the document"])
+
     def test_default_command_prefers_installed_console_script(self):
         with mock.patch("scripts.smoke_mcp.shutil.which", return_value="/tmp/bin/citeguard-mcp"):
             command, args = _server_command("", None)
@@ -90,6 +100,10 @@ class MCPStdioSmokeCommandTests(unittest.TestCase):
                 "engine": "heuristic_fallback",
                 "next_action": "install_or_configure_dependency",
                 "deep_models_available": False,
+                "requested_engine": "auto",
+                "effective_engine": "auto",
+                "model_loading_enabled": True,
+                "configuration_error": "",
                 "model_dependencies": {
                     "sentence_transformers": False,
                     "transformers": False,
@@ -97,6 +111,7 @@ class MCPStdioSmokeCommandTests(unittest.TestCase):
                 },
                 "missing_dependencies": ["sentence_transformers", "torch", "transformers"],
             },
+            "support_engine": "auto",
         }
 
         _require_status_payload(payload, fixture_path)
@@ -117,6 +132,53 @@ class MCPStdioSmokeCommandTests(unittest.TestCase):
         unsafe["explanation"] = "This citation is fabricated."
         with self.assertRaises(RuntimeError):
             _require_not_found_safety_payload(unsafe)
+
+    def test_counterevidence_payload_contract_checks_source_provenance_without_sdk(self):
+        source = InMemoryMetadataSource(
+            [
+                CitationRecord(
+                    citation_id="fixture-counterevidence",
+                    title="Method M Does Not Improve Task T",
+                    abstract="We show method M does not improve task T accuracy.",
+                    source="fixture",
+                )
+            ]
+        )
+        payload = search_counterevidence_candidates(
+            "Method M improves task T.",
+            source,
+            top_k=1,
+        ).to_dict()
+
+        _require_counterevidence_payload(payload)
+
+        unsafe = dict(payload)
+        unsafe["sources_responded"] = []
+        with self.assertRaises(RuntimeError):
+            _require_counterevidence_payload(unsafe)
+
+    def test_document_audit_payload_contract_requires_locator_and_no_mutation(self):
+        fixture_path = Path("/tmp/citeguard-document-fixture.md")
+        payload = {
+            "contract_version": "v1",
+            "tool": "audit_document",
+            "document": {
+                "path": str(fixture_path.resolve()),
+                "snapshot": {"digest": "sha256:" + "a" * 64, "file_count": 1},
+            },
+            "extraction": {
+                "candidate_count": 1,
+                "candidates": [{"document_locator": f"{fixture_path.resolve()}#line-3"}],
+            },
+            "edit_policy": {"document_modified": False, "automatic_apply_allowed": False},
+        }
+
+        _require_document_audit_payload(payload, fixture_path)
+
+        unsafe = dict(payload)
+        unsafe["edit_policy"] = {"document_modified": True, "automatic_apply_allowed": True}
+        with self.assertRaises(RuntimeError):
+            _require_document_audit_payload(unsafe, fixture_path)
 
 
 @unittest.skipUnless(importlib.util.find_spec("mcp") is not None, "MCP SDK is not installed")

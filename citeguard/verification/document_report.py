@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import html
+import re
 from typing import Any, Dict, List, Mapping, Optional, Sequence
 
 from citeguard.graph import CitationRecord
@@ -22,6 +23,17 @@ ISSUE_SCOPE = "scope_overclaim"
 ISSUE_UNLINKED = "unlinked_citation"
 ISSUE_AMBIGUOUS = "ambiguous_attachment"
 ISSUE_SOURCE_UNAVAILABLE = "source_unavailable"
+
+ISSUE_CATEGORY = {
+    ISSUE_IDENTITY: "metadata",
+    ISSUE_UNLINKED: "metadata",
+    ISSUE_AMBIGUOUS: "metadata",
+    ISSUE_INSUFFICIENT_EVIDENCE: "insufficient_evidence",
+    ISSUE_SCOPE: "insufficient_evidence",
+    ISSUE_CONTRADICTION: "contradiction",
+    ISSUE_SOURCE_UNAVAILABLE: "source_unavailable",
+    "supported": "supported",
+}
 
 _OVERCLAIM_MARKERS = (
     "all tasks",
@@ -191,23 +203,26 @@ def build_claim_reviews(
             )
             continue
         backend = support_backend or HeuristicSupportBackend()
-        support = assess_support(str(item.get("sentence") or ""), record, backend=backend)
-        issue, problem, suggestion, next_action, risk = _support_issue(item, support, evidence_text)
-        reviews.append(
-            _review_item(
-                item,
-                issue=issue,
-                risk=risk,
-                next_action=next_action,
-                identity_verdict=identity or "verified",
-                support_verdict=support.verdict.value,
-                evidence_coverage=str(support.evidence_scope or "abstract"),
-                evidence_text=str((support.evidence or {}).get("text") or evidence_text),
-                problem=problem,
-                suggestion=suggestion,
-                rewritten=_rewrite_hint(str(item.get("sentence") or ""), issue, evidence_text),
+        for claim_text in _claim_units(str(item.get("sentence") or "")):
+            claim_item = dict(item)
+            claim_item["sentence"] = claim_text
+            support = assess_support(claim_text, record, backend=backend)
+            issue, problem, suggestion, next_action, risk = _support_issue(claim_item, support, evidence_text)
+            reviews.append(
+                _review_item(
+                    claim_item,
+                    issue=issue,
+                    risk=risk,
+                    next_action=next_action,
+                    identity_verdict=identity or "verified",
+                    support_verdict=support.verdict.value,
+                    evidence_coverage=str(support.evidence_scope or "abstract"),
+                    evidence_text=str((support.evidence or {}).get("text") or evidence_text),
+                    problem=problem,
+                    suggestion=suggestion,
+                    rewritten=_rewrite_hint(claim_text, issue, evidence_text),
+                )
             )
-        )
     return reviews
 
 
@@ -226,9 +241,18 @@ def build_manuscript_summary(
     incomplete += len(linked.get("unlinked_markers") or [])
     incomplete += sum(1 for item in claim_reviews if item.get("issue") != "supported")
     issue_counts: Dict[str, int] = {}
+    category_counts = {
+        "metadata": 0,
+        "insufficient_evidence": 0,
+        "contradiction": 0,
+        "source_unavailable": 0,
+    }
     for item in claim_reviews:
         issue = str(item.get("issue") or "other")
         issue_counts[issue] = issue_counts.get(issue, 0) + 1
+        category = str(item.get("category") or ISSUE_CATEGORY.get(issue, "other"))
+        if category in category_counts:
+            category_counts[category] += 1
     top = [
         {
             "locator": item.get("locator", ""),
@@ -248,6 +272,7 @@ def build_manuscript_summary(
         "unlinked_count": len(list(linked.get("unlinked_markers") or [])),
         "incomplete_count": incomplete,
         "issue_counts": issue_counts,
+        "category_counts": category_counts,
         "top_reviews": top,
     }
 
@@ -262,7 +287,7 @@ def render_document_audit_html(payload: Mapping[str, Any]) -> str:
     citation_count = int(summary.get("citation_count") or 0)
     in_text_count = int(summary.get("in_text_count") or 0)
     incomplete = int(summary.get("incomplete_count") or 0)
-    issue_counts = summary.get("issue_counts") if isinstance(summary.get("issue_counts"), Mapping) else {}
+    categories = _as_mapping(summary.get("category_counts"))
     rows = []
     for item in reviews:
         sentence = html.escape(str(item.get("sentence") or item.get("locator") or ""))
@@ -274,7 +299,7 @@ def render_document_audit_html(payload: Mapping[str, Any]) -> str:
         after = html.escape(str(rewritten.get("after") or ""))
         rows.append(
             "<article class=\"review\">"
-            f"<h3>{html.escape(str(item.get('issue') or 'review'))}</h3>"
+            f"<h3>{html.escape(str(item.get('category') or item.get('issue') or 'review'))}</h3>"
             f"<p class=\"meta\">locator: {html.escape(str(item.get('locator') or ''))} · "
             f"next: {html.escape(str(item.get('next_action') or ''))}</p>"
             f"<p><strong>Citing sentence</strong> {sentence}</p>"
@@ -284,7 +309,10 @@ def render_document_audit_html(payload: Mapping[str, Any]) -> str:
             f"<pre class=\"diff\">- {before}\n+ {after}</pre>"
             "</article>"
         )
-    issue_bits = ", ".join(f"{html.escape(str(key))}={int(value)}" for key, value in issue_counts.items()) or "none"
+    metadata_n = int(categories.get("metadata") or 0)
+    evidence_n = int(categories.get("insufficient_evidence") or 0)
+    contradiction_n = int(categories.get("contradiction") or 0)
+    source_n = int(categories.get("source_unavailable") or 0)
     top = list(summary.get("top_reviews") or [])
     top_items = "".join(
         f"<li>{html.escape(str(item.get('issue') or ''))}: {html.escape(str(item.get('sentence') or item.get('locator') or ''))}</li>"
@@ -304,7 +332,12 @@ def render_document_audit_html(payload: Mapping[str, Any]) -> str:
         f"<p>Audited <strong>{citation_count}</strong> bibliography entries and "
         f"<strong>{in_text_count}</strong> in-text citations. "
         f"<strong>{incomplete}</strong> items still need review.</p>\n"
-        f"<p>Issue mix: {issue_bits}</p>\n"
+        "<ul>"
+        f"<li>Metadata / identity: {metadata_n}</li>"
+        f"<li>Insufficient evidence: {evidence_n}</li>"
+        f"<li>Contradiction: {contradiction_n}</li>"
+        f"<li>Source unavailable: {source_n}</li>"
+        "</ul>\n"
         "</section>\n"
         "<section class=\"priority\">\n<h2>Check these first</h2>\n<ol>"
         f"{top_items}</ol>\n</section>\n"
@@ -382,6 +415,16 @@ def _unchanged(sentence: str) -> Dict[str, str]:
     return {"before": sentence, "after": sentence}
 
 
+def _claim_units(sentence: str) -> List[str]:
+    text = str(sentence or "").strip()
+    if not text:
+        return [""]
+    parts = [part.strip() for part in re.split(r"[;；]", text) if part.strip()]
+    if len(parts) > 1 and all(len(part) >= 12 for part in parts):
+        return parts
+    return [text]
+
+
 def _review_item(
     marker: Mapping[str, Any],
     *,
@@ -416,6 +459,7 @@ def _review_item(
         "problem": problem,
         "suggestion": suggestion,
         "rewritten": dict(rewritten),
+        "category": ISSUE_CATEGORY.get(issue, "other"),
         "requires_user_confirmation": True,
         "automatic_apply_allowed": False,
     }

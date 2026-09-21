@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Manuscript HTML reports now answer the first-screen questions: how many
+  citations were audited, which items to check first, and whether the problem
+  is metadata, insufficient evidence, contradiction, or a source outage.
+  Semicolon-separated claims are reviewed separately.
 - Full-text evidence is split into region-tagged units (methods, experiments,
   limitations, references, and so on) with character locators. Support results
   keep both supporting and conflicting spans, and never treat one located span

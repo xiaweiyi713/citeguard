@@ -379,7 +379,45 @@ class DocumentAuditTests(unittest.TestCase):
         html = render_document_audit_html(payload)
         self.assertIn("outperform recurrence on all tasks", html)
         self.assertIn("Check these first", html)
+        self.assertIn("Metadata / identity", html)
+        self.assertIn("Insufficient evidence", html)
         self.assertIn("outperform recurrence on all tasks", html_text)
+
+    def test_semicolon_clauses_are_reviewed_separately(self):
+        source = InMemoryMetadataSource(
+            [
+                CitationRecord(
+                    citation_id="attention",
+                    title="Attention Is All You Need",
+                    authors=["Ashish Vaswani"],
+                    year=2017,
+                    arxiv_id="1706.03762",
+                    abstract=(
+                        "We propose a new simple network architecture, the Transformer, "
+                        "based solely on attention mechanisms, dispensing with recurrence "
+                        "and convolutions entirely. Experiments on two machine translation "
+                        "tasks show these models to be superior in quality."
+                    ),
+                    source="fixture",
+                )
+            ]
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            document = root / "paper.md"
+            document.write_text(
+                "The Transformer is based solely on attention mechanisms; "
+                "it outperforms recurrence on all tasks [1].\n\n"
+                "## References\n\n"
+                "1. Vaswani, A. Attention Is All You Need. NeurIPS, 2017. arXiv:1706.03762.\n",
+                encoding="utf-8",
+            )
+            payload = audit_document(str(document), source=source, allowed_roots=[str(root)])
+
+        sentences = [item["sentence"] for item in payload["claim_reviews"]]
+        self.assertGreaterEqual(len(sentences), 2)
+        self.assertTrue(any("based solely on attention" in sentence for sentence in sentences))
+        self.assertTrue(any("outperforms recurrence on all tasks" in sentence for sentence in sentences))
 
     def test_unlinked_latex_marker_stays_visible_in_the_report(self):
         with tempfile.TemporaryDirectory() as directory:

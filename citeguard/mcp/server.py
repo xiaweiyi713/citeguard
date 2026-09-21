@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+from functools import wraps
 import sqlite3
+import time
 from typing import Any, Dict, List, Optional, Union
 
+from citeguard.contracts import with_contract_version
 from citeguard.errors import error_payload
 from citeguard.runtime import (
     build_configured_source,
@@ -13,14 +16,18 @@ from citeguard.runtime import (
     build_oa_fulltext_fetcher,
     environment_status,
 )
+from citeguard.runtime_metrics import record_runtime_metric
 from citeguard.verification import (
     ClaimSupportAuditItem,
+    DocumentAuditError,
     audit_citations,
     audit_claim_support,
+    audit_document,
     check_claim_support,
     check_claim_support_set,
     enrich_support_payload_with_counterevidence,
     filter_high_risk_payload,
+    configured_document_roots,
     search_counterevidence_candidates,
     verify_citation,
 )
@@ -71,6 +78,27 @@ else:
     _MCP_IMPORT_ERROR = None
 
 mcp = FastMCP("CiteGuard")
+
+
+def _mcp_tool(metric_name: str):
+    """Register a tool while recording an optional aggregate local event."""
+
+    def decorator(func):
+        @wraps(func)
+        def wrapped(*args, **kwargs):
+            started = time.monotonic()
+            outcome = "failure"
+            try:
+                payload = func(*args, **kwargs)
+                if not isinstance(payload, dict) or payload.get("ok", True) is not False:
+                    outcome = "success"
+                return payload
+            finally:
+                record_runtime_metric(f"mcp:{metric_name}", outcome, time.monotonic() - started)
+
+        return mcp.tool()(wrapped)
+
+    return decorator
 
 
 def _build_source():
@@ -129,7 +157,13 @@ def _value_error_payload(tool: str, exc: ValueError) -> dict:
     return error_payload("invalid_input", str(exc), details=_value_error_details(tool, exc))
 
 
-@mcp.tool()
+def _public_payload(payload: dict) -> dict:
+    """Mark a successful MCP response with the stable outer contract version."""
+
+    return with_contract_version(payload)
+
+
+@_mcp_tool("citeguard_status_tool")
 def citeguard_status_tool(check_sources: bool = False, health_query: str = "Attention Is All You Need") -> dict:
     """Return MCP configuration and dependency status.
 
@@ -138,14 +172,16 @@ def citeguard_status_tool(check_sources: bool = False, health_query: str = "Atte
     does not load model weights. Set `check_sources=true` to run a lightweight
     per-source live probe using `health_query`.
     """
-    return environment_status(
-        mcp_sdk_available=_MCP_IMPORT_ERROR is None,
-        check_sources=bool(check_sources),
-        health_query=str(health_query or "Attention Is All You Need"),
+    return _public_payload(
+        environment_status(
+            mcp_sdk_available=_MCP_IMPORT_ERROR is None,
+            check_sources=bool(check_sources),
+            health_query=str(health_query or "Attention Is All You Need"),
+        )
     )
 
 
-@mcp.tool()
+@_mcp_tool("verify_citation_tool")
 def verify_citation_tool(
     raw_text: str = "",
     title: str = "",
@@ -187,10 +223,10 @@ def verify_citation_tool(
     active_source = _source_or_error("verify_citation_tool")
     if isinstance(active_source, dict):
         return active_source
-    return verify_citation(candidate, active_source, doi_registry=build_doi_registry_probe()).to_dict()
+    return _public_payload(verify_citation(candidate, active_source, doi_registry=build_doi_registry_probe()).to_dict())
 
 
-@mcp.tool()
+@_mcp_tool("audit_citations_tool")
 def audit_citations_tool(citations: Any, high_risk_only: bool = False, max_workers: int = 4) -> dict:
     """Verify MANY citations at once.
 
@@ -263,10 +299,58 @@ def audit_citations_tool(citations: Any, high_risk_only: bool = False, max_worke
     ).to_dict()
     if high_risk_only:
         result = filter_high_risk_payload(result)
-    return result
+    return _public_payload(result)
 
 
-@mcp.tool()
+@_mcp_tool("audit_document_tool")
+def audit_document_tool(
+    path: str,
+    source_format: str = "auto",
+    high_risk_only: bool = False,
+    max_workers: int = 4,
+) -> dict:
+    """Audit a bounded Markdown, LaTeX, BibTeX, BBL, or DOCX document.
+
+    The path must be inside `CITEGUARD_ALLOWED_FILE_ROOTS`, or the server's
+    working directory when that environment variable is unset. Local LaTeX
+    includes and bibliography files use the same limits. The response returns
+    exact line/paragraph locators and a suggestion-only review queue; it never
+    edits the document, and `not_found` remains an identity issue to investigate
+    rather than evidence of citation fabrication.
+    """
+    if not isinstance(path, str) or not path.strip():
+        return error_payload(
+            "missing_citation_input",
+            "Provide a non-empty document path.",
+            details={"tool": "audit_document_tool", "field": "path"},
+        )
+    parsed_max_workers = _parse_max_workers(max_workers, "audit_document_tool")
+    if isinstance(parsed_max_workers, dict):
+        return parsed_max_workers
+    try:
+        payload = audit_document(
+            path,
+            source_factory=_source,
+            doi_registry_factory=build_doi_registry_probe,
+            source_format=source_format,
+            allowed_roots=configured_document_roots(),
+            max_workers=parsed_max_workers,
+            high_risk_only=bool(high_risk_only),
+        )
+    except DocumentAuditError as exc:
+        return error_payload(exc.code, str(exc), details={"tool": "audit_document_tool", **exc.details})
+    except ValueError as exc:
+        return _value_error_payload("audit_document_tool", exc)
+    except (OSError, sqlite3.Error) as exc:
+        return error_payload(
+            "file_error",
+            str(exc),
+            details={"tool": "audit_document_tool", "field": "path", "filename": path},
+        )
+    return _public_payload(payload)
+
+
+@_mcp_tool("check_claim_support_tool")
 def check_claim_support_tool(
     claim: str,
     raw_text: str = "",
@@ -332,17 +416,19 @@ def check_claim_support_tool(
     active_backend = _support_backend_or_error("check_claim_support_tool")
     if isinstance(active_backend, dict):
         return active_backend
-    return check_claim_support(
-        claim,
-        candidate,
-        active_source,
-        backend=active_backend,
-        lang=lang,
-        oa_fulltext_fetcher=build_oa_fulltext_fetcher(),
-    ).to_dict()
+    return _public_payload(
+        check_claim_support(
+            claim,
+            candidate,
+            active_source,
+            backend=active_backend,
+            lang=lang,
+            oa_fulltext_fetcher=build_oa_fulltext_fetcher(),
+        ).to_dict()
+    )
 
 
-@mcp.tool()
+@_mcp_tool("check_claim_support_set_tool")
 def check_claim_support_set_tool(
     claim: str,
     citations: Any,
@@ -445,16 +531,18 @@ def check_claim_support_set_tool(
     if include_counterevidence:
         assert isinstance(parsed_counterevidence_top_k, int)
         result = enrich_support_payload_with_counterevidence(result, active_source, top_k=parsed_counterevidence_top_k)
-    return result
+    return _public_payload(result)
 
 
-@mcp.tool()
+@_mcp_tool("search_counterevidence_tool")
 def search_counterevidence_tool(claim: str, top_k: int = 5) -> dict:
     """Search for scholarly records that may contain counter-evidence.
 
     This tool returns review candidates only. It does not prove contradiction
     and does not change a support verdict; run claim-support checks on any
-    promising candidate before editing text or replacing citations.
+    promising candidate before editing text or replacing citations. Query rows
+    expose sources_responded/sources_failed, candidate rows expose every merged
+    source, and top-level response provenance is retained before top_k truncation.
     """
     if not str(claim).strip():
         return error_payload(
@@ -479,10 +567,10 @@ def search_counterevidence_tool(claim: str, top_k: int = 5) -> dict:
     active_source = _source_or_error("search_counterevidence_tool")
     if isinstance(active_source, dict):
         return active_source
-    return search_counterevidence_candidates(claim, active_source, top_k=parsed_top_k).to_dict()
+    return _public_payload(search_counterevidence_candidates(claim, active_source, top_k=parsed_top_k).to_dict())
 
 
-@mcp.tool()
+@_mcp_tool("audit_claim_support_tool")
 def audit_claim_support_tool(
     items: Any,
     lang: str = "",
@@ -677,7 +765,7 @@ def audit_claim_support_tool(
         result = enrich_support_payload_with_counterevidence(result, active_source, top_k=parsed_counterevidence_top_k)
     if high_risk_only:
         result = filter_high_risk_payload(result)
-    return result
+    return _public_payload(result)
 
 
 def main() -> None:
