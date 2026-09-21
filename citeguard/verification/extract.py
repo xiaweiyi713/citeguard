@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+import io
 import json
 import re
 import zipfile
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
+from typing import Any, Callable, Dict, Iterable, List, Optional, Set, Tuple
 from xml.etree import ElementTree
 
 from .parse import extract_arxiv_id, extract_doi, extract_year, parse_gbt7714_reference
@@ -25,58 +26,100 @@ BIBITEM_RE = re.compile(
 )
 
 
-def load_citation_candidates(path: str, source_format: str = "auto") -> List[dict]:
+def load_citation_candidates(
+    path: str,
+    source_format: str = "auto",
+    *,
+    path_resolver: Optional[Callable[[Path], Path]] = None,
+    max_docx_xml_bytes: Optional[int] = None,
+    text_reader: Optional[Callable[[Path], str]] = None,
+    binary_reader: Optional[Callable[[Path], bytes]] = None,
+    missing_dependency_handler: Optional[Callable[[str, Path], None]] = None,
+) -> List[dict]:
     """Load a text-like file and extract citation candidate objects."""
 
     active_format = _resolve_format(path, source_format)
+    root_path = _resolve_source_path(Path(path), path_resolver)
+    root_source_path = str(root_path) if path_resolver is not None else str(path)
+    read_text = text_reader or _read_utf8_text
     if active_format == "docx":
-        text = _read_docx_text(path)
+        paragraphs = _read_docx_paragraphs(
+            str(root_path),
+            max_xml_bytes=max_docx_xml_bytes,
+            binary_reader=binary_reader,
+        )
         return _annotate_source_path(
-            extract_citation_candidates(text, source_format=active_format),
-            source_path=path,
+            _extract_docx_candidates(paragraphs),
+            source_path=root_source_path,
         )
 
-    text = Path(path).read_text(encoding="utf-8")
+    text = read_text(root_path)
     candidates = _annotate_source_path(
         extract_citation_candidates(text, source_format=active_format),
-        source_path=path,
+        source_path=root_source_path,
     )
     if active_format in {"latex", "tex"}:
-        latex_parts = _latex_document_parts(path, text)
+        latex_parts = _latex_document_parts(
+            root_path,
+            text,
+            path_resolver=path_resolver,
+            text_reader=read_text,
+            missing_dependency_handler=missing_dependency_handler,
+        )
         for tex_path, tex_text in latex_parts[1:]:
             included_candidates = extract_citation_candidates(tex_text, source_format=active_format)
             candidates.extend(_annotate_source_path(included_candidates, source_path=str(tex_path)))
         for tex_path, tex_text in latex_parts:
             for bib_path in _latex_bibliography_paths(tex_text, source_path=str(tex_path)):
+                bib_path = _resolve_source_path(bib_path, path_resolver)
                 if not bib_path.exists() or not bib_path.is_file():
+                    if missing_dependency_handler is not None:
+                        missing_dependency_handler("bibliography", bib_path)
                     continue
                 bib_candidates = extract_citation_candidates(
-                    bib_path.read_text(encoding="utf-8"),
+                    read_text(bib_path),
                     source_format="bibtex",
                 )
                 candidates.extend(_annotate_source_path(bib_candidates, source_path=str(bib_path)))
     return _dedupe_candidates(candidates)
 
 
-def _latex_document_parts(path: str, text: str) -> List[Tuple[Path, str]]:
+def _latex_document_parts(
+    path: Path,
+    text: str,
+    *,
+    path_resolver: Optional[Callable[[Path], Path]] = None,
+    text_reader: Optional[Callable[[Path], str]] = None,
+    missing_dependency_handler: Optional[Callable[[str, Path], None]] = None,
+) -> List[Tuple[Path, str]]:
     root = Path(path)
     parts: List[Tuple[Path, str]] = [(root, text)]
     seen: Set[str] = {str(root.resolve())}
+    read_text = text_reader or _read_utf8_text
 
     def visit(source_path: Path, source_text: str) -> None:
         for include_path in _latex_input_paths(source_text, source_path=source_path):
+            include_path = _resolve_source_path(include_path, path_resolver)
             key = str(include_path.resolve())
             if key in seen:
                 continue
             if not include_path.exists() or not include_path.is_file():
+                if missing_dependency_handler is not None:
+                    missing_dependency_handler("include", include_path)
                 continue
             seen.add(key)
-            include_text = include_path.read_text(encoding="utf-8")
+            include_text = read_text(include_path)
             parts.append((include_path, include_text))
             visit(include_path, include_text)
 
     visit(root, text)
     return parts
+
+
+def _resolve_source_path(path: Path, path_resolver: Optional[Callable[[Path], Path]]) -> Path:
+    if path_resolver is None:
+        return path
+    return Path(path_resolver(path))
 
 
 def _latex_input_paths(text: str, source_path: Path) -> List[Path]:
@@ -142,7 +185,13 @@ def _extract_bibtex(text: str) -> List[dict]:
         body = _strip_bibtex_entry_tail(match.group(2))
         fields = _parse_bibtex_fields(body, string_macros=string_macros)
         raw_text = _bibtex_raw_text(fields) or match.group(0).strip()
-        item = _candidate(raw_text=raw_text, source_type="bibtex", source_id=key)
+        item = _candidate(
+            raw_text=raw_text,
+            source_type="bibtex",
+            source_id=key,
+            source_line_start=_line_number_at_offset(text, match.start()),
+            source_line_end=_line_number_at_offset(text, max(match.start(), match.end() - 1)),
+        )
         if fields.get("title"):
             item["title"] = fields["title"]
         if fields.get("year"):
@@ -277,7 +326,15 @@ def _extract_bibitems(text: str) -> List[dict]:
         key = match.group(1).strip()
         raw_text = _clean_reference_text(match.group(2))
         if _looks_like_citation(raw_text):
-            candidates.append(_candidate(raw_text=raw_text, source_type="bibitem", source_id=key))
+            candidates.append(
+                _candidate(
+                    raw_text=raw_text,
+                    source_type="bibitem",
+                    source_id=key,
+                    source_line_start=_line_number_at_offset(text, match.start()),
+                    source_line_end=_line_number_at_offset(text, max(match.start(), match.end() - 1)),
+                )
+            )
     return candidates
 
 
@@ -367,6 +424,18 @@ def _extract_reference_lines(text: str) -> List[dict]:
     ]
 
 
+def _extract_docx_candidates(paragraphs: List[str]) -> List[dict]:
+    candidates = extract_citation_candidates("\n".join(paragraphs), source_format="docx")
+    for candidate in candidates:
+        line_start = candidate.get("source_line_start")
+        line_end = candidate.get("source_line_end")
+        if isinstance(line_start, int):
+            candidate["source_paragraph_start"] = line_start
+        if isinstance(line_end, int):
+            candidate["source_paragraph_end"] = line_end
+    return candidates
+
+
 def _extract_loose_reference_list(lines: List[str]) -> List[dict]:
     items: List[Dict[str, Any]] = []
     current: List[str] = []
@@ -431,6 +500,10 @@ def _extract_loose_reference_list(lines: List[str]) -> List[dict]:
 
 def _leading_whitespace_width(line: str) -> int:
     return len(line) - len(line.lstrip())
+
+
+def _line_number_at_offset(text: str, offset: int) -> int:
+    return text.count("\n", 0, max(0, offset)) + 1
 
 
 def _is_loose_reference_syntax_line(text: str) -> bool:
@@ -591,16 +664,39 @@ def _annotate_source_path(candidates: Iterable[dict], source_path: str) -> List[
 
 
 def _read_docx_text(path: str) -> str:
+    return "\n".join(_read_docx_paragraphs(path))
+
+
+def _read_utf8_text(path: Path) -> str:
+    """Read a regular UTF-8 text file for the unbounded extraction API."""
+
+    return path.read_text(encoding="utf-8")
+
+
+def _read_docx_paragraphs(
+    path: str,
+    max_xml_bytes: Optional[int] = None,
+    binary_reader: Optional[Callable[[Path], bytes]] = None,
+) -> List[str]:
     try:
-        with zipfile.ZipFile(path) as archive:
+        if binary_reader is None:
+            archive_source = zipfile.ZipFile(path)
+        else:
+            archive_source = zipfile.ZipFile(io.BytesIO(binary_reader(Path(path))))
+        with archive_source as archive:
+            info = archive.getinfo("word/document.xml")
+            if max_xml_bytes is not None and info.file_size > max_xml_bytes:
+                raise OSError(f"DOCX document.xml exceeds the {max_xml_bytes}-byte extraction limit.")
             xml = archive.read("word/document.xml")
+        if b"<!DOCTYPE" in xml.upper() or b"<!ENTITY" in xml.upper():
+            raise OSError("DOCX document.xml contains a prohibited DTD or entity declaration.")
         root = ElementTree.fromstring(xml)
     except (zipfile.BadZipFile, KeyError, ElementTree.ParseError) as exc:
         raise OSError(f"Could not read DOCX file {path!r}: {exc}") from exc
     namespace = {"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
-    paragraphs = []
+    paragraphs: List[str] = []
     for paragraph in root.findall(".//w:p", namespace):
         texts = [node.text or "" for node in paragraph.findall(".//w:t", namespace)]
         if texts:
             paragraphs.append("".join(texts))
-    return "\n".join(paragraphs)
+    return paragraphs

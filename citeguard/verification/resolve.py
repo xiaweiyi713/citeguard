@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 import socket
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date
 from typing import Any, Dict, List, Optional
 
@@ -12,7 +12,12 @@ from citeguard.citation import author_coverage, sequence_similarity, year_matche
 from citeguard.graph import CitationRecord
 from citeguard.retrieval.scholarly_clients.base import MetadataSource
 from citeguard.retrieval.scholarly_clients.multi_source import MultiSourceMetadataSource
-from citeguard.retrieval.scholarly_clients.utils import base_arxiv_id, normalize_arxiv_id, normalize_doi
+from citeguard.retrieval.scholarly_clients.utils import (
+    base_arxiv_id,
+    normalize_arxiv_id,
+    normalize_doi,
+    record_source_names,
+)
 
 STRONG_MATCH = 0.70
 AMBIGUOUS_MARGIN = 0.05
@@ -55,6 +60,7 @@ class ResolveOutcome:
     ambiguous: bool
     identifier_lookup: Optional[Dict[str, Any]] = None
     ambiguity_reason: str = ""
+    query_records: List[Dict[str, Any]] = field(default_factory=list)
 
 
 def verification_match_score(candidate: CitationRecord, record: CitationRecord) -> float:
@@ -160,9 +166,11 @@ def resolve_citation(candidate: CitationRecord, source: MetadataSource) -> Resol
 
     results: List[CitationRecord] = []
     identifier_info: Optional[Dict[str, Any]] = None
+    query_records: List[Dict[str, Any]] = []
     authority = _identifier_authority(candidate, source)
     if authority is not None:
         identifier_info, authority_record = authority
+        query_records.append(_identifier_query_record(candidate.citation_id, identifier_info))
         if identifier_info.get("status") == "hit" and authority_record is not None:
             results.append(authority_record)
         elif identifier_info.get("status") == "failed":
@@ -193,6 +201,7 @@ def resolve_citation(candidate: CitationRecord, source: MetadataSource) -> Resol
     inner = getattr(source, "inner", source)
     failed.extend(getattr(inner, "last_failures", []))
     failure_details.extend(getattr(inner, "last_failure_details", []))
+    search_failure_details = list(failure_details)
 
     if identifier_hit and identifier_info:
         # The identifier authority answered definitively, so this citation is
@@ -208,6 +217,14 @@ def resolve_citation(candidate: CitationRecord, source: MetadataSource) -> Resol
             detail for detail in failure_details if detail.get("source") != authority_name
         ]
 
+    query_records.extend(
+        _title_search_query_records(
+            candidate.citation_id,
+            search_failure_details,
+            identifier_info=identifier_info,
+        )
+    )
+
     failure_details = _dedupe_failure_details(failure_details)
     failed.extend(
         str(detail.get("source", ""))
@@ -216,7 +233,7 @@ def resolve_citation(candidate: CitationRecord, source: MetadataSource) -> Resol
     )
     failed = sorted(set(failed))
 
-    responded = sorted({record.source for record in results if record.source})
+    responded = sorted({source_name for record in results for source_name in record_source_names(record)})
 
     seen = set()
     scored = []
@@ -239,6 +256,7 @@ def resolve_citation(candidate: CitationRecord, source: MetadataSource) -> Resol
             ambiguous=False,
             identifier_lookup=identifier_info,
             ambiguity_reason="",
+            query_records=query_records,
         )
 
     best_score, best = scored[0]
@@ -268,6 +286,7 @@ def resolve_citation(candidate: CitationRecord, source: MetadataSource) -> Resol
         ambiguous=ambiguous,
         identifier_lookup=identifier_info,
         ambiguity_reason=ambiguity_reason,
+        query_records=query_records,
     )
 
 
@@ -326,3 +345,65 @@ def _dedupe_failure_details(details: List[Dict[str, Any]]) -> List[Dict[str, Any
         if detail not in deduped:
             deduped.append(detail)
     return deduped
+
+
+def _query_reason_code(status: str, detail: Optional[Dict[str, Any]] = None) -> str:
+    if status == "hit":
+        return "ok"
+    if status == "miss":
+        return "no_match"
+    if status == "unavailable":
+        return "unconfigured"
+    payload = detail or {}
+    kind = str(payload.get("kind") or "")
+    if kind in {"timeout", "rate_limited"}:
+        return kind
+    code = str(payload.get("code") or "")
+    if code in {"timeout", "rate_limited"}:
+        return code
+    if kind:
+        return kind
+    return code or "source_unavailable"
+
+
+def _identifier_query_record(citation_id: str, info: Dict[str, Any]) -> Dict[str, Any]:
+    status = str(info.get("status") or "failed")
+    return {
+        "citation_id": citation_id,
+        "source": str(info.get("source") or ""),
+        "operation": "identifier_lookup",
+        "status": status,
+        "reason_code": _query_reason_code(status, info.get("failure_detail") if isinstance(info.get("failure_detail"), dict) else None),
+    }
+
+
+def _title_search_query_records(
+    citation_id: str,
+    details: List[Dict[str, Any]],
+    *,
+    identifier_info: Optional[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    records: List[Dict[str, Any]] = []
+    identifier_status = str((identifier_info or {}).get("status") or "")
+    authority = str((identifier_info or {}).get("source") or "")
+    seen = set()
+    for detail in details:
+        source_name = str(detail.get("source") or "")
+        if not source_name:
+            continue
+        if identifier_status == "failed" and source_name == authority:
+            continue
+        key = (source_name, str(detail.get("kind") or ""), str(detail.get("code") or ""))
+        if key in seen:
+            continue
+        seen.add(key)
+        records.append(
+            {
+                "citation_id": citation_id,
+                "source": source_name,
+                "operation": "title_search",
+                "status": "failed",
+                "reason_code": _query_reason_code("failed", detail),
+            }
+        )
+    return records

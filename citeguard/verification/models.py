@@ -34,6 +34,9 @@ INPUT_SOURCE_METADATA_KEYS = [
     "input_source_locator",
     "input_source_line_start",
     "input_source_line_end",
+    "input_source_paragraph_start",
+    "input_source_paragraph_end",
+    "input_document_locator",
 ]
 
 
@@ -190,6 +193,7 @@ class VerificationResult:
     identifier_lookup: Optional[Dict[str, Any]] = None
     suggested_bibtex: str = ""
     suggested_gbt7714: str = ""
+    query_records: List[Dict[str, Any]] = field(default_factory=list)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -212,6 +216,7 @@ class VerificationResult:
             "outage_limited": self.outage_limited,
             "doi_registration": self.doi_registration,
             "identifier_lookup": dict(self.identifier_lookup) if self.identifier_lookup else None,
+            "query_records": [dict(item) for item in self.query_records],
             "recovery_code": verification_recovery_code(self.verdict, self.source_failure_details),
             "next_action": verification_next_action(self.verdict, self.source_failure_mode, self.sources_failed),
             "alternatives": [asdict(record) for record in self.alternatives],

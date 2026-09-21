@@ -315,3 +315,19 @@ class IdentifierHitFailureAttributionTests(unittest.TestCase):
         )
         self.assertFalse(payload["outage_limited"])
         self.assertEqual(result.verdict, Verdict.VERIFIED)
+        operations = {
+            (item["operation"], item["source"], item["status"], item["reason_code"])
+            for item in payload["query_records"]
+        }
+        self.assertIn(("identifier_lookup", "arxiv", "hit", "ok"), operations)
+        self.assertIn(("title_search", "arxiv", "failed", "timeout"), operations)
+
+    def test_unconfigured_identifier_authority_uses_unconfigured_reason_code(self):
+        openalex = _NamedMemory([AIAYN_TRUE], "openalex")
+        candidate = parse_citation(
+            title="Attention Is All You Need", arxiv_id="1706.03762", year=2017
+        )
+        outcome = resolve_citation(candidate, openalex)
+        identifier = next(item for item in outcome.query_records if item["operation"] == "identifier_lookup")
+        self.assertEqual(identifier["status"], "unavailable")
+        self.assertEqual(identifier["reason_code"], "unconfigured")

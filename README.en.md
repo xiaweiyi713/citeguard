@@ -12,7 +12,15 @@
 
 LLM writing assistants hallucinate references: they invent papers, stitch together wrong metadata, and cite real papers that don't support the claim. CiteGuard is the skeptical reviewer that catches this — the check an agent can't reliably do on its own. It treats every citation as a `claim → citation → evidence` problem and tries to *disprove* it; when it can't be sure, it says so instead of guessing.
 
-> **Status:** Alpha (`v0.1.1`, published on [PyPI](https://pypi.org/project/citationguard/) and the [official MCP registry](https://registry.modelcontextprotocol.io)). The actively developed product surface is the `citeguard.*` auditor package, CLI, MCP server, batch workflows, cache replay, and release gates. Historical writing-agent experiments remain in source checkouts for context, but they are not part of the published package surface.
+> **Status:** Alpha (the current release version is shown on [PyPI](https://pypi.org/project/citationguard/) and the [official MCP registry](https://registry.modelcontextprotocol.io)). The actively developed product surface is the `citeguard.*` auditor package, CLI, MCP server, batch workflows, cache replay, and release gates. Historical writing-agent experiments remain in source checkouts for context, but they are not part of the published package surface.
+
+## Product Boundary
+
+CiteGuard is for **people who write academic or technical text with an agent**. It is a citation-review gate before a draft is submitted, shared, or rewritten: it checks citation identity, metadata, and available evidence for a concrete claim, then returns a traceable human-review queue.
+
+It does not write papers for users, silently edit drafts, call `not_found` proof of fabrication, or retrieve gated full text. The supported product remains local-first: the `citeguard` CLI, the stdio MCP server, and the lightweight `citeguard-verify` Skill. The writing experiments under `legacy/` and the repository-maintainer Skill are not end-user products.
+
+CLI and MCP root responses carry a stable `contract_version: "v1"`. The bundled JSON Schema, field vocabularies, and compatibility rules are documented in [`docs/agent_output_contract.md`](docs/agent_output_contract.md).
 
 ---
 
@@ -97,6 +105,22 @@ bypass paywalls; remote full text is OA-only and disabled by default.
 
 Two guardrails keep it honest: a source being **unreachable is never escalated to "fabricated"** (it lowers confidence, sets `outage_limited=true` for outage-limited `not_found` results, and reports `sources_available`, `sources_failed`, and `source_failure_mode`), and `insufficient_evidence` / `not_found` are phrased as "could not confirm", leaving the final judgment to a human or the host agent.
 
+### 3. Which citations in a manuscript need review first?
+
+`audit-document` / `audit_document_tool` boundedly reads a Markdown, LaTeX,
+BibTeX, BBL, or DOCX manuscript, verifies extracted citations, and returns exact
+line/paragraph locations plus a risk-sorted review queue. Markdown/LaTeX bodies
+also link in-text markers to bibliography entries and emit claim-level
+suggestions (sentence, evidence, rewrite hint); unmatched markers stay listed.
+`--html report.html` writes a local human-readable report from the same JSON
+model. It is suggestion-only
+and never modifies the document; `not_found` still means "check the identity,"
+not "fabricated." `document.snapshot.digest` identifies the resolved input
+version read by the call; re-run the audit when the manuscript or an included
+LaTeX/BibTeX file changes. Use `--fail-on-review` when CI should return exit
+code 1 for a non-empty suggestion queue; the default exit code only reports
+whether the audit operation completed.
+
 ---
 
 ## Quick start
@@ -127,6 +151,7 @@ citeguard verify \
 
 citeguard audit examples/citations.json --jobs 4         # batch: JSON array or .jsonl
 citeguard audit examples/references.md --high-risk-only  # extract + audit a bibliography file
+citeguard audit-document manuscript.tex --allowed-root . # bounded audit with exact locators and review queue
 
 citeguard support \
   --claim "The Transformer relies entirely on attention." \
@@ -189,6 +214,7 @@ Register it in any MCP-compatible client (Claude Code example):
 | `citeguard_status_tool` | inspect MCP/Python readiness, cache readiness, source selection, and model dependency status without live queries |
 | `verify_citation_tool` | verify one citation; returns verdict, canonical record, per-field diffs, suggested fix, sources checked |
 | `audit_citations_tool` | verify a list of citations; returns a per-item report plus a verdict-count summary |
+| `audit_document_tool` | boundedly audit one manuscript/reference file; return exact locators and a suggestion-only review queue |
 | `check_claim_support_tool` | judge whether a cited paper supports a claim sentence (deep mode) |
 | `check_claim_support_set_tool` | judge whether one claim is supported by a set of cited papers |
 | `search_counterevidence_tool` | search for possible counter-evidence candidates; review leads only, not a contradiction verdict |
@@ -201,7 +227,7 @@ cache status, and model readiness without live queries; see
 
 <sub>mcp-name: io.github.xiaweiyi713/citeguard</sub>
 
-For agent clients that support skills, [`skills/citeguard-verify/SKILL.md`](skills/citeguard-verify/SKILL.md) makes CiteGuard **proactively** verify citations while you write (and present results without silently editing your text). It is written for MCP-compatible agents such as Codex, Claude Code, Cursor, and similar clients.
+For agent clients that support skills, [`skills/citeguard-verify/SKILL.md`](skills/citeguard-verify/SKILL.md) makes CiteGuard **proactively** verify citations while you write (and present results without silently editing your text). It is written for MCP-compatible agents such as Codex, Claude Code, Cursor, and similar clients. Install and self-check it with `citeguard skill install --client codex` followed by `citeguard skill check --client codex`; use `skill status` before an explicit `skill upgrade --force`.
 
 ### As a Python library
 
@@ -232,11 +258,14 @@ print(support.verdict.value, support.engine)
 | `CITEGUARD_MAILTO` | — | real contact email for polite OpenAlex/Crossref; unset values are not sent as `mailto` |
 | `SEMANTIC_SCHOLAR_API_KEY` | — | optional, improves Semantic Scholar access |
 | `CITEGUARD_CACHE` | OS user cache directory | local SQLite resolution cache |
+| `CITEGUARD_METRICS_PATH` | empty (disabled) | explicit local JSONL aggregate runtime metrics; no network telemetry, claims, citations, file paths, or evidence text |
 | `CITEGUARD_FIXTURE_CITATIONS` | — | JSON/JSONL citation fixture for deterministic offline runs |
 | `CITEGUARD_HTTP_TIMEOUT` | `10` | timeout, in seconds, for live scholarly API calls |
 | `CITEGUARD_SOURCE_BUDGET` | `8.0` | total fan-out budget for one multi-source query; slow sources become `budget_exceeded` failures instead of blocking |
 | `CITEGUARD_REMOTE_EVIDENCE` | `0` | set to `1` to fetch landing-page snippets in addition to title/abstract metadata |
 | `CITEGUARD_OA_FULLTEXT` | `0` | set to `1` to fetch open-access paper bodies for full-text claim support; OA locations only, never bypasses paywalls |
+| `CITEGUARD_ALLOWED_FILE_ROOTS` | server working directory | allowed roots for MCP local full-text evidence and document audits; separate multiple roots with the platform path separator |
+| `CITEGUARD_SUPPORT_ENGINE` | `auto` | `auto` uses deep models when available; `heuristic` prevents model loading for offline/low-resource runs; `production` requests deep mode |
 | `CITEGUARD_RERANKER_MODEL` / `CITEGUARD_NLI_MODEL` | English models | support deep-mode models — set multilingual ones for non-English claims |
 
 The full runtime contract (retry/backoff knobs, evidence timeouts, cache paths,
@@ -247,7 +276,10 @@ Support deep mode downloads model weights on first use; pre-download with
 support runs a labelled `heuristic` engine which never emits `supported` or
 `contradicted`; `citeguard status` reports this as
 `support_models.engine=heuristic_fallback` with
-`next_action=install_or_configure_dependency`.
+`next_action=install_or_configure_dependency`. Set
+`CITEGUARD_SUPPORT_ENGINE=heuristic` to intentionally avoid model loading; status
+then records `requested_engine=heuristic` and `model_loading_enabled=false`, which
+is an intentional profile rather than a dependency failure.
 
 ---
 
@@ -273,7 +305,7 @@ CNKI (知网) and Wanfang (万方) are **not** integrated: they have no open/fre
 
 ## Status, scope & known limitations
 
-**In scope today:** existence + metadata verification, abstract-level claim-support verification, user-provided local full-text evidence files, multi-citation claim checks, multi-source adapters, SQLite caching, Markdown/LaTeX/BibTeX/BBL/DOCX reference extraction, an MCP server, a Claude Code skill, and offline evals.
+**In scope today:** existence + metadata verification, abstract-level claim-support verification, user-provided local full-text evidence files, multi-citation claim checks, multi-source adapters, SQLite caching, Markdown/LaTeX/BibTeX/BBL/DOCX reference extraction, bounded suggestion-only manuscript audits, an MCP server, a Claude Code skill, and offline evals.
 
 **Known limitations**
 
@@ -293,6 +325,7 @@ python3 -m unittest discover -s tests -v   # full unittest suite; optional MCP s
 python3 scripts/smoke_mcp.py --require-sdk # MCP stdio smoke; the MCP SDK requires Python 3.10+
 python3 scripts/eval_verification.py       # offline, deterministic existence/metadata eval
 python3 scripts/eval_support.py --report --split test --quality-gate
+python3 scripts/run_support_ablations.py --split test --plan-only
 python3 scripts/release_package_gate.py    # development/contract gate; grants no release claim
 python3 -m pip install -e ".[models]"
 python3 scripts/automated_release_review.py --output automated-release-review.json

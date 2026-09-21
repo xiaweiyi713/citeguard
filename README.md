@@ -12,7 +12,15 @@
 
 LLM 写作助手会幻觉参考文献:编造不存在的论文、拼错真实论文的元数据、引用与论点无关的真论文。CiteGuard 扮演那个"多疑的审稿人":它把每条引用当作 `论点 → 引用 → 证据` 问题去**证伪**;拿不准的时候明确说"查不准",而不是猜一个答案。
 
-> **状态:** Alpha(`v0.1.1`,已发布至 [PyPI](https://pypi.org/project/citationguard/) 与 [MCP 官方 registry](https://registry.modelcontextprotocol.io))。当前积极开发的产品面是 `citeguard.*` 审计包、CLI、MCP server、批量工作流、缓存回放与发布门禁;历史遗留的写作 agent 实验仅保留在源码签出中,不属于发布包。
+> **状态:** Alpha(当前发行版本见 [PyPI](https://pypi.org/project/citationguard/) 与 [MCP 官方 registry](https://registry.modelcontextprotocol.io))。当前积极开发的产品面是 `citeguard.*` 审计包、CLI、MCP server、批量工作流、缓存回放与发布门禁;历史遗留的写作 agent 实验仅保留在源码签出中,不属于发布包。
+
+## 产品边界
+
+CiteGuard 的首要用户是**借助 Agent 撰写学术或技术文本的人**。它是提交、共享或改写文稿前的引用审计闸门:核验引用身份、元数据和可获得证据是否支撑具体论断，并给出可追溯的人工复核队列。
+
+它不替用户写论文、不静默改写文稿、不把 `not_found` 当作伪造结论，也不抓取受限全文。发布面保持本地优先的 `citeguard` CLI、stdio MCP server 和轻量 `citeguard-verify` Skill；`legacy/` 中的写作实验和仓库维护 Skill 不属于终端用户产品。
+
+CLI 与 MCP 的根响应使用稳定 `contract_version: "v1"`。可随包读取的 JSON Schema、字段词表和兼容规则见 [`docs/agent_output_contract.md`](docs/agent_output_contract.md)。
 
 ---
 
@@ -84,6 +92,10 @@ CiteGuard 对照 **OpenAlex、Crossref、arXiv、Semantic Scholar** 回答两个
 
 两条守护原则保证它"诚实":**源不可达永远不会升级成"伪造"**(只降低置信度,设置 `outage_limited=true` 并上报 `sources_available` / `sources_failed` / `source_failure_mode`);`insufficient_evidence` / `not_found` 一律表述为"无法确认",最终裁决留给人或宿主 agent。此外,**标识符是硬裁决**:DOI / arXiv id 会先在其权威源(Crossref / arXiv)直查,命中即定音、压过任何同名记录;权威查询失败时结果降级为 `ambiguous` 并标记 `outage_limited`,绝不用纯标题匹配冒充高置信结论(输出附 `identifier_lookup` 字段)。多源查询并发执行,总预算默认 8 秒(`CITEGUARD_SOURCE_BUDGET`),慢源记为 `budget_exceeded` 而不拖垮整次核验。
 
+### 3. 一篇文稿里的引用该先看哪里?
+
+`audit-document` / `audit_document_tool` 受限读取 Markdown、LaTeX、BibTeX、BBL 或 DOCX 文稿，提取并核验引用后返回精确行号/段落号和风险排序的 review queue。Markdown/LaTeX 还会把正文引用标记连到文献条目，并给出论点级建议（原句、证据、修改对照）；连不上的标记单独列出，不会从报告里消失。`--html report.html` 用同一份 JSON 结果写一份给人看的本地报告，stdout 仍是 JSON。它只给建议，绝不自动修改文稿；`not_found` 仍表示“需要核对身份”，不代表伪造。返回的 `document.snapshot.digest` 标识本次实际读取的文稿版本；文稿或其 include/BibTeX 依赖变化后，应重新审计。CI 可显式使用 `--fail-on-review`，让非空 review queue 返回退出码 1。
+
 ---
 
 ## 快速上手
@@ -114,6 +126,7 @@ citeguard verify \
 
 citeguard audit examples/citations.json --jobs 4         # 批量:JSON 数组或 .jsonl
 citeguard audit examples/references.md --high-risk-only  # 提取并审计参考文献文件
+citeguard audit-document manuscript.tex --allowed-root . # 受限文稿审计，返回精确位置与待复核队列
 
 citeguard support \
   --claim "The Transformer relies entirely on attention." \
@@ -166,6 +179,7 @@ citeguard-mcp
 | `citeguard_status_tool` | 不做实时查询,检查 MCP/Python 就绪度、缓存、源配置与模型依赖状态 |
 | `verify_citation_tool` | 核验单条引用;返回判定、规范记录、逐字段差异、修复建议与所查源 |
 | `audit_citations_tool` | 批量核验引用;逐条报告 + 判定计数汇总 |
+| `audit_document_tool` | 受限审计一篇文稿或参考文献文件;返回精确位置与仅建议的复核队列 |
 | `check_claim_support_tool` | 判断某篇论文是否支持某论点句(深度模式) |
 | `check_claim_support_set_tool` | 判断一组引用是否共同支持一个论点 |
 | `search_counterevidence_tool` | 检索潜在反证线索;仅为复核线索,不构成矛盾判定 |
@@ -175,7 +189,7 @@ citeguard-mcp
 
 <sub>mcp-name: io.github.xiaweiyi713/citeguard</sub>
 
-支持 skill 的 agent 客户端可使用 [`skills/citeguard-verify/SKILL.md`](skills/citeguard-verify/SKILL.md),让 CiteGuard 在你写作时**主动**核验引用(呈现结果而不静默改动你的文本),适用于 Codex、Claude Code、Cursor 等 MCP 客户端。
+支持 skill 的 agent 客户端可使用 [`skills/citeguard-verify/SKILL.md`](skills/citeguard-verify/SKILL.md),让 CiteGuard 在你写作时**主动**核验引用(呈现结果而不静默改动你的文本),适用于 Codex、Claude Code、Cursor 等 MCP 客户端。可用 `citeguard skill install --client codex` 安装后执行 `citeguard skill check --client codex` 自检;升级前先用 `skill status` 检查本地修改,只有确认覆盖时再运行 `skill upgrade --force`。
 
 ### 作为 Python 库
 
@@ -206,15 +220,18 @@ print(support.verdict.value, support.engine)
 | `CITEGUARD_MAILTO` | — | OpenAlex/Crossref 礼貌池的真实联系邮箱;未设置则不发送 `mailto` |
 | `SEMANTIC_SCHOLAR_API_KEY` | — | 可选,改善 Semantic Scholar 访问 |
 | `CITEGUARD_CACHE` | 系统用户缓存目录 | 本地 SQLite 解析缓存 |
+| `CITEGUARD_METRICS_PATH` | —（默认关闭） | 显式指定本地 JSONL 聚合运行指标文件;不联网、不记录论点/引文/文件路径/证据文本 |
 | `CITEGUARD_FIXTURE_CITATIONS` | — | JSON/JSONL 引用 fixture,用于确定性离线运行 |
 | `CITEGUARD_HTTP_TIMEOUT` | `10` | 实时学术 API 调用超时(秒) |
 | `CITEGUARD_REMOTE_EVIDENCE` | `0` | 设为 `1` 时额外抓取落地页摘要片段 |
 | `CITEGUARD_OA_FULLTEXT` | `0` | 设为 `1` 时自动拉取开放获取(OA)论文全文用于全文级支撑判定;仅限 OA 地址,绝不绕过付费墙 |
+| `CITEGUARD_ALLOWED_FILE_ROOTS` | server working directory | MCP 本地全文证据和文稿审计允许读取的路径根;可用系统路径分隔符配置多个 |
+| `CITEGUARD_SUPPORT_ENGINE` | `auto` | `auto` 在可用时使用深度模型;`heuristic` 禁止加载模型,适合离线/低资源场景;`production` 请求深度模式 |
 | `CITEGUARD_RERANKER_MODEL` / `CITEGUARD_NLI_MODEL` | 英文模型 | 支撑性深度模式模型——非英文论点请配置多语模型 |
 
 完整运行时契约(重试/退避、证据超时、缓存路径、远程证据边界)见 [docs/configuration.md](docs/configuration.md)。
 
-支撑性深度模式首次使用时下载模型权重,可用 `citeguard models warmup` 预下载。未安装 `[models]` 时,支撑性检查运行带标注的 `heuristic` 引擎(永不输出 `supported` 或 `contradicted`);`citeguard status` 会报告 `support_models.engine=heuristic_fallback` 与 `next_action=install_or_configure_dependency`。
+支撑性深度模式首次使用时下载模型权重,可用 `citeguard models warmup` 预下载。未安装 `[models]` 时,支撑性检查运行带标注的 `heuristic` 引擎(永不输出 `supported` 或 `contradicted`);`citeguard status` 会报告 `support_models.engine=heuristic_fallback` 与 `next_action=install_or_configure_dependency`。若明确设置 `CITEGUARD_SUPPORT_ENGINE=heuristic`,则不会加载模型;状态会保留 `requested_engine=heuristic` 且 `model_loading_enabled=false`,这是有意选择,不应误报为依赖故障。
 
 ---
 
@@ -240,7 +257,7 @@ print(support.verdict.value, support.engine)
 
 ## 边界与已知限制
 
-**当前能力范围:** 存在性 + 元数据核验、摘要级支撑性核验、用户提供的本地全文证据文件、多引用论点检查、多源适配器、SQLite 缓存、Markdown/LaTeX/BibTeX/BBL/DOCX 参考文献提取、MCP server、Claude Code skill、离线 eval。
+**当前能力范围:** 存在性 + 元数据核验、摘要级支撑性核验、用户提供的本地全文证据文件、多引用论点检查、多源适配器、SQLite 缓存、Markdown/LaTeX/BibTeX/BBL/DOCX 参考文献提取、受限且只建议的文稿审计、MCP server、Claude Code skill、离线 eval。
 
 **已知限制**
 
@@ -260,6 +277,7 @@ python3 -m unittest discover -s tests -v   # 完整单测套件;MCP stdio 冒烟
 python3 scripts/smoke_mcp.py --require-sdk # MCP stdio 冒烟;MCP SDK 需要 Python 3.10+
 python3 scripts/eval_verification.py       # 离线确定性的存在性/元数据 eval
 python3 scripts/eval_support.py --report --split test --quality-gate
+python3 scripts/run_support_ablations.py --split test --plan-only
 python3 scripts/release_package_gate.py    # 开发/契约门禁，不授予发布声明资格
 python3 -m pip install -e ".[models]"
 python3 scripts/automated_release_review.py --output automated-release-review.json

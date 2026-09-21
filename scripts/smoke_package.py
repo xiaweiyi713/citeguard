@@ -36,17 +36,31 @@ _SDIST_RELEASE_FILES = {
     "requirements-dev.txt",
     "citeguard/__init__.py",
     "citeguard/__main__.py",
+    "citeguard/contracts/__init__.py",
+    "citeguard/contracts/v1/agent-output.schema.json",
+    "citeguard/contracts/v1/skill-trigger-prediction.schema.json",
+    "citeguard/evidence.py",
+    "citeguard/runtime_metrics.py",
+    "citeguard/benchmark/live_case_collection.py",
+    "citeguard/benchmark/human_candidates.py",
     "citeguard/mcp/server.py",
     "citeguard/mcp/input.py",
     "citeguard/runtime_config.py",
     "citeguard/runtime_health.py",
     "citeguard/skill_install.py",
     "citeguard/retrieval/scholarly_clients/factory.py",
+    "citeguard/verification/document_audit.py",
+    "citeguard/verification/document_report.py",
+    "citeguard/verification/intext.py",
+    "citeguard/verification/support_hard_cases.py",
     "citeguard/verification/verify.py",
     "citeguard/verification/support_pattern_registry.json",
     "docs/chinaxiv_spike.md",
+    "docs/agent_output_contract.md",
     "docs/benchmark_design.md",
     "docs/benchmark_todo.md",
+    "docs/human_benchmark_protocol.md",
+    "docs/live_retrieval_benchmark_protocol.md",
     "docs/cli_reference.md",
     "docs/configuration.md",
     "docs/claude_code_quickstart.md",
@@ -73,6 +87,14 @@ _SDIST_RELEASE_FILES = {
     "configs/verifier.yaml",
     "data/eval/support_eval.json",
     "data/eval/support_eval_label_sidecar.json",
+    "data/eval/support_hard_cases_v1.json",
+    "data/eval/human_support_benchmark_campaign.json",
+    "data/eval/live_retrieval_benchmark_campaign.json",
+    "data/eval/live_retrieval_benchmark.json",
+    "data/eval/live_retrieval_pilot_requests.json",
+    "data/eval/human_support_candidates.json",
+    "data/eval/human_support_pilot_claims.json",
+    "data/eval/retrieval_source_eval.json",
     "data/eval/skill_trigger_eval.json",
     "skills/citeguard-verify/SKILL.md",
     "skills/citeguard-verify/agents/openai.yaml",
@@ -86,8 +108,21 @@ _SDIST_RELEASE_FILES = {
     "scripts/release_package_gate.py",
     "scripts/automated_release_review.py",
     "scripts/eval_skill_trigger.py",
+    "scripts/generate_sbom.py",
     "scripts/prepare_support_label_sidecar.py",
+    "scripts/audit_human_support_benchmark.py",
+    "scripts/freeze_human_support_benchmark_test_split.py",
+    "scripts/audit_live_retrieval_benchmark.py",
+    "scripts/observe_live_retrieval_benchmark.py",
+    "scripts/summarize_live_retrieval_observations.py",
+    "scripts/collect_live_retrieval_cases.py",
+    "scripts/build_human_support_candidates.py",
+    "scripts/merge_human_support_annotations.py",
+    "scripts/audit_human_support_candidates.py",
+    "scripts/build_support_hard_cases.py",
     "scripts/compare_support_baselines.py",
+    "scripts/run_support_ablations.py",
+    "scripts/run_retrieval_ablations.py",
 }
 
 _SDIST_COPY_IGNORE_PATTERNS = (
@@ -286,6 +321,9 @@ def _assert_wheel_contains_core_files(wheel_path: Path) -> None:
         "citeguard/cli.py",
         "citeguard/runtime.py",
         "citeguard/errors.py",
+        "citeguard/contracts/__init__.py",
+        "citeguard/contracts/v1/agent-output.schema.json",
+        "citeguard/evidence.py",
         "citeguard/py.typed",
         "citeguard/mcp/server.py",
         "citeguard/retrieval/__init__.py",
@@ -294,6 +332,8 @@ def _assert_wheel_contains_core_files(wheel_path: Path) -> None:
         "citeguard/benchmark/__init__.py",
         "citeguard/benchmark/metrics.py",
         "citeguard/benchmark/support_calibration.py",
+        "citeguard/benchmark/live_case_collection.py",
+        "citeguard/benchmark/human_candidates.py",
         "citeguard/skill_install.py",
         "citeguard/verification/support_pattern_registry.json",
     }
@@ -487,8 +527,10 @@ def _assert_sdist_requires_contract(requires_text: str) -> None:
     normalized_requires = requires_text.replace("'", '"')
     # Setuptools may serialize a marked base dependency into a dedicated
     # ``[:python_version ...]`` section rather than the unsectioned prefix.
-    if "mcp>=1.2" not in normalized_requires or 'python_version >= "3.10"' not in normalized_requires:
-        errors.append("missing Python 3.10+ base mcp dependency")
+    if "mcp<2,>=1.28" not in normalized_requires or 'python_version >= "3.10"' not in normalized_requires:
+        errors.append("missing Python 3.10+ base mcp v1 dependency bound")
+    if "cryptography>=50" not in normalized_requires:
+        errors.append("missing cryptography security floor")
     for section, packages in required.items():
         if section not in requires_text:
             errors.append(f"missing {section} section")
@@ -497,6 +539,8 @@ def _assert_sdist_requires_contract(requires_text: str) -> None:
         for package in packages:
             if package not in section_text:
                 errors.append(f"missing {package} in {section}")
+    if "pypdf<7,>=6.14.2" not in normalized_requires:
+        errors.append("missing pypdf security floor")
     if "[api]" in requires_text:
         errors.append("stale [api] section: the FastAPI surface moved to legacy/ and is not published")
     if errors:
@@ -635,11 +679,17 @@ def _run_json(cmd: List[str]) -> dict:
 
 _IMPORT_SMOKE = r"""
 import citeguard
-from citeguard import ERROR_CODE_CATEGORY, ERROR_CODE_NEXT_ACTION, ERROR_CODE_RETRYABLE, ERROR_SCHEMA_VERSION, STABLE_NEXT_ACTIONS, error_code_registry, error_payload, parse_citation, verify_citation, check_claim_support_set, available_sources, stable_next_action, verification_next_action, verification_recovery_code, Verdict
+from citeguard import CONTRACT_VERSION, ERROR_CODE_CATEGORY, ERROR_CODE_NEXT_ACTION, ERROR_CODE_RETRYABLE, ERROR_SCHEMA_VERSION, STABLE_NEXT_ACTIONS, contract_schema_path, error_code_registry, error_payload, load_contract_schema, parse_citation, verify_citation, check_claim_support_set, available_sources, stable_next_action, verification_next_action, verification_recovery_code, Verdict
 from citeguard.errors import STABLE_ERROR_CODES
+from citeguard.evidence import EVIDENCE_OBJECT_SCHEMA_VERSION, build_evidence_object
 from citeguard.verification import search_counterevidence_candidates
 from citeguard.runtime import environment_status
 assert parse_citation(title="A Paper").title == "A Paper"
+assert CONTRACT_VERSION == "v1"
+assert contract_schema_path().is_file()
+assert load_contract_schema()["$defs"]["contract_version"]["const"] == CONTRACT_VERSION
+assert EVIDENCE_OBJECT_SCHEMA_VERSION == 1
+assert build_evidence_object({"text": "evidence", "source_field": "none"})["schema_version"] == 1
 assert callable(verify_citation)
 assert callable(check_claim_support_set)
 assert available_sources(["openalex", "arxiv"], ["arxiv"]) == ["openalex"]
