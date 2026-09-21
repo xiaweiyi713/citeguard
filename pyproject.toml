@@ -102,7 +102,7 @@ include = ["citeguard", "citeguard.*"]
 include-package-data = true
 
 [tool.setuptools.package-data]
-citeguard = ["py.typed", "verification/*.json"]
+citeguard = ["py.typed", "verification/*.json", "contracts/v1/*.json"]
 
 [tool.setuptools.data-files]
 "share/citationguard/skills/citeguard-verify" = ["skills/citeguard-verify/SKILL.md"]

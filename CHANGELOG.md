@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Shipped the v1 agent output schema and evidence-object helpers with the
+  public package, including optional `query_records` and evidence-span fields.
 - Query provenance now covers identifier lookup, title search, abstract fetch,
   and full-text fetch. Title-search misses after an identifier hit stay out of
   `sources_failed`. Batch audits keep the same core verdicts under one worker,

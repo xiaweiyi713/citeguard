@@ -1,0 +1,152 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/xiaweiyi713/citeguard/blob/main/citeguard/contracts/v1/skill-trigger-prediction.schema.json",
+  "title": "CiteGuard Skill Trigger Prediction Artifact Contract v1",
+  "description": "Label-blind capture templates and completed, provenance-bound client prediction artifacts for the CiteGuard skill-trigger suite. The evaluator additionally verifies digests against the local suite and installed Skill bundle.",
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "client": {
+      "type": "string",
+      "enum": ["codex", "claude", "cursor"]
+    },
+    "template_client": {
+      "anyOf": [
+        {"$ref": "#/$defs/client"},
+        {"const": ""}
+      ]
+    },
+    "template_digest": {
+      "anyOf": [
+        {"$ref": "#/$defs/sha256"},
+        {"const": ""}
+      ]
+    },
+    "template_timestamp": {
+      "anyOf": [
+        {"type": "string", "format": "date-time"},
+        {"const": ""}
+      ]
+    },
+    "template_run": {
+      "type": "object",
+      "required": ["client", "client_version", "suite_id", "skill_digest", "recorded_at", "dataset_digest"],
+      "properties": {
+        "client": {"$ref": "#/$defs/template_client"},
+        "client_version": {"type": "string"},
+        "suite_id": {"type": "string"},
+        "skill_digest": {"$ref": "#/$defs/template_digest"},
+        "recorded_at": {"$ref": "#/$defs/template_timestamp"},
+        "dataset_digest": {"$ref": "#/$defs/template_digest"}
+      },
+      "additionalProperties": true
+    },
+    "completed_run": {
+      "type": "object",
+      "required": ["client", "client_version", "suite_id", "skill_digest", "recorded_at", "dataset_digest"],
+      "properties": {
+        "client": {"$ref": "#/$defs/client"},
+        "client_version": {"type": "string", "minLength": 1},
+        "suite_id": {"type": "string", "minLength": 1},
+        "skill_digest": {"$ref": "#/$defs/sha256"},
+        "recorded_at": {"type": "string", "format": "date-time", "minLength": 1},
+        "dataset_digest": {"$ref": "#/$defs/sha256"}
+      },
+      "additionalProperties": true
+    },
+    "template_prediction": {
+      "type": "object",
+      "required": ["id", "request", "request_digest", "triggered"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "request": {"type": "string", "minLength": 1},
+        "request_digest": {"$ref": "#/$defs/sha256"},
+        "triggered": {"type": "null"}
+      },
+      "not": {
+        "anyOf": [
+          {"required": ["adjudicated_label"]},
+          {"required": ["expected"]},
+          {"required": ["expected_triggered"]},
+          {"required": ["gold"]},
+          {"required": ["gold_label"]},
+          {"required": ["should_trigger"]}
+        ]
+      },
+      "additionalProperties": true
+    },
+    "completed_prediction": {
+      "type": "object",
+      "required": ["id", "request_digest", "triggered"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "request": {"type": "string", "minLength": 1},
+        "request_digest": {"$ref": "#/$defs/sha256"},
+        "triggered": {"type": "boolean"}
+      },
+      "not": {
+        "anyOf": [
+          {"required": ["adjudicated_label"]},
+          {"required": ["expected"]},
+          {"required": ["expected_triggered"]},
+          {"required": ["gold"]},
+          {"required": ["gold_label"]},
+          {"required": ["should_trigger"]}
+        ]
+      },
+      "additionalProperties": true
+    },
+    "capture_template": {
+      "type": "object",
+      "required": ["schema_version", "run", "instructions", "predictions"],
+      "properties": {
+        "schema_version": {"const": 2},
+        "run": {"$ref": "#/$defs/template_run"},
+        "instructions": {"type": "string", "minLength": 1},
+        "predictions": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"$ref": "#/$defs/template_prediction"}
+        }
+      },
+      "not": {
+        "anyOf": [
+          {"required": ["adjudicated_labels"]},
+          {"required": ["expected"]},
+          {"required": ["gold"]},
+          {"required": ["labels"]}
+        ]
+      },
+      "additionalProperties": true
+    },
+    "completed_client_run": {
+      "type": "object",
+      "required": ["schema_version", "run", "predictions"],
+      "properties": {
+        "schema_version": {"const": 2},
+        "run": {"$ref": "#/$defs/completed_run"},
+        "instructions": {"type": "string", "minLength": 1},
+        "predictions": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"$ref": "#/$defs/completed_prediction"}
+        }
+      },
+      "not": {
+        "anyOf": [
+          {"required": ["adjudicated_labels"]},
+          {"required": ["expected"]},
+          {"required": ["gold"]},
+          {"required": ["labels"]}
+        ]
+      },
+      "additionalProperties": true
+    }
+  },
+  "oneOf": [
+    {"$ref": "#/$defs/capture_template"},
+    {"$ref": "#/$defs/completed_client_run"}
+  ]
+}
