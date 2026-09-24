@@ -92,6 +92,33 @@ class InTextLinkTests(unittest.TestCase):
         self.assertEqual([item["cite_key"] for item in payload["body_links"]], ["attention"])
         self.assertEqual(payload["unlinked_markers"], [])
 
+    def test_chinese_bracket_numeric_citation_links_to_gbt_reference(self):
+        text = (
+            "Transformer 完全基于注意力机制【1】。\n\n"
+            "## 参考文献\n\n"
+            "【1】 Vaswani A. Attention Is All You Need. 2017.\n"
+        )
+        bibliography = extract_citation_candidates(text, source_format="markdown")
+        payload = link_document_citations(
+            [{"path": "paper.md", "text": text, "source_format": "markdown"}],
+            bibliography,
+        )
+
+        self.assertEqual(len(bibliography), 1)
+        self.assertEqual(payload["body_links"][0]["cite_key"], "1")
+        self.assertEqual(payload["body_links"][0]["link_status"], "linked")
+        self.assertIn("完全基于注意力机制", payload["body_links"][0]["sentence"])
+        self.assertEqual(payload["unlinked_markers"], [])
+
+    def test_fullwidth_author_year_citation_is_extracted(self):
+        text = "已有工作表明注意力可以替代循环结构（Vaswani, 2017）。\n"
+        payload = link_document_citations(
+            [{"path": "paper.md", "text": text, "source_format": "markdown"}],
+            [],
+        )
+        self.assertEqual(payload["unlinked_markers"][0]["kind"], "author_year")
+        self.assertEqual(payload["unlinked_markers"][0]["cite_key"], "Vaswani|2017")
+
 
 if __name__ == "__main__":
     unittest.main()

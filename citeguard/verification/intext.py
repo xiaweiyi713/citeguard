@@ -16,8 +16,11 @@ LATEX_CITE_RE = re.compile(
     r"\{(?P<keys>[^}]+)\}"
 )
 MD_NUMERIC_RE = re.compile(r"\[(\d+(?:\s*[,;]\s*\d+)*)\](?!\()")
+CN_NUMERIC_RE = re.compile(r"[【［](\d+(?:\s*[,;，、]\s*\d+)*)[】］]")
 MD_PANDOC_RE = re.compile(r"\[@([A-Za-z][\w:.-]*(?:\s*;\s*@?[A-Za-z][\w:.-]*)*)\]")
-AUTHOR_YEAR_RE = re.compile(r"\((?P<authors>[^()]{1,80}?),\s*(?P<year>(?:19|20)\d{2}[a-z]?)\)")
+AUTHOR_YEAR_RE = re.compile(
+    r"[（(](?P<authors>[^()（）]{1,80}?)[，,]\s*(?P<year>(?:19|20)\d{2}[a-z]?)[）)]"
+)
 SENTENCE_SPLIT_RE = re.compile(r"(?<=[.!?。！？])\s+")
 LATEX_COMMENT_RE = re.compile(r"(?<!\\)%.*?$", re.MULTILINE)
 THEBIBLIOGRAPHY_RE = re.compile(
@@ -110,6 +113,7 @@ def _extract_markers(text: str, source_format: str, path: str) -> List[Dict[str,
         return _markers_from_regex(searchable, LATEX_CITE_RE, path, source_format, kind="latex_key")
     markers: List[Dict[str, Any]] = []
     markers.extend(_markers_from_regex(text, MD_NUMERIC_RE, path, source_format, kind="numeric"))
+    markers.extend(_markers_from_regex(text, CN_NUMERIC_RE, path, source_format, kind="numeric"))
     markers.extend(_markers_from_regex(text, MD_PANDOC_RE, path, source_format, kind="pandoc_key"))
     markers.extend(_author_year_markers(text, path, source_format))
     markers.sort(key=lambda item: (item["line_start"], item["char_start"]))
@@ -213,7 +217,7 @@ def _marker_payload(
 
 def _split_cite_keys(raw: str, *, kind: str) -> List[str]:
     if kind == "numeric":
-        return [part.strip() for part in re.split(r"[,;]", raw) if part.strip()]
+        return [part.strip() for part in re.split(r"[,;，、]", raw) if part.strip()]
     if kind == "pandoc_key":
         return [part.strip().lstrip("@") for part in raw.split(";") if part.strip()]
     return [part.strip() for part in raw.split(",") if part.strip()]
@@ -265,9 +269,9 @@ def _bibliography_catalog(bibliography: Sequence[Mapping[str, Any]]) -> Dict[str
         if isinstance(source_index, int) and source_index > 0:
             by_numeric.setdefault(str(source_index), []).append(index)
         raw = str(candidate.get("raw_text") or "")
-        numbered = re.match(r"^\s*(?:\[(\d+)\]|(\d+)[.)])\s+", raw)
+        numbered = re.match(r"^\s*(?:\[(\d+)\]|【(\d+)】|［(\d+)］|(\d+)[.)])\s+", raw)
         if numbered:
-            number = numbered.group(1) or numbered.group(2)
+            number = next(group for group in numbered.groups() if group)
             by_numeric.setdefault(number, []).append(index)
     return {"by_key": by_key, "by_numeric": by_numeric}
 

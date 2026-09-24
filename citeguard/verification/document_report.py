@@ -318,8 +318,9 @@ def render_document_audit_html(payload: Mapping[str, Any]) -> str:
         f"<li>{html.escape(str(item.get('issue') or ''))}: {html.escape(str(item.get('sentence') or item.get('locator') or ''))}</li>"
         for item in top
     ) or "<li>No claim-level issues queued.</li>"
+    lang = _html_lang(payload, reviews)
     return (
-        "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n"
+        f"<!DOCTYPE html>\n<html lang=\"{html.escape(lang)}\">\n<head>\n<meta charset=\"utf-8\">\n"
         "<title>CiteGuard manuscript audit</title>\n<style>\n"
         "body{font-family:ui-sans-serif,system-ui,sans-serif;line-height:1.45;"
         "margin:1.5rem;max-width:52rem;color:#111}"
@@ -413,6 +414,15 @@ def _rewrite_hint(sentence: str, issue: str, evidence_text: str) -> Dict[str, st
 
 def _unchanged(sentence: str) -> Dict[str, str]:
     return {"before": sentence, "after": sentence}
+
+
+def _html_lang(payload: Mapping[str, Any], reviews: Sequence[Mapping[str, Any]]) -> str:
+    parts = [str(_as_mapping(payload.get("document")).get("path") or "")]
+    parts.extend(str(item.get("sentence") or "") for item in reviews)
+    blob = "\n".join(parts)
+    if re.search(r"[\u4e00-\u9fff]", blob):
+        return "zh"
+    return "en"
 
 
 def _claim_units(sentence: str) -> List[str]:

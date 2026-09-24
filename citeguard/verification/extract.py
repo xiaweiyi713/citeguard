@@ -17,7 +17,7 @@ REFERENCE_HEADING_RE = re.compile(
     re.IGNORECASE,
 )
 NEXT_SECTION_RE = re.compile(r"^\s*(?:#{1,6}\s+\S|\\(?:section|chapter|subsection)\*?\{.+\})")
-REFERENCE_ITEM_RE = re.compile(r"^\s*(?:\[\d+\]|\d+[.)]|\-\s+|\*\s+)\s*(.+)$")
+REFERENCE_ITEM_RE = re.compile(r"^\s*(?:\[\d+\]|【\d+】|［\d+］|\d+[.)]|\-\s+|\*\s+)\s*(.+)$")
 BIBTEX_ENTRY_RE = re.compile(r"@\w+\s*[\{\(]\s*([^,\s]+)\s*,(.*?)(?=\n\s*@\w+\s*[\{\(]|\Z)", re.DOTALL)
 BIBTEX_STRING_RE = re.compile(r"@string\s*[\{\(]\s*([^=,\s]+)\s*=\s*(.*?)(?=\n\s*@\w+\s*[\{\(]|\Z)", re.DOTALL | re.IGNORECASE)
 BIBITEM_RE = re.compile(

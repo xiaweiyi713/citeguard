@@ -381,6 +381,7 @@ class DocumentAuditTests(unittest.TestCase):
         self.assertIn("Check these first", html)
         self.assertIn("Metadata / identity", html)
         self.assertIn("Insufficient evidence", html)
+        self.assertIn('lang="en"', html)
         self.assertIn("outperform recurrence on all tasks", html_text)
 
     def test_semicolon_clauses_are_reviewed_separately(self):
@@ -438,6 +439,18 @@ class DocumentAuditTests(unittest.TestCase):
         self.assertIn("ghost", keys)
         self.assertTrue(any(item.get("issue") == "unlinked_citation" for item in payload["claim_reviews"]))
         self.assertTrue(payload["review_status"]["review_required"])
+
+    def test_chinese_manuscript_html_uses_zh_lang(self):
+        from citeguard.verification.document_report import render_document_audit_html
+
+        html = render_document_audit_html(
+            {
+                "document": {"path": "稿件.md"},
+                "claim_reviews": [{"sentence": "方法在所有任务上均优于基线【1】。"}],
+                "manuscript_summary": {"citation_count": 1, "in_text_count": 1, "incomplete_count": 1},
+            }
+        )
+        self.assertIn('lang="zh"', html)
 
 
 if __name__ == "__main__":
