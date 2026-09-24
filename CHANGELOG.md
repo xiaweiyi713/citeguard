@@ -3,8 +3,8 @@
 ## Unreleased
 
 - Markdown manuscript audits now link GB/T-style `【1】` markers and fullwidth
-  author-year citations, and HTML reports use `lang=zh` when the manuscript is
-  Chinese.
+  author-year citations, expand numeric ranges such as `[1-3]`, and render
+  Chinese HTML reports (`lang=zh`, Chinese first-screen copy).
 - Shipped the v1 agent output schema and evidence-object helpers with the
   public package, including optional `query_records` and evidence-span fields.
 - Query provenance now covers identifier lookup, title search, abstract fetch,

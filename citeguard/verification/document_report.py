@@ -288,6 +288,9 @@ def render_document_audit_html(payload: Mapping[str, Any]) -> str:
     in_text_count = int(summary.get("in_text_count") or 0)
     incomplete = int(summary.get("incomplete_count") or 0)
     categories = _as_mapping(summary.get("category_counts"))
+    lang = _html_lang(payload, reviews)
+    copy = _HTML_COPY[lang]
+    empty_evidence = html.escape(copy["no_evidence"])
     rows = []
     for item in reviews:
         sentence = html.escape(str(item.get("sentence") or item.get("locator") or ""))
@@ -300,12 +303,12 @@ def render_document_audit_html(payload: Mapping[str, Any]) -> str:
         rows.append(
             "<article class=\"review\">"
             f"<h3>{html.escape(str(item.get('category') or item.get('issue') or 'review'))}</h3>"
-            f"<p class=\"meta\">locator: {html.escape(str(item.get('locator') or ''))} · "
-            f"next: {html.escape(str(item.get('next_action') or ''))}</p>"
-            f"<p><strong>Citing sentence</strong> {sentence}</p>"
-            f"<p><strong>Problem</strong> {problem}</p>"
-            f"<p><strong>Evidence</strong> {evidence or 'None available in this audit.'}</p>"
-            f"<p><strong>Suggestion</strong> {suggestion}</p>"
+            f"<p class=\"meta\">{html.escape(copy['locator'])}: {html.escape(str(item.get('locator') or ''))} · "
+            f"{html.escape(copy['next'])}: {html.escape(str(item.get('next_action') or ''))}</p>"
+            f"<p><strong>{html.escape(copy['sentence'])}</strong> {sentence}</p>"
+            f"<p><strong>{html.escape(copy['problem'])}</strong> {problem}</p>"
+            f"<p><strong>{html.escape(copy['evidence'])}</strong> {evidence or empty_evidence}</p>"
+            f"<p><strong>{html.escape(copy['suggestion'])}</strong> {suggestion}</p>"
             f"<pre class=\"diff\">- {before}\n+ {after}</pre>"
             "</article>"
         )
@@ -317,33 +320,32 @@ def render_document_audit_html(payload: Mapping[str, Any]) -> str:
     top_items = "".join(
         f"<li>{html.escape(str(item.get('issue') or ''))}: {html.escape(str(item.get('sentence') or item.get('locator') or ''))}</li>"
         for item in top
-    ) or "<li>No claim-level issues queued.</li>"
-    lang = _html_lang(payload, reviews)
+    ) or f"<li>{html.escape(copy['empty_queue'])}</li>"
     return (
         f"<!DOCTYPE html>\n<html lang=\"{html.escape(lang)}\">\n<head>\n<meta charset=\"utf-8\">\n"
-        "<title>CiteGuard manuscript audit</title>\n<style>\n"
+        f"<title>{html.escape(copy['title'])}</title>\n<style>\n"
         "body{font-family:ui-sans-serif,system-ui,sans-serif;line-height:1.45;"
         "margin:1.5rem;max-width:52rem;color:#111}"
         "h1,h2,h3{line-height:1.2} .summary,.priority,.review{border:1px solid #ddd;"
         "padding:1rem;margin:1rem 0} pre.diff{white-space:pre-wrap;background:#f6f6f6;padding:.75rem}"
         ".meta{color:#555;font-size:.9rem}\n</style>\n</head>\n<body>\n"
-        "<h1>CiteGuard manuscript audit</h1>\n"
-        f"<p class=\"meta\">Source: {path}</p>\n"
+        f"<h1>{html.escape(copy['title'])}</h1>\n"
+        f"<p class=\"meta\">{html.escape(copy['source'])}: {path}</p>\n"
         "<section class=\"summary\">\n"
-        f"<p>Audited <strong>{citation_count}</strong> bibliography entries and "
-        f"<strong>{in_text_count}</strong> in-text citations. "
-        f"<strong>{incomplete}</strong> items still need review.</p>\n"
+        f"<p>{copy['audited_prefix']}<strong>{citation_count}</strong>{copy['audited_mid']}"
+        f"<strong>{in_text_count}</strong>{copy['audited_end']} "
+        f"<strong>{incomplete}</strong>{copy['need_review']}</p>\n"
         "<ul>"
-        f"<li>Metadata / identity: {metadata_n}</li>"
-        f"<li>Insufficient evidence: {evidence_n}</li>"
-        f"<li>Contradiction: {contradiction_n}</li>"
-        f"<li>Source unavailable: {source_n}</li>"
+        f"<li>{html.escape(copy['metadata'])}: {metadata_n}</li>"
+        f"<li>{html.escape(copy['insufficient'])}: {evidence_n}</li>"
+        f"<li>{html.escape(copy['contradiction'])}: {contradiction_n}</li>"
+        f"<li>{html.escape(copy['unavailable'])}: {source_n}</li>"
         "</ul>\n"
         "</section>\n"
-        "<section class=\"priority\">\n<h2>Check these first</h2>\n<ol>"
+        f"<section class=\"priority\">\n<h2>{html.escape(copy['priority'])}</h2>\n<ol>"
         f"{top_items}</ol>\n</section>\n"
-        "<section>\n<h2>Claim reviews</h2>\n"
-        f"{''.join(rows) or '<p>No in-text citations were linked in this file.</p>'}\n"
+        f"<section>\n<h2>{html.escape(copy['reviews'])}</h2>\n"
+        f"{''.join(rows) or '<p>' + html.escape(copy['no_links']) + '</p>'}\n"
         "</section>\n</body>\n</html>\n"
     )
 
@@ -414,6 +416,56 @@ def _rewrite_hint(sentence: str, issue: str, evidence_text: str) -> Dict[str, st
 
 def _unchanged(sentence: str) -> Dict[str, str]:
     return {"before": sentence, "after": sentence}
+
+
+_HTML_COPY = {
+    "en": {
+        "title": "CiteGuard manuscript audit",
+        "source": "Source",
+        "audited_prefix": "Audited ",
+        "audited_mid": " bibliography entries and ",
+        "audited_end": " in-text citations.",
+        "need_review": " items still need review.",
+        "metadata": "Metadata / identity",
+        "insufficient": "Insufficient evidence",
+        "contradiction": "Contradiction",
+        "unavailable": "Source unavailable",
+        "priority": "Check these first",
+        "reviews": "Claim reviews",
+        "empty_queue": "No claim-level issues queued.",
+        "no_links": "No in-text citations were linked in this file.",
+        "locator": "locator",
+        "next": "next",
+        "sentence": "Citing sentence",
+        "problem": "Problem",
+        "evidence": "Evidence",
+        "suggestion": "Suggestion",
+        "no_evidence": "None available in this audit.",
+    },
+    "zh": {
+        "title": "CiteGuard 文稿审计",
+        "source": "来源",
+        "audited_prefix": "已审计 ",
+        "audited_mid": " 条文献条目和 ",
+        "audited_end": " 处正文引用。",
+        "need_review": " 条仍需复核。",
+        "metadata": "元数据 / 身份",
+        "insufficient": "证据不足",
+        "contradiction": "矛盾",
+        "unavailable": "来源不可用",
+        "priority": "先看这些",
+        "reviews": "论点复核",
+        "empty_queue": "没有待复核的论点。",
+        "no_links": "这份文稿没有连上正文引用。",
+        "locator": "位置",
+        "next": "下一步",
+        "sentence": "引用句",
+        "problem": "问题",
+        "evidence": "证据",
+        "suggestion": "建议",
+        "no_evidence": "本次审计没有可用证据。",
+    },
+}
 
 
 def _html_lang(payload: Mapping[str, Any], reviews: Sequence[Mapping[str, Any]]) -> str:

@@ -15,8 +15,8 @@ LATEX_CITE_RE = re.compile(
     r"(?:\[[^\]]*\]){0,2}"
     r"\{(?P<keys>[^}]+)\}"
 )
-MD_NUMERIC_RE = re.compile(r"\[(\d+(?:\s*[,;]\s*\d+)*)\](?!\()")
-CN_NUMERIC_RE = re.compile(r"[【［](\d+(?:\s*[,;，、]\s*\d+)*)[】］]")
+MD_NUMERIC_RE = re.compile(r"\[(\d+(?:\s*[-–—,;]\s*\d+)*)\](?!\()")
+CN_NUMERIC_RE = re.compile(r"[【［](\d+(?:\s*[-–—,;，、]\s*\d+)*)[】］]")
 MD_PANDOC_RE = re.compile(r"\[@([A-Za-z][\w:.-]*(?:\s*;\s*@?[A-Za-z][\w:.-]*)*)\]")
 AUTHOR_YEAR_RE = re.compile(
     r"[（(](?P<authors>[^()（）]{1,80}?)[，,]\s*(?P<year>(?:19|20)\d{2}[a-z]?)[）)]"
@@ -217,10 +217,29 @@ def _marker_payload(
 
 def _split_cite_keys(raw: str, *, kind: str) -> List[str]:
     if kind == "numeric":
-        return [part.strip() for part in re.split(r"[,;，、]", raw) if part.strip()]
+        keys: List[str] = []
+        for part in re.split(r"[,;，、]", raw):
+            keys.extend(_expand_numeric_key(part.strip()))
+        return [key for key in keys if key]
     if kind == "pandoc_key":
         return [part.strip().lstrip("@") for part in raw.split(";") if part.strip()]
     return [part.strip() for part in raw.split(",") if part.strip()]
+
+
+_MAX_NUMERIC_RANGE = 30
+
+
+def _expand_numeric_key(part: str) -> List[str]:
+    if not part:
+        return []
+    ranged = re.fullmatch(r"(\d+)\s*[-–—]\s*(\d+)", part)
+    if not ranged:
+        return [part]
+    start = int(ranged.group(1))
+    end = int(ranged.group(2))
+    if end < start or end - start + 1 > _MAX_NUMERIC_RANGE:
+        return [part]
+    return [str(value) for value in range(start, end + 1)]
 
 
 def _context_for_offset(text: str, offset: int) -> Tuple[str, str, str, List[str]]:

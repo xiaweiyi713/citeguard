@@ -451,6 +451,8 @@ class DocumentAuditTests(unittest.TestCase):
             }
         )
         self.assertIn('lang="zh"', html)
+        self.assertIn("先看这些", html)
+        self.assertIn("元数据 / 身份", html)
 
 
 if __name__ == "__main__":

@@ -119,6 +119,21 @@ class InTextLinkTests(unittest.TestCase):
         self.assertEqual(payload["unlinked_markers"][0]["kind"], "author_year")
         self.assertEqual(payload["unlinked_markers"][0]["cite_key"], "Vaswani|2017")
 
+    def test_numeric_range_expands_to_each_bibliography_entry(self):
+        text = (
+            "Two papers introduced the architecture [1-2].\n\n"
+            "## References\n\n"
+            "1. Vaswani, A. Attention Is All You Need. 2017.\n"
+            "2. Devlin, J. BERT. 2019.\n"
+        )
+        bibliography = extract_citation_candidates(text, source_format="markdown")
+        payload = link_document_citations(
+            [{"path": "paper.md", "text": text, "source_format": "markdown"}],
+            bibliography,
+        )
+        self.assertEqual([item["cite_key"] for item in payload["body_links"]], ["1", "2"])
+        self.assertEqual(payload["unlinked_markers"], [])
+
 
 if __name__ == "__main__":
     unittest.main()
