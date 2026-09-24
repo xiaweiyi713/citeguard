@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Manuscript audits now present bibliography/identity fixes separately from
+  claim-wording rewrites (`family=metadata|claim`, distinct `suggested_fix.kind`
+  values). HTML reports split those queues instead of mixing them.
 - Hardened release operations with a deterministic CycloneDX SBOM, immutable
   GitHub Action pins, Dependabot coverage, strict dependency audits in both CI
   and `Publish`, and audited security floors for MCP/PDF runtime dependencies.

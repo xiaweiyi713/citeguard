@@ -440,6 +440,70 @@ class DocumentAuditTests(unittest.TestCase):
         self.assertTrue(any(item.get("issue") == "unlinked_citation" for item in payload["claim_reviews"]))
         self.assertTrue(payload["review_status"]["review_required"])
 
+    def test_metadata_fixes_and_claim_rewrites_are_presented_separately(self):
+        from citeguard.verification.document_report import render_document_audit_html
+
+        source = InMemoryMetadataSource(
+            [
+                CitationRecord(
+                    citation_id="attention",
+                    title="Attention Is All You Need",
+                    authors=["Ashish Vaswani"],
+                    year=2017,
+                    arxiv_id="1706.03762",
+                    abstract=(
+                        "We propose a new simple network architecture, the Transformer, "
+                        "based solely on attention mechanisms. Experiments on two machine "
+                        "translation tasks show these models to be superior in quality."
+                    ),
+                    source="fixture",
+                )
+            ]
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            document = root / "paper.md"
+            document.write_text(
+                "Transformer-based models outperform recurrence on all tasks [1]. "
+                "A missing paper is cited here [2].\n\n"
+                "## References\n\n"
+                "1. Vaswani, A. Attention Is All You Need. NeurIPS, 2017. arXiv:1706.03762.\n",
+                encoding="utf-8",
+            )
+            payload = audit_document(str(document), source=source, allowed_roots=[str(root)])
+
+        families = {item["issue"]: item["family"] for item in payload["claim_reviews"]}
+        self.assertEqual(families["unlinked_citation"], "metadata")
+        self.assertIn(
+            next(item["family"] for item in payload["claim_reviews"] if item["issue"] != "unlinked_citation"),
+            {"claim", "metadata"},
+        )
+        claim_reviews = [item for item in payload["claim_reviews"] if item["family"] == "claim"]
+        self.assertTrue(claim_reviews)
+        self.assertTrue(any(item["issue"] != "unlinked_citation" for item in claim_reviews))
+
+        unlinked_queue = [item for item in payload["review_queue"] if item.get("issue") == "unlinked_citation"]
+        self.assertTrue(unlinked_queue)
+        self.assertEqual(unlinked_queue[0]["suggested_fix"]["kind"], "resolve_citation_identity")
+        claim_queue = [
+            item
+            for item in payload["review_queue"]
+            if item.get("suggested_fix", {}).get("kind")
+            in {
+                "tighten_claim_or_inspect_full_text",
+                "inspect_full_text_or_find_stronger_citation",
+                "rewrite_claim_or_replace_evidence",
+            }
+        ]
+        self.assertTrue(claim_queue)
+        self.assertNotEqual(claim_queue[0]["suggested_fix"]["kind"], "claim_rewrite")
+
+        html = render_document_audit_html(payload)
+        self.assertIn("Bibliography / identity", html)
+        self.assertIn("Claim wording", html)
+        self.assertIn("missing paper is cited here", html)
+        self.assertIn("outperform recurrence on all tasks", html)
+
     def test_chinese_manuscript_html_uses_zh_lang(self):
         from citeguard.verification.document_report import render_document_audit_html
 
@@ -453,6 +517,8 @@ class DocumentAuditTests(unittest.TestCase):
         self.assertIn('lang="zh"', html)
         self.assertIn("先看这些", html)
         self.assertIn("元数据 / 身份", html)
+        self.assertIn("文献元数据 / 身份", html)
+        self.assertIn("论点改写", html)
 
 
 if __name__ == "__main__":

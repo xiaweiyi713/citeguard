@@ -35,6 +35,28 @@ ISSUE_CATEGORY = {
     "supported": "supported",
 }
 
+ISSUE_FAMILY = {
+    ISSUE_IDENTITY: "metadata",
+    ISSUE_UNLINKED: "metadata",
+    ISSUE_AMBIGUOUS: "metadata",
+    ISSUE_INSUFFICIENT_EVIDENCE: "claim",
+    ISSUE_SCOPE: "claim",
+    ISSUE_CONTRADICTION: "claim",
+    ISSUE_SOURCE_UNAVAILABLE: "source",
+    "supported": "claim",
+}
+
+FIX_KIND = {
+    ISSUE_IDENTITY: "resolve_citation_identity",
+    ISSUE_UNLINKED: "resolve_citation_identity",
+    ISSUE_AMBIGUOUS: "disambiguate_identifier",
+    ISSUE_INSUFFICIENT_EVIDENCE: "inspect_full_text_or_find_stronger_citation",
+    ISSUE_SCOPE: "tighten_claim_or_inspect_full_text",
+    ISSUE_CONTRADICTION: "rewrite_claim_or_replace_evidence",
+    ISSUE_SOURCE_UNAVAILABLE: "retry_or_check_source_health",
+    "supported": "keep_claim",
+}
+
 _OVERCLAIM_MARKERS = (
     "all tasks",
     "every task",
@@ -291,27 +313,7 @@ def render_document_audit_html(payload: Mapping[str, Any]) -> str:
     lang = _html_lang(payload, reviews)
     copy = _HTML_COPY[lang]
     empty_evidence = html.escape(copy["no_evidence"])
-    rows = []
-    for item in reviews:
-        sentence = html.escape(str(item.get("sentence") or item.get("locator") or ""))
-        evidence = html.escape(str(item.get("evidence_text") or ""))
-        problem = html.escape(str(item.get("problem") or item.get("issue") or ""))
-        suggestion = html.escape(str(item.get("suggestion") or ""))
-        rewritten = item.get("rewritten") if isinstance(item.get("rewritten"), Mapping) else {}
-        before = html.escape(str(rewritten.get("before") or item.get("sentence") or ""))
-        after = html.escape(str(rewritten.get("after") or ""))
-        rows.append(
-            "<article class=\"review\">"
-            f"<h3>{html.escape(str(item.get('category') or item.get('issue') or 'review'))}</h3>"
-            f"<p class=\"meta\">{html.escape(copy['locator'])}: {html.escape(str(item.get('locator') or ''))} · "
-            f"{html.escape(copy['next'])}: {html.escape(str(item.get('next_action') or ''))}</p>"
-            f"<p><strong>{html.escape(copy['sentence'])}</strong> {sentence}</p>"
-            f"<p><strong>{html.escape(copy['problem'])}</strong> {problem}</p>"
-            f"<p><strong>{html.escape(copy['evidence'])}</strong> {evidence or empty_evidence}</p>"
-            f"<p><strong>{html.escape(copy['suggestion'])}</strong> {suggestion}</p>"
-            f"<pre class=\"diff\">- {before}\n+ {after}</pre>"
-            "</article>"
-        )
+    grouped = _group_reviews_for_html(reviews)
     metadata_n = int(categories.get("metadata") or 0)
     evidence_n = int(categories.get("insufficient_evidence") or 0)
     contradiction_n = int(categories.get("contradiction") or 0)
@@ -321,6 +323,19 @@ def render_document_audit_html(payload: Mapping[str, Any]) -> str:
         f"<li>{html.escape(str(item.get('issue') or ''))}: {html.escape(str(item.get('sentence') or item.get('locator') or ''))}</li>"
         for item in top
     ) or f"<li>{html.escape(copy['empty_queue'])}</li>"
+    metadata_body = _html_review_articles(grouped["metadata"], copy, empty_evidence) or (
+        "<p>" + html.escape(copy["empty_queue"]) + "</p>"
+    )
+    claim_body = _html_review_articles(grouped["claim"], copy, empty_evidence) or (
+        "<p>" + html.escape(copy["empty_queue"]) + "</p>"
+    )
+    source_section = ""
+    if grouped["source"]:
+        source_section = (
+            f"<section>\n<h2>{html.escape(copy['source_reviews'])}</h2>\n"
+            f"{_html_review_articles(grouped['source'], copy, empty_evidence)}\n"
+            "</section>\n"
+        )
     return (
         f"<!DOCTYPE html>\n<html lang=\"{html.escape(lang)}\">\n<head>\n<meta charset=\"utf-8\">\n"
         f"<title>{html.escape(copy['title'])}</title>\n<style>\n"
@@ -344,9 +359,14 @@ def render_document_audit_html(payload: Mapping[str, Any]) -> str:
         "</section>\n"
         f"<section class=\"priority\">\n<h2>{html.escape(copy['priority'])}</h2>\n<ol>"
         f"{top_items}</ol>\n</section>\n"
-        f"<section>\n<h2>{html.escape(copy['reviews'])}</h2>\n"
-        f"{''.join(rows) or '<p>' + html.escape(copy['no_links']) + '</p>'}\n"
-        "</section>\n</body>\n</html>\n"
+        f"<section>\n<h2>{html.escape(copy['metadata_reviews'])}</h2>\n"
+        f"{metadata_body}\n"
+        "</section>\n"
+        f"<section>\n<h2>{html.escape(copy['claim_reviews'])}</h2>\n"
+        f"{claim_body}\n"
+        "</section>\n"
+        f"{source_section}"
+        "</body>\n</html>\n"
     )
 
 
@@ -432,6 +452,9 @@ _HTML_COPY = {
         "unavailable": "Source unavailable",
         "priority": "Check these first",
         "reviews": "Claim reviews",
+        "metadata_reviews": "Bibliography / identity",
+        "claim_reviews": "Claim wording",
+        "source_reviews": "Source unavailable",
         "empty_queue": "No claim-level issues queued.",
         "no_links": "No in-text citations were linked in this file.",
         "locator": "locator",
@@ -455,6 +478,9 @@ _HTML_COPY = {
         "unavailable": "来源不可用",
         "priority": "先看这些",
         "reviews": "论点复核",
+        "metadata_reviews": "文献元数据 / 身份",
+        "claim_reviews": "论点改写",
+        "source_reviews": "来源不可用",
         "empty_queue": "没有待复核的论点。",
         "no_links": "这份文稿没有连上正文引用。",
         "locator": "位置",
@@ -475,6 +501,51 @@ def _html_lang(payload: Mapping[str, Any], reviews: Sequence[Mapping[str, Any]])
     if re.search(r"[\u4e00-\u9fff]", blob):
         return "zh"
     return "en"
+
+
+def _review_family(item: Mapping[str, Any]) -> str:
+    family = str(item.get("family") or "")
+    if family in {"metadata", "claim", "source"}:
+        return family
+    return ISSUE_FAMILY.get(str(item.get("issue") or ""), "claim")
+
+
+def _group_reviews_for_html(reviews: Sequence[Mapping[str, Any]]) -> Dict[str, List[Mapping[str, Any]]]:
+    grouped: Dict[str, List[Mapping[str, Any]]] = {"metadata": [], "claim": [], "source": []}
+    for item in reviews:
+        grouped[_review_family(item)].append(item)
+    return grouped
+
+
+def _html_review_articles(
+    reviews: Sequence[Mapping[str, Any]],
+    copy: Mapping[str, str],
+    empty_evidence: str,
+) -> str:
+    rows: List[str] = []
+    for item in reviews:
+        sentence = html.escape(str(item.get("sentence") or item.get("locator") or ""))
+        evidence = html.escape(str(item.get("evidence_text") or ""))
+        problem = html.escape(str(item.get("problem") or item.get("issue") or ""))
+        suggestion = html.escape(str(item.get("suggestion") or ""))
+        rewritten = item.get("rewritten") if isinstance(item.get("rewritten"), Mapping) else {}
+        before = html.escape(str(rewritten.get("before") or item.get("sentence") or ""))
+        after = html.escape(str(rewritten.get("after") or ""))
+        article = (
+            '<article class="review">'
+            f"<h3>{html.escape(str(item.get('category') or item.get('issue') or 'review'))}</h3>"
+            f"<p class=\"meta\">{html.escape(copy['locator'])}: {html.escape(str(item.get('locator') or ''))} · "
+            f"{html.escape(copy['next'])}: {html.escape(str(item.get('next_action') or ''))}</p>"
+            f"<p><strong>{html.escape(copy['sentence'])}</strong> {sentence}</p>"
+            f"<p><strong>{html.escape(copy['problem'])}</strong> {problem}</p>"
+            f"<p><strong>{html.escape(copy['evidence'])}</strong> {evidence or empty_evidence}</p>"
+            f"<p><strong>{html.escape(copy['suggestion'])}</strong> {suggestion}</p>"
+        )
+        if before and after and before != after:
+            article += f'<pre class="diff">- {before}\n+ {after}</pre>'
+        article += "</article>"
+        rows.append(article)
+    return "".join(rows)
 
 
 def _claim_units(sentence: str) -> List[str]:
@@ -522,6 +593,7 @@ def _review_item(
         "suggestion": suggestion,
         "rewritten": dict(rewritten),
         "category": ISSUE_CATEGORY.get(issue, "other"),
+        "family": ISSUE_FAMILY.get(issue, "claim"),
         "requires_user_confirmation": True,
         "automatic_apply_allowed": False,
     }
@@ -546,7 +618,8 @@ def _claim_review_queue_items(reviews: Sequence[Mapping[str, Any]], *, start_ran
                 "locator": review.get("locator", ""),
                 "position": {"path": "", "line_start": None, "line_end": None},
                 "suggested_fix": {
-                    "kind": "claim_rewrite",
+                    "kind": FIX_KIND.get(str(review.get("issue") or ""), "resolve_citation_identity"),
+                    "family": ISSUE_FAMILY.get(str(review.get("issue") or ""), "claim"),
                     "before": (review.get("rewritten") or {}).get("before", ""),
                     "after": (review.get("rewritten") or {}).get("after", ""),
                     "note": review.get("suggestion", ""),

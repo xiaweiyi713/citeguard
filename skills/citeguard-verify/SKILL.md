@@ -73,8 +73,10 @@ Return `document_locator` and the suggestion-only `review_queue` so the user can
 inspect each issue in place. Prefer `manuscript.review_summary` for the
 first-screen answer: how many citations were audited, which items to check
 first, and whether the problem is metadata, insufficient evidence, contradiction,
-or a source outage. Use `manuscript.claim_reviews` for sentence-level rewrite
-suggestions and `body_links.unlinked_markers` for in-text marks that did not
+or a source outage. Split `manuscript.claim_reviews` by `family`: `metadata`
+for bibliography/identity fixes, `claim` for wording rewrites. HTML reports
+use the same split (`Bibliography / identity` vs `Claim wording`). Use
+`body_links.unlinked_markers` for in-text marks that did not
 bind to a bibliography entry. Markdown/LaTeX numeric markers include `[1]`,
 `【1】`, ranges such as `[1-3]`, and fullwidth author-year `（Author, 2017）`.
 Respect `edit_policy`: the tool never edits the
