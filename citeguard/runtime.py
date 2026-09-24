@@ -18,7 +18,9 @@ from citeguard.runtime_health import polite_access_status, source_health_status
 from citeguard.runtime_config import (
     CONTACT_REQUIRED_SOURCES,
     DEFAULT_MAILTO,
+    DEFAULT_SUPPORT_ENGINE,
     SOURCE_HEALTH_SCHEMA_VERSION,
+    SUPPORT_ENGINE_VALUES,
     STATUS_SCHEMA_VERSION,
     cache_path,
     cache_ttl,
@@ -33,6 +35,7 @@ from citeguard.runtime_config import (
     http_timeout,
     negative_cache_ttl,
     remote_evidence_enabled,
+    support_engine,
     source_budget,
 )
 from citeguard.verification import CachingMetadataSource, inspect_cache, stable_next_action
@@ -54,6 +57,7 @@ __all__ = [
     "remote_evidence_enabled",
     "source_budget",
     "source_health_status",
+    "support_engine",
 ]
 
 
@@ -227,10 +231,14 @@ def build_configured_support_backend(env: Optional[Mapping[str, str]] = None):
     from citeguard.verifiers import (
         DEFAULT_NLI_MODEL,
         DEFAULT_RERANKER_MODEL,
+        HeuristicSupportBackend,
         build_production_support_backend,
     )
 
     active_env = env or os.environ
+    requested_engine = support_engine(active_env)
+    if requested_engine == "heuristic":
+        return HeuristicSupportBackend()
     reranker = active_env.get("CITEGUARD_RERANKER_MODEL", DEFAULT_RERANKER_MODEL)
     nli = active_env.get("CITEGUARD_NLI_MODEL", DEFAULT_NLI_MODEL)
     return build_production_support_backend(
@@ -314,13 +322,24 @@ def environment_status(
 
     reranker = active_env.get("CITEGUARD_RERANKER_MODEL", "")
     nli = active_env.get("CITEGUARD_NLI_MODEL", "")
+    configured_support_engine = DEFAULT_SUPPORT_ENGINE
+    support_engine_error = ""
+    try:
+        configured_support_engine = support_engine(active_env)
+    except ValueError as exc:
+        support_engine_error = str(exc)
+        warnings.append(support_engine_error)
     model_dependencies = {
         "sentence_transformers": check_module("sentence_transformers"),
         "transformers": check_module("transformers"),
         "torch": check_module("torch"),
     }
     support_models = _support_model_status(
-        reranker_model=reranker, nli_model=nli, model_dependencies=model_dependencies
+        reranker_model=reranker,
+        nli_model=nli,
+        model_dependencies=model_dependencies,
+        requested_engine=configured_support_engine,
+        configuration_error=support_engine_error,
     )
     sdk_available = check_module("mcp") if mcp_sdk_available is None else mcp_sdk_available
     python_mcp_compatible = sys.version_info >= (3, 10)
@@ -343,9 +362,13 @@ def environment_status(
         warnings.append(
             "Remote landing-page evidence harvesting is disabled by default; set CITEGUARD_REMOTE_EVIDENCE=1 for deeper support checks."
         )
-    if not support_models["deep_models_available"]:
+    if not support_models["deep_models_available"] and configured_support_engine != "heuristic":
         warnings.append(
             "Deep claim-support models are not fully installed; support checks will fall back to heuristic mode."
+        )
+    if configured_support_engine == "heuristic":
+        warnings.append(
+            "CITEGUARD_SUPPORT_ENGINE=heuristic is active; support checks will not load model weights."
         )
     if configured_fixture_path:
         warnings.append(
@@ -392,6 +415,7 @@ def environment_status(
         "mailto_configured": contact_email_configured(active_env),
         "semantic_scholar_api_key_configured": bool(active_env.get("SEMANTIC_SCHOLAR_API_KEY")),
         "support_models": support_models,
+        "support_engine": configured_support_engine,
         "warnings": warnings,
     }
 
@@ -400,23 +424,41 @@ def _support_model_status(
     reranker_model: str,
     nli_model: str,
     model_dependencies: Mapping[str, bool],
+    requested_engine: str = DEFAULT_SUPPORT_ENGINE,
+    configuration_error: str = "",
 ) -> dict:
     missing = sorted(name for name, available in model_dependencies.items() if not available)
     deep_available = not missing
+    valid_engine = requested_engine in SUPPORT_ENGINE_VALUES
+    effective_engine = requested_engine if valid_engine else DEFAULT_SUPPORT_ENGINE
+    forced_heuristic = effective_engine == "heuristic"
+    if forced_heuristic:
+        next_action = "continue"
+        install_hint = ""
+    elif deep_available:
+        next_action = "continue"
+        install_hint = ""
+    else:
+        next_action = "install_or_configure_dependency"
+        install_hint = (
+            'Install published packages with `python -m pip install "citationguard[models]"`, '
+            'or use `python -m pip install -e ".[models]"` from a source checkout.'
+        )
+    if configuration_error:
+        next_action = "fix_configuration"
     return {
         "reranker_model": reranker_model or "default",
         "nli_model": nli_model or "default",
+        "requested_engine": requested_engine,
+        "effective_engine": effective_engine,
+        "model_loading_enabled": not forced_heuristic,
         "model_dependencies": dict(model_dependencies),
         "missing_dependencies": missing,
         "deep_models_available": deep_available,
-        "engine": "production_ensemble" if deep_available else "heuristic_fallback",
-        "next_action": stable_next_action("continue" if deep_available else "install_or_configure_dependency"),
-        "install_hint": (
-            ""
-            if deep_available
-            else 'Install published packages with `python -m pip install "citationguard[models]"`, '
-            'or use `python -m pip install -e ".[models]"` from a source checkout.'
-        ),
+        "engine": "heuristic_fallback" if forced_heuristic or not deep_available else "production_ensemble",
+        "next_action": stable_next_action(next_action),
+        "install_hint": install_hint,
+        "configuration_error": configuration_error,
         "warmup_command": "citeguard models warmup",
         "model_weights_loaded": False,
     }

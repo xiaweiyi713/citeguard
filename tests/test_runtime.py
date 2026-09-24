@@ -7,6 +7,7 @@ import unittest
 
 from citeguard.runtime import (
     SOURCE_HEALTH_SCHEMA_VERSION,
+    build_configured_support_backend,
     build_configured_source,
     cache_path,
     cache_ttl,
@@ -21,6 +22,7 @@ from citeguard.runtime import (
     negative_cache_ttl,
     source_budget,
     source_health_status,
+    support_engine,
 )
 from citeguard.verification import CachingMetadataSource, CitationRecord
 from citeguard.version import __version__
@@ -241,6 +243,44 @@ class RuntimeConfigTests(unittest.TestCase):
             "transformers": True,
             "torch": True,
         })
+        self.assertEqual(status["support_engine"], "auto")
+        self.assertEqual(support_models["requested_engine"], "auto")
+        self.assertEqual(support_models["effective_engine"], "auto")
+        self.assertTrue(support_models["model_loading_enabled"])
+        self.assertEqual(support_models["configuration_error"], "")
+
+    def test_support_engine_can_force_heuristic_without_model_loading(self):
+        env = {"CITEGUARD_SOURCES": "arxiv", "CITEGUARD_SUPPORT_ENGINE": "heuristic"}
+
+        self.assertEqual(support_engine(env), "heuristic")
+        backend = build_configured_support_backend(env)
+        status = environment_status(env=env, module_checker=lambda name: True)
+        support_models = status["support_models"]
+
+        self.assertEqual(backend.backend_name, "heuristic_support")
+        self.assertEqual(status["support_engine"], "heuristic")
+        self.assertEqual(support_models["requested_engine"], "heuristic")
+        self.assertEqual(support_models["effective_engine"], "heuristic")
+        self.assertEqual(support_models["engine"], "heuristic_fallback")
+        self.assertFalse(support_models["model_loading_enabled"])
+        self.assertEqual(support_models["next_action"], "continue")
+        self.assertEqual(support_models["install_hint"], "")
+        self.assertTrue(any("will not load model weights" in warning for warning in status["warnings"]))
+
+    def test_invalid_support_engine_is_visible_in_status_and_rejected_by_runtime(self):
+        env = {"CITEGUARD_SUPPORT_ENGINE": "turbo"}
+
+        with self.assertRaisesRegex(ValueError, "CITEGUARD_SUPPORT_ENGINE"):
+            support_engine(env)
+        with self.assertRaisesRegex(ValueError, "CITEGUARD_SUPPORT_ENGINE"):
+            build_configured_support_backend(env)
+
+        status = environment_status(env=env, module_checker=lambda name: False)
+        support_models = status["support_models"]
+        self.assertEqual(status["support_engine"], "auto")
+        self.assertIn("CITEGUARD_SUPPORT_ENGINE", support_models["configuration_error"])
+        self.assertEqual(support_models["next_action"], "fix_configuration")
+        self.assertTrue(any("CITEGUARD_SUPPORT_ENGINE" in warning for warning in status["warnings"]))
 
     def test_remote_evidence_can_be_enabled(self):
         env = {

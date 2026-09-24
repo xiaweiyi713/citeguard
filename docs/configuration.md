@@ -51,6 +51,7 @@ source-checkout fallback.
 | `CITEGUARD_EVIDENCE_TIMEOUT` | `2` | Positive integer timeout in seconds for optional remote evidence fetching. |
 | `CITEGUARD_ALLOWED_FILE_ROOTS` | server working directory | `os.pathsep`-separated roots from which MCP `full_text_file` evidence may be read. Symlinks are resolved before checking. |
 | `SEMANTIC_SCHOLAR_API_KEY` | empty | Optional Semantic Scholar API key. Status reports only whether it is configured. |
+| `CITEGUARD_SUPPORT_ENGINE` | `auto` | `auto` uses the production ensemble when dependencies are available; `heuristic` disables model loading; `production` requests deep mode but still reports an honest fallback when dependencies are missing. Invalid values are reported in `status.warnings` and reject support-backend construction. |
 | `CITEGUARD_RERANKER_MODEL` | packaged default | Optional reranker model name for deep claim-support mode. |
 | `CITEGUARD_NLI_MODEL` | packaged default | Optional NLI model name for deep claim-support mode. |
 

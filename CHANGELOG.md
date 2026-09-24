@@ -8,10 +8,6 @@
 - Added opt-in local-only runtime metrics with allowlisted aggregate events,
   bounded regular-file writes, symlink rejection, owner-only POSIX permissions,
   and no request/evidence content.
-- Added `CITEGUARD_SUPPORT_ENGINE=auto|heuristic|production`. The explicit
-  `heuristic` profile prevents support-model weight loading for offline, CI, and
-  low-resource MCP runs; `status` now reports the requested profile and whether
-  model loading is enabled. The MCP stdio smoke uses this deterministic profile.
 - Added a reproducible six-row claim-support verifier ablation matrix covering
   heuristic-only, reranker-only, NLI-only, heuristic+reranker, reranker+NLI,
   and the full ensemble. Unavailable or failed model rows are never reported as
@@ -78,6 +74,8 @@
   perturbation labels. This is not the 250-case dual-annotated campaign.
 - Pinned the current FastMCP integration to the compatible v1 SDK line
   (`mcp>=1.28,<2`). MCP SDK v2 remains an explicit future migration.
+- Added `CITEGUARD_SUPPORT_ENGINE=auto|heuristic|production` so offline and MCP
+  runs can force the lexical backend without loading model weights.
 
 ## 0.1.3 - 2026-07-15
 
