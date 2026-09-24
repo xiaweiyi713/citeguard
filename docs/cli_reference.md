@@ -287,7 +287,9 @@ The output has `tool=audit_document`, the extracted candidates, the ordinary
 citation audit, and a separate `review_queue`. Markdown and LaTeX bodies also
 produce `body_links`, `unlinked_markers`, and `claim_reviews`: citing sentence →
 citation marker → bibliography entry → identity result → available evidence →
-a suggestion-only rewrite hint. Unlinked markers stay visible instead of
+a suggestion-only rewrite hint. Numeric markers include `[1]`, `【1】`, and
+ranges such as `[1-3]`; Chinese HTML reports use Chinese first-screen copy.
+Unlinked markers stay visible instead of
 disappearing. `--html PATH` writes a local HTML report from the same JSON
 model; stdout remains JSON. Each candidate and queue item
 has a `document_locator`: `path#line-N` or `path#lines-N-M` for text files, and

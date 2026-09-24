@@ -75,7 +75,9 @@ first-screen answer: how many citations were audited, which items to check
 first, and whether the problem is metadata, insufficient evidence, contradiction,
 or a source outage. Use `manuscript.claim_reviews` for sentence-level rewrite
 suggestions and `body_links.unlinked_markers` for in-text marks that did not
-bind to a bibliography entry. Respect `edit_policy`: the tool never edits the
+bind to a bibliography entry. Markdown/LaTeX numeric markers include `[1]`,
+`【1】`, ranges such as `[1-3]`, and fullwidth author-year `（Author, 2017）`.
+Respect `edit_policy`: the tool never edits the
 document, every proposed change needs user confirmation, and `not_found` is not
 evidence of fabrication. Preserve `document.snapshot.digest`; treat the queue as
 stale and re-run the tool if the manuscript, a LaTeX include, or a bibliography

@@ -2,6 +2,43 @@
 
 ## Unreleased
 
+- Hardened release operations with a deterministic CycloneDX SBOM, immutable
+  GitHub Action pins, Dependabot coverage, strict dependency audits in both CI
+  and `Publish`, and audited security floors for MCP/PDF runtime dependencies.
+- Added opt-in local-only runtime metrics with allowlisted aggregate events,
+  bounded regular-file writes, symlink rejection, owner-only POSIX permissions,
+  and no request/evidence content.
+- Added `CITEGUARD_SUPPORT_ENGINE=auto|heuristic|production`. The explicit
+  `heuristic` profile prevents support-model weight loading for offline, CI, and
+  low-resource MCP runs; `status` now reports the requested profile and whether
+  model loading is enabled. The MCP stdio smoke uses this deterministic profile.
+- Added a reproducible six-row claim-support verifier ablation matrix covering
+  heuristic-only, reranker-only, NLI-only, heuristic+reranker, reranker+NLI,
+  and the full ensemble. Unavailable or failed model rows are never reported as
+  zero-score runs; completed rows retain strict false-support gates, standard
+  experiment artifacts, label-maturity provenance, CI coverage, and a release
+  gate contract.
+- Preserved complete source-response provenance across merged scholarly
+  records and counter-evidence retrieval. Query rows now expose responding
+  sources, candidate rows retain every merged source, and `top_k` truncation no
+  longer erases evidence that a source returned records.
+- Added stable false-support annotation-packet queues to support-eval review
+  plans and experiment manifests. Packets remain blinded review assignments,
+  not automatic label changes or permission to accept support predictions.
+- Added an additive document-audit `review_status` contract bound to the input
+  snapshot digest, so agents can branch on `clear/review_required` and a stable
+  next action without parsing queue prose.
+- Added a release gate for the checked-in real-source candidate dataset and
+  blinded packet, covering gold-label policy, immutable locators, packet id,
+  digest, and case-count integrity.
+- Hardened bounded document reads against replacement symlinks and concurrent
+  file-size/metadata changes, and made empty in-scope documents valid schema-
+  compliant clear audits.
+- LaTeX document audits now surface missing in-root includes and bibliography
+  files instead of silently presenting a partial manuscript as complete.
+
+## 0.1.4 - 2026-09-21
+
 - Markdown manuscript audits now link GB/T-style `【1】` markers and fullwidth
   author-year citations, expand numeric ranges such as `[1-3]`, and render
   Chinese HTML reports (`lang=zh`, Chinese first-screen copy).
@@ -39,43 +76,8 @@
   (`data/eval/support_hard_cases_v1.json`): 39 abstract-level cases plus 2
   multi-citation set cases, paper-grouped splits, and separate natural vs
   perturbation labels. This is not the 250-case dual-annotated campaign.
-- Hardened release operations with a deterministic CycloneDX SBOM, immutable
-  GitHub Action pins, Dependabot coverage, strict dependency audits in both CI
-  and `Publish`, and audited security floors for MCP/PDF runtime dependencies.
 - Pinned the current FastMCP integration to the compatible v1 SDK line
-  (`mcp>=1.28,<2`) and verified both wheel and sdist installs through a real
-  offline MCP stdio session. MCP SDK v2 remains an explicit future migration.
-- Added opt-in local-only runtime metrics with allowlisted aggregate events,
-  bounded regular-file writes, symlink rejection, owner-only POSIX permissions,
-  and no request/evidence content.
-- Added `CITEGUARD_SUPPORT_ENGINE=auto|heuristic|production`. The explicit
-  `heuristic` profile prevents support-model weight loading for offline, CI, and
-  low-resource MCP runs; `status` now reports the requested profile and whether
-  model loading is enabled. The MCP stdio smoke uses this deterministic profile.
-- Added a reproducible six-row claim-support verifier ablation matrix covering
-  heuristic-only, reranker-only, NLI-only, heuristic+reranker, reranker+NLI,
-  and the full ensemble. Unavailable or failed model rows are never reported as
-  zero-score runs; completed rows retain strict false-support gates, standard
-  experiment artifacts, label-maturity provenance, CI coverage, and a release
-  gate contract.
-- Preserved complete source-response provenance across merged scholarly
-  records and counter-evidence retrieval. Query rows now expose responding
-  sources, candidate rows retain every merged source, and `top_k` truncation no
-  longer erases evidence that a source returned records.
-- Added stable false-support annotation-packet queues to support-eval review
-  plans and experiment manifests. Packets remain blinded review assignments,
-  not automatic label changes or permission to accept support predictions.
-- Added an additive document-audit `review_status` contract bound to the input
-  snapshot digest, so agents can branch on `clear/review_required` and a stable
-  next action without parsing queue prose.
-- Added a release gate for the checked-in real-source candidate dataset and
-  blinded packet, covering gold-label policy, immutable locators, packet id,
-  digest, and case-count integrity.
-- Hardened bounded document reads against replacement symlinks and concurrent
-  file-size/metadata changes, and made empty in-scope documents valid schema-
-  compliant clear audits.
-- LaTeX document audits now surface missing in-root includes and bibliography
-  files instead of silently presenting a partial manuscript as complete.
+  (`mcp>=1.28,<2`). MCP SDK v2 remains an explicit future migration.
 
 ## 0.1.3 - 2026-07-15
 
