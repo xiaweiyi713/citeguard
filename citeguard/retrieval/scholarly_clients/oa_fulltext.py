@@ -11,10 +11,12 @@ pipeline can judge claims against the paper body instead of the abstract only.
 from __future__ import annotations
 
 import io
+import hashlib
 import urllib.request
 from dataclasses import replace
 from typing import Any, Dict, Optional, Tuple
 
+from citeguard.evidence import utc_now_iso
 from citeguard.graph import CitationRecord
 
 from .evidence import (
@@ -98,7 +100,7 @@ class OaFulltextFetcher:
                 detail = "pypdf_not_installed"
                 break
             if text.strip():
-                return self._chunk_report(text, pdf_url, content_type="pdf")
+                return self._chunk_report(text, pdf_url, content_type="pdf", open_access=open_access)
             detail = detail or "pdf_had_no_extractable_text"
 
         if landing_url:
@@ -115,13 +117,7 @@ class OaFulltextFetcher:
                     max_chunks=self.max_chunks,
                 )
                 if chunks:
-                    return {
-                        "status": FETCHED,
-                        "source_url": landing_url,
-                        "content_type": "html",
-                        "chunk_count": len(chunks),
-                        "chunks": chunks,
-                    }
+                    return self._chunks_report(chunks, landing_url, content_type="html", open_access=open_access)
                 detail = detail or "no_extractable_text"
             else:
                 detail = detail or fetch_detail
@@ -143,23 +139,69 @@ class OaFulltextFetcher:
             "detail": detail or "fetch_failed",
         }
 
-    def _chunk_report(self, text: str, source_url: str, content_type: str) -> Dict[str, Any]:
-        chunks = build_text_evidence_chunks(
+    def _chunk_report(
+        self,
+        text: str,
+        source_url: str,
+        content_type: str,
+        open_access: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        from citeguard.verification.fulltext import build_located_fulltext_chunks
+
+        chunks = build_located_fulltext_chunks(
             text,
-            "oa_full_text",
             source_url=source_url,
             source_name=self.source_name,
             max_chunks=self.max_chunks,
-            max_words=90,
         )
         if not chunks:
+            chunks = build_text_evidence_chunks(
+                text,
+                "oa_full_text",
+                source_url=source_url,
+                source_name=self.source_name,
+                max_chunks=self.max_chunks,
+                max_words=90,
+            )
+        if not chunks:
             return {"status": UNAVAILABLE, "source_url": source_url, "detail": "no_extractable_text"}
+        report = self._chunks_report(chunks, source_url, content_type=content_type, open_access=open_access)
+        report["snapshot_sha256"] = "sha256:" + hashlib.sha256(text.encode("utf-8")).hexdigest()
+        report["complete_paper_reviewed"] = False
+        return report
+
+    def _chunks_report(
+        self,
+        chunks: list,
+        source_url: str,
+        content_type: str,
+        open_access: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        provenance = self._evidence_provenance(open_access)
+        annotated = []
+        for index, chunk in enumerate(chunks, start=1):
+            item = dict(chunk)
+            item.update(provenance)
+            if not item.get("source_locator"):
+                item.update(_source_locator(source_url, item.get("source_field", ""), content_type, index))
+            annotated.append(item)
         return {
             "status": FETCHED,
             "source_url": source_url,
             "content_type": content_type,
-            "chunk_count": len(chunks),
-            "chunks": chunks,
+            "chunk_count": len(annotated),
+            **provenance,
+            "chunks": annotated,
+        }
+
+    def _evidence_provenance(self, open_access: Dict[str, Any]) -> Dict[str, str]:
+        license_value = str(open_access.get("license") or "")
+        return {
+            "retrieved_at": utc_now_iso(),
+            "retrieval_method": "oa_fulltext_fetch",
+            "license_status": "open_access_license_known" if license_value else "open_access_license_unknown",
+            "license": license_value,
+            "rights_basis": "source_marked_open_access",
         }
 
     def _fetch_bytes(self, url: str) -> Tuple[Optional[bytes], str]:
@@ -174,8 +216,30 @@ class OaFulltextFetcher:
         except Exception as exc:
             return None, exc.__class__.__name__
         if len(payload) > self.max_bytes:
-            payload = payload[: self.max_bytes]
+            return None, "payload_too_large"
         return payload, ""
+
+
+def _source_locator(source_url: str, source_field: object, content_type: str, chunk_index: int) -> Dict[str, object]:
+    """Return the most precise locator supported by the extraction path."""
+
+    field = str(source_field or "")
+    if content_type == "html":
+        for label in ("paragraph", "heading", "meta"):
+            prefix = f"oa_full_text_{label}_"
+            if field.startswith(prefix):
+                try:
+                    item_index = int(field[len(prefix) :].split("_", 1)[0])
+                except ValueError:
+                    break
+                locator: Dict[str, object] = {"source_locator": f"{source_url}#{label}-{item_index}"}
+                if label == "paragraph":
+                    locator["source_paragraph_start"] = item_index
+                    locator["source_paragraph_end"] = item_index
+                return locator
+    if content_type == "pdf":
+        return {"source_locator": f"{source_url}#extracted-text-chunk-{chunk_index}"}
+    return {"source_locator": f"{source_url}#chunk-{chunk_index}"}
 
 
 def _extract_pdf_text(payload: bytes) -> Optional[str]:

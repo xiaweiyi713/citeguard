@@ -89,7 +89,122 @@ def _result_summary(result: Dict[str, Any]) -> Dict[str, Any]:
     _add_support_set_policy_summary(summary, result)
     _add_support_label_gate_summary(summary, result)
     _add_support_calibration_summary(summary, result)
+    _add_support_ablation_summary(summary, result)
+    _add_retrieval_ablation_summary(summary, result)
     return summary
+
+
+def _add_support_ablation_summary(summary: Dict[str, Any], result: Dict[str, Any]) -> None:
+    if result.get("axis") != "verifier_components" or not isinstance(result.get("comparison"), list):
+        return
+    rows = [row for row in result["comparison"] if isinstance(row, dict)]
+    metric_fields = [
+        "accuracy",
+        "macro_precision",
+        "macro_recall",
+        "macro_f1",
+        "weighted_precision",
+        "weighted_recall",
+        "weighted_f1",
+        "supported_precision",
+        "supported_recall",
+        "supported_f1",
+        "false_support_rate",
+        "support_overcall_count",
+        "support_overcall_rate",
+        "abstention_rate",
+        "contradiction_recall",
+    ]
+    summary["support_ablation_axis"] = result.get("axis")
+    summary["support_ablation_requested"] = list(result.get("requested_ablations", []) or [])
+    summary["support_ablation_completed"] = list(result.get("completed_ablations", []) or [])
+    summary["support_ablation_unavailable"] = list(result.get("unavailable_ablations", []) or [])
+    summary["support_ablation_model_errors"] = list(result.get("model_error_ablations", []) or [])
+    summary["support_ablation_planned"] = list(result.get("planned_ablations", []) or [])
+    summary["support_ablation_matrix_complete"] = bool(result.get("matrix_complete"))
+    summary["support_ablation_quality_gates_ok"] = bool(result.get("quality_gates_ok"))
+    summary["support_ablation_status_by_name"] = {
+        str(row.get("ablation")): str(row.get("status", ""))
+        for row in rows
+        if row.get("ablation")
+    }
+    summary["support_ablation_metric_fields"] = metric_fields
+    summary["support_ablation_metrics"] = {
+        str(row.get("ablation")): {
+            field: row.get(field)
+            for field in metric_fields
+        }
+        for row in rows
+        if row.get("ablation") and row.get("status") == "completed"
+    }
+    provenance = result.get("label_provenance")
+    if not isinstance(provenance, dict):
+        provenance = {}
+    summary["support_ablation_label_human_reviewed"] = int(provenance.get("human_reviewed", 0) or 0)
+    summary["support_ablation_label_dual_annotated"] = int(provenance.get("dual_annotated", 0) or 0)
+    summary["support_ablation_label_published_benchmark"] = int(
+        provenance.get("published_benchmark", 0) or 0
+    )
+    summary["support_ablation_benchmark_claim_safe"] = bool(provenance.get("benchmark_claim_safe"))
+
+
+def _add_retrieval_ablation_summary(summary: Dict[str, Any], result: Dict[str, Any]) -> None:
+    if result.get("axis") != "retrieval_sources" or not isinstance(result.get("comparison"), list):
+        return
+    rows = [row for row in result["comparison"] if isinstance(row, dict)]
+    metric_fields = [
+        "accuracy",
+        "verified_precision",
+        "verified_recall",
+        "metadata_mismatch_precision",
+        "metadata_mismatch_recall",
+        "not_found_precision",
+        "not_found_recall",
+        "ambiguous_precision",
+        "ambiguous_recall",
+        "real_citation_not_found_rate",
+        "verified_not_found_rate",
+    ]
+    summary["retrieval_ablation_axis"] = result.get("axis")
+    summary["retrieval_ablation_mode"] = result.get("mode")
+    summary["retrieval_ablation_snapshot_id"] = result.get("snapshot_id")
+    summary["retrieval_ablation_deterministic"] = bool(result.get("deterministic"))
+    summary["retrieval_ablation_permanent_source_ranking_allowed"] = bool(
+        result.get("permanent_source_ranking_allowed")
+    )
+    summary["retrieval_ablation_requested_sources"] = list(result.get("requested_sources", []) or [])
+    summary["retrieval_ablation_completed_sources"] = list(result.get("completed_sources", []) or [])
+    summary["retrieval_ablation_source_limited_sources"] = list(
+        result.get("source_limited_sources", []) or []
+    )
+    summary["retrieval_ablation_unavailable_sources"] = list(result.get("unavailable_sources", []) or [])
+    summary["retrieval_ablation_matrix_complete"] = bool(result.get("matrix_complete"))
+    summary["retrieval_ablation_status_by_source"] = {
+        str(row.get("source")): str(row.get("status", ""))
+        for row in rows
+        if row.get("source")
+    }
+    summary["retrieval_ablation_regression_comparison_sources"] = [
+        str(row.get("source"))
+        for row in rows
+        if row.get("source") and row.get("regression_comparison_allowed")
+    ]
+    summary["retrieval_ablation_metric_fields"] = metric_fields
+    summary["retrieval_ablation_metrics"] = {
+        str(row.get("source")): {field: row.get(field) for field in metric_fields}
+        for row in rows
+        if row.get("source") and row.get("status") in {"completed", "source_limited"}
+    }
+    summary["retrieval_ablation_real_citation_not_found_case_ids"] = {
+        str(row.get("source")): list(row.get("real_citation_not_found_case_ids", []) or [])
+        for row in rows
+        if row.get("source")
+    }
+    summary["retrieval_ablation_source_limited_case_ids"] = {
+        str(row.get("source")): list(row.get("source_limited_case_ids", []) or [])
+        for row in rows
+        if row.get("source")
+    }
 
 
 def _add_support_release_summary(summary: Dict[str, Any], result: Dict[str, Any]) -> None:
@@ -147,6 +262,7 @@ def _add_support_release_summary(summary: Dict[str, Any], result: Dict[str, Any]
     summary["support_release_abstention_review_case_ids"] = list(abstention.get("review_case_ids", []) or [])
     summary["support_release_label_human_reviewed"] = int(label_maturity.get("human_reviewed", 0) or 0)
     summary["support_release_label_dual_annotated"] = int(label_maturity.get("dual_annotated", 0) or 0)
+    summary["support_release_label_dual_independent"] = int(label_maturity.get("dual_independent", 0) or 0)
     summary["support_release_label_published_benchmark"] = int(
         label_maturity.get("published_benchmark", 0) or 0
     )
@@ -405,6 +521,7 @@ def _add_support_label_gate_summary(summary: Dict[str, Any], result: Dict[str, A
     )
     summary["support_label_policy_boundary_unreviewed"] = int(metrics.get("policy_boundary_unreviewed", 0) or 0)
     summary["support_label_dual_annotated"] = int(metrics.get("dual_annotated", 0) or 0)
+    summary["support_label_dual_independent"] = int(metrics.get("dual_independent", 0) or 0)
     summary["support_label_unresolved_disagreements"] = int(metrics.get("unresolved_disagreements", 0) or 0)
     summary["support_label_supported_disagreements"] = int(metrics.get("supported_disagreements", 0) or 0)
     summary["support_label_raw_dual_agreement_rate"] = metrics.get("raw_dual_agreement_rate")

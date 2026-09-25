@@ -1,0 +1,103 @@
+{
+  "schema_version": 1,
+  "snapshot_id": "retrieval-source-adapter-fixture-v1",
+  "snapshot_policy": {
+    "mode": "maintainer-authored deterministic adapter snapshot",
+    "notes": "Real publication metadata is arranged into source-specific coverage fixtures for regression testing. This is not a captured live-source benchmark and must not be used for permanent source-quality rankings."
+  },
+  "snapshot_sources": [
+    "in_memory",
+    "openalex",
+    "crossref",
+    "arxiv",
+    "semantic_scholar"
+  ],
+  "multi_source_members": [
+    "openalex",
+    "crossref",
+    "arxiv",
+    "semantic_scholar"
+  ],
+  "records": [
+    {
+      "citation_id": "attention-is-all-you-need",
+      "title": "Attention Is All You Need",
+      "authors": ["Ashish Vaswani", "Noam Shazeer", "Niki Parmar"],
+      "year": 2017,
+      "venue": "NeurIPS",
+      "doi": "10.48550/arXiv.1706.03762",
+      "arxiv_id": "1706.03762",
+      "available_in": ["in_memory", "openalex", "arxiv", "semantic_scholar"]
+    },
+    {
+      "citation_id": "deep-residual-learning",
+      "title": "Deep Residual Learning for Image Recognition",
+      "authors": ["Kaiming He", "Xiangyu Zhang", "Shaoqing Ren", "Jian Sun"],
+      "year": 2016,
+      "venue": "CVPR",
+      "doi": "10.1109/CVPR.2016.90",
+      "arxiv_id": "1512.03385",
+      "available_in": ["in_memory", "openalex", "crossref", "arxiv", "semantic_scholar"]
+    },
+    {
+      "citation_id": "bert-pretraining",
+      "title": "BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding",
+      "authors": ["Jacob Devlin", "Ming-Wei Chang", "Kenton Lee", "Kristina Toutanova"],
+      "year": 2019,
+      "venue": "NAACL-HLT",
+      "doi": "10.18653/v1/N19-1423",
+      "arxiv_id": "1810.04805",
+      "available_in": ["in_memory", "openalex", "crossref", "arxiv", "semantic_scholar"]
+    }
+  ],
+  "cases": [
+    {
+      "id": "rs01",
+      "expected": "verified",
+      "fields": {"title": "Attention Is All You Need", "authors": ["Ashish Vaswani"], "year": 2017},
+      "note": "title metadata path"
+    },
+    {
+      "id": "rs02",
+      "expected": "verified",
+      "fields": {"arxiv_id": "1706.03762"},
+      "note": "arXiv authority path"
+    },
+    {
+      "id": "rs03",
+      "expected": "verified",
+      "fields": {"doi": "10.1109/CVPR.2016.90"},
+      "note": "Crossref DOI authority path"
+    },
+    {
+      "id": "rs04",
+      "expected": "verified",
+      "fields": {"title": "BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding", "authors": ["Jacob Devlin"], "year": 2019},
+      "note": "title and author path"
+    },
+    {
+      "id": "rs05",
+      "expected": "metadata_mismatch",
+      "fields": {"title": "Deep Residual Learning for Image Recognition", "authors": ["Kaiming He"], "year": 2020},
+      "note": "real paper with wrong year"
+    },
+    {
+      "id": "rs06",
+      "expected": "metadata_mismatch",
+      "fields": {"title": "BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding", "authors": ["Jane Fabricated"], "year": 2019},
+      "note": "real paper with wrong author"
+    },
+    {
+      "id": "rs07",
+      "expected": "not_found",
+      "fields": {"title": "Quantum Teleportation of Citation Hallucinations in Alpacas"},
+      "note": "fabricated title fixture; not_found is unresolved, not proof of fabrication"
+    },
+    {
+      "id": "rs08",
+      "expected": "not_found",
+      "fields": {"raw_text": "Nonexistent, J. (2099). Imaginary Methods for Imaginary Problems. Journal of Nowhere."},
+      "note": "fabricated free-text fixture; not_found is unresolved, not proof of fabrication"
+    }
+  ]
+}

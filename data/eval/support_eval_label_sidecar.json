@@ -17,7 +17,8 @@
       "case_type": "direct_support",
       "evidence_scope": "abstract",
       "split": "train",
-      "lang": "en"
+      "lang": "en",
+      "annotator_ids": []
     },
     {
       "case_id": "s02",
@@ -33,7 +34,8 @@
       "case_type": "direct_support",
       "evidence_scope": "abstract",
       "split": "dev",
-      "lang": "en"
+      "lang": "en",
+      "annotator_ids": []
     },
     {
       "case_id": "s03",
@@ -49,7 +51,8 @@
       "case_type": "unrelated_negative",
       "evidence_scope": "abstract",
       "split": "train",
-      "lang": "en"
+      "lang": "en",
+      "annotator_ids": []
     },
     {
       "case_id": "s04",
@@ -65,7 +68,8 @@
       "case_type": "contradiction",
       "evidence_scope": "abstract",
       "split": "train",
-      "lang": "en"
+      "lang": "en",
+      "annotator_ids": []
     },
     {
       "case_id": "s05",
@@ -81,7 +85,8 @@
       "case_type": "direct_support",
       "evidence_scope": "abstract",
       "split": "test",
-      "lang": "zh"
+      "lang": "zh",
+      "annotator_ids": []
     },
     {
       "case_id": "s06",
@@ -97,7 +102,8 @@
       "case_type": "unrelated_negative",
       "evidence_scope": "abstract",
       "split": "dev",
-      "lang": "zh"
+      "lang": "zh",
+      "annotator_ids": []
     },
     {
       "case_id": "s07",
@@ -113,7 +119,8 @@
       "case_type": "hard_negative",
       "evidence_scope": "abstract",
       "split": "train",
-      "lang": "en"
+      "lang": "en",
+      "annotator_ids": []
     },
     {
       "case_id": "s08",
@@ -129,7 +136,8 @@
       "case_type": "contradiction",
       "evidence_scope": "abstract",
       "split": "dev",
-      "lang": "en"
+      "lang": "en",
+      "annotator_ids": []
     },
     {
       "case_id": "s09",
@@ -145,7 +153,8 @@
       "case_type": "direct_support",
       "evidence_scope": "abstract",
       "split": "test",
-      "lang": "en"
+      "lang": "en",
+      "annotator_ids": []
     },
     {
       "case_id": "s10",
@@ -161,7 +170,8 @@
       "case_type": "contradiction",
       "evidence_scope": "abstract",
       "split": "test",
-      "lang": "zh"
+      "lang": "zh",
+      "annotator_ids": []
     },
     {
       "case_id": "s11",
@@ -177,7 +187,8 @@
       "case_type": "weak_support",
       "evidence_scope": "title",
       "split": "train",
-      "lang": "en"
+      "lang": "en",
+      "annotator_ids": []
     },
     {
       "case_id": "s12",
@@ -193,7 +204,8 @@
       "case_type": "direct_support",
       "evidence_scope": "metadata_snippet",
       "split": "dev",
-      "lang": "en"
+      "lang": "en",
+      "annotator_ids": []
     },
     {
       "case_id": "s13",
@@ -209,7 +221,8 @@
       "case_type": "full_text_required",
       "evidence_scope": "abstract",
       "split": "dev",
-      "lang": "en"
+      "lang": "en",
+      "annotator_ids": []
     },
     {
       "case_id": "s14",
@@ -225,7 +238,8 @@
       "case_type": "direct_support",
       "evidence_scope": "full_text",
       "split": "dev",
-      "lang": "en"
+      "lang": "en",
+      "annotator_ids": []
     },
     {
       "case_id": "s15",
@@ -241,7 +255,8 @@
       "case_type": "hard_negative",
       "evidence_scope": "abstract",
       "split": "train",
-      "lang": "en"
+      "lang": "en",
+      "annotator_ids": []
     },
     {
       "case_id": "s16",
@@ -257,7 +272,8 @@
       "case_type": "contradiction",
       "evidence_scope": "abstract",
       "split": "test",
-      "lang": "en"
+      "lang": "en",
+      "annotator_ids": []
     },
     {
       "case_id": "s17",
@@ -273,7 +289,8 @@
       "case_type": "full_text_required",
       "evidence_scope": "abstract",
       "split": "test",
-      "lang": "en"
+      "lang": "en",
+      "annotator_ids": []
     },
     {
       "case_id": "s18",
@@ -289,7 +306,8 @@
       "case_type": "weak_support",
       "evidence_scope": "title",
       "split": "test",
-      "lang": "zh"
+      "lang": "zh",
+      "annotator_ids": []
     },
     {
       "case_id": "s19",
@@ -305,7 +323,8 @@
       "case_type": "weak_support",
       "evidence_scope": "title",
       "split": "train",
-      "lang": "en"
+      "lang": "en",
+      "annotator_ids": []
     },
     {
       "case_id": "s20",
@@ -321,7 +340,8 @@
       "case_type": "full_text_required",
       "evidence_scope": "abstract",
       "split": "train",
-      "lang": "en"
+      "lang": "en",
+      "annotator_ids": []
     },
     {
       "case_id": "s21",
@@ -337,7 +357,8 @@
       "case_type": "contradiction",
       "evidence_scope": "abstract",
       "split": "dev",
-      "lang": "zh"
+      "lang": "zh",
+      "annotator_ids": []
     },
     {
       "case_id": "s22",
@@ -353,7 +374,8 @@
       "case_type": "contradiction",
       "evidence_scope": "metadata_snippet",
       "split": "dev",
-      "lang": "en"
+      "lang": "en",
+      "annotator_ids": []
     },
     {
       "case_id": "s23",
@@ -369,7 +391,8 @@
       "case_type": "hard_negative",
       "evidence_scope": "abstract",
       "split": "test",
-      "lang": "en"
+      "lang": "en",
+      "annotator_ids": []
     },
     {
       "case_id": "s24",
@@ -385,7 +408,8 @@
       "case_type": "direct_support",
       "evidence_scope": "metadata_snippet",
       "split": "test",
-      "lang": "en"
+      "lang": "en",
+      "annotator_ids": []
     },
     {
       "case_id": "s25",
@@ -401,7 +425,8 @@
       "case_type": "weak_support",
       "evidence_scope": "title",
       "split": "train",
-      "lang": "en"
+      "lang": "en",
+      "annotator_ids": []
     },
     {
       "case_id": "s26",
@@ -417,7 +442,8 @@
       "case_type": "metadata_only",
       "evidence_scope": "metadata",
       "split": "dev",
-      "lang": "en"
+      "lang": "en",
+      "annotator_ids": []
     },
     {
       "case_id": "s27",
@@ -433,7 +459,8 @@
       "case_type": "contradiction",
       "evidence_scope": "mixed_with_full_text",
       "split": "test",
-      "lang": "en"
+      "lang": "en",
+      "annotator_ids": []
     },
     {
       "case_id": "s28",
@@ -449,7 +476,8 @@
       "case_type": "hard_negative",
       "evidence_scope": "abstract",
       "split": "train",
-      "lang": "en"
+      "lang": "en",
+      "annotator_ids": []
     },
     {
       "case_id": "s29",
@@ -465,7 +493,8 @@
       "case_type": "contradiction",
       "evidence_scope": "metadata_snippet",
       "split": "dev",
-      "lang": "en"
+      "lang": "en",
+      "annotator_ids": []
     },
     {
       "case_id": "s30",
@@ -481,7 +510,8 @@
       "case_type": "full_text_required",
       "evidence_scope": "abstract",
       "split": "test",
-      "lang": "en"
+      "lang": "en",
+      "annotator_ids": []
     },
     {
       "case_id": "s31",
@@ -497,7 +527,8 @@
       "case_type": "hard_negative",
       "evidence_scope": "abstract",
       "split": "test",
-      "lang": "en"
+      "lang": "en",
+      "annotator_ids": []
     },
     {
       "case_id": "s32",
@@ -513,7 +544,8 @@
       "case_type": "contradiction",
       "evidence_scope": "metadata_snippet",
       "split": "dev",
-      "lang": "en"
+      "lang": "en",
+      "annotator_ids": []
     },
     {
       "case_id": "s33",
@@ -529,7 +561,8 @@
       "case_type": "full_text_required",
       "evidence_scope": "abstract",
       "split": "train",
-      "lang": "en"
+      "lang": "en",
+      "annotator_ids": []
     },
     {
       "case_id": "s34",
@@ -545,7 +578,8 @@
       "case_type": "contradiction",
       "evidence_scope": "metadata_snippet",
       "split": "train",
-      "lang": "zh"
+      "lang": "zh",
+      "annotator_ids": []
     },
     {
       "case_id": "s35",
@@ -561,7 +595,8 @@
       "case_type": "hard_negative",
       "evidence_scope": "metadata_snippet",
       "split": "dev",
-      "lang": "zh"
+      "lang": "zh",
+      "annotator_ids": []
     },
     {
       "case_id": "s36",
@@ -577,7 +612,8 @@
       "case_type": "contradiction",
       "evidence_scope": "metadata_snippet",
       "split": "test",
-      "lang": "zh"
+      "lang": "zh",
+      "annotator_ids": []
     },
     {
       "case_id": "s37",
@@ -593,7 +629,8 @@
       "case_type": "hard_negative",
       "evidence_scope": "abstract",
       "split": "train",
-      "lang": "en"
+      "lang": "en",
+      "annotator_ids": []
     },
     {
       "case_id": "s38",
@@ -609,7 +646,8 @@
       "case_type": "full_text_required",
       "evidence_scope": "abstract",
       "split": "dev",
-      "lang": "en"
+      "lang": "en",
+      "annotator_ids": []
     },
     {
       "case_id": "s39",
@@ -625,7 +663,8 @@
       "case_type": "contradiction",
       "evidence_scope": "metadata_snippet",
       "split": "test",
-      "lang": "zh"
+      "lang": "zh",
+      "annotator_ids": []
     },
     {
       "case_id": "s40",
@@ -641,7 +680,8 @@
       "case_type": "hard_negative",
       "evidence_scope": "abstract",
       "split": "dev",
-      "lang": "zh"
+      "lang": "zh",
+      "annotator_ids": []
     },
     {
       "case_id": "s41",
@@ -657,7 +697,8 @@
       "case_type": "hard_negative",
       "evidence_scope": "mixed",
       "split": "test",
-      "lang": "en"
+      "lang": "en",
+      "annotator_ids": []
     },
     {
       "case_id": "s42",
@@ -673,7 +714,8 @@
       "case_type": "contradiction",
       "evidence_scope": "metadata_snippet",
       "split": "dev",
-      "lang": "en"
+      "lang": "en",
+      "annotator_ids": []
     },
     {
       "case_id": "s43",
@@ -689,7 +731,8 @@
       "case_type": "full_text_required",
       "evidence_scope": "abstract",
       "split": "test",
-      "lang": "zh"
+      "lang": "zh",
+      "annotator_ids": []
     },
     {
       "case_id": "s44",
@@ -705,7 +748,8 @@
       "case_type": "contradiction",
       "evidence_scope": "metadata_snippet",
       "split": "train",
-      "lang": "zh"
+      "lang": "zh",
+      "annotator_ids": []
     },
     {
       "case_id": "s45",
@@ -721,7 +765,8 @@
       "case_type": "hard_negative",
       "evidence_scope": "abstract",
       "split": "test",
-      "lang": "en"
+      "lang": "en",
+      "annotator_ids": []
     },
     {
       "case_id": "s46",
@@ -737,7 +782,8 @@
       "case_type": "hard_negative",
       "evidence_scope": "abstract",
       "split": "test",
-      "lang": "en"
+      "lang": "en",
+      "annotator_ids": []
     },
     {
       "case_id": "s47",
@@ -753,7 +799,8 @@
       "case_type": "hard_negative",
       "evidence_scope": "abstract",
       "split": "test",
-      "lang": "en"
+      "lang": "en",
+      "annotator_ids": []
     },
     {
       "case_id": "s48",
@@ -769,7 +816,8 @@
       "case_type": "contradiction",
       "evidence_scope": "abstract",
       "split": "test",
-      "lang": "en"
+      "lang": "en",
+      "annotator_ids": []
     },
     {
       "case_id": "ss01",
@@ -785,7 +833,8 @@
       "case_type": "set_aggregation",
       "evidence_scope": "mixed",
       "split": "dev",
-      "lang": "en"
+      "lang": "en",
+      "annotator_ids": []
     },
     {
       "case_id": "ss02",
@@ -801,7 +850,8 @@
       "case_type": "weak_set_boundary",
       "evidence_scope": "mixed",
       "split": "test",
-      "lang": "en"
+      "lang": "en",
+      "annotator_ids": []
     },
     {
       "case_id": "ss03",
@@ -817,7 +867,8 @@
       "case_type": "contradiction_set",
       "evidence_scope": "mixed",
       "split": "test",
-      "lang": "en"
+      "lang": "en",
+      "annotator_ids": []
     },
     {
       "case_id": "ss04",
@@ -833,7 +884,8 @@
       "case_type": "set_aggregation",
       "evidence_scope": "mixed",
       "split": "train",
-      "lang": "en"
+      "lang": "en",
+      "annotator_ids": []
     },
     {
       "case_id": "ss05",
@@ -849,7 +901,8 @@
       "case_type": "weak_set_boundary",
       "evidence_scope": "mixed",
       "split": "test",
-      "lang": "zh"
+      "lang": "zh",
+      "annotator_ids": []
     },
     {
       "case_id": "ss06",
@@ -865,7 +918,8 @@
       "case_type": "set_aggregation",
       "evidence_scope": "mixed",
       "split": "dev",
-      "lang": "en"
+      "lang": "en",
+      "annotator_ids": []
     }
   ]
 }

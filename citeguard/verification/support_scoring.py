@@ -194,11 +194,16 @@ def assess_support(
         assessment = backend.assess(claim, span["text"])
         assessed.append((span, assessment, _extract_nli(assessment)))
     model_failures = _model_failure_details_from_assessed(assessed)
+    supporting_spans, conflicting_spans = _partition_evidence_spans(claim, assessed)
 
     def emit(result: SupportResult) -> SupportResult:
-        if not model_failures:
-            return result
-        return replace(result, model_failure_details=model_failures)
+        updates: Dict[str, Any] = {
+            "supporting_spans": supporting_spans,
+            "conflicting_spans": conflicting_spans,
+        }
+        if model_failures:
+            updates["model_failure_details"] = model_failures
+        return replace(result, **updates)
 
     engine = "ensemble" if any(nli for _, _, nli in assessed) else "heuristic"
     best_score_span, best_score_assessment, _ = max(
@@ -408,17 +413,21 @@ def _result(verdict, confidence, claim, span, nli, engine, resolution, explanati
         }.get(evidence_scope, "The abstract")
         explanation = scope_subject + explanation[len("The abstract") :]
     adjusted_explanation = explanation + _support_source_failure_note(resolution)
-    return SupportResult(
-        verdict=verdict,
-        confidence=adjusted_confidence,
-        claim=claim,
-        evidence={
+    evidence = dict(span)
+    evidence.update(
+        {
             "text": span["text"],
             "source_field": span["source_field"],
             "source_url": span.get("source_url", ""),
             "evidence_scope": evidence_scope,
             "source_name": source_name,
-        },
+        }
+    )
+    return SupportResult(
+        verdict=verdict,
+        confidence=adjusted_confidence,
+        claim=claim,
+        evidence=evidence,
         nli_scores=nli,
         engine=engine,
         resolution=resolution,
@@ -426,6 +435,29 @@ def _result(verdict, confidence, claim, span, nli, engine, resolution, explanati
         lang=lang,
         evidence_scope=evidence_scope,
     )
+
+
+def _partition_evidence_spans(claim: str, assessed: List[tuple]) -> tuple:
+    supporting: List[Dict[str, Any]] = []
+    conflicting: List[Dict[str, Any]] = []
+    for span, assessment, nli in assessed:
+        item = {
+            "text": span.get("text", ""),
+            "source_field": span.get("source_field", ""),
+            "source_url": span.get("source_url", ""),
+            "evidence_scope": span.get("evidence_scope", ""),
+            "region": span.get("region", ""),
+            "char_start": span.get("char_start"),
+            "char_end": span.get("char_end"),
+            "score": round(float(assessment.score), 4),
+        }
+        contra = _explicit_contradiction_confidence(claim, str(span.get("text", "")), assessment.score)
+        nli_contra = float((nli or {}).get("contradiction") or 0.0)
+        if contra >= 0.58 or nli_contra >= 0.55:
+            conflicting.append(item)
+        elif assessment.passed or assessment.score >= 0.18:
+            supporting.append(item)
+    return supporting[:5], conflicting[:5]
 
 
 def _support_confidence_with_source_failures(confidence: float, resolution: Dict[str, Any]) -> float:

@@ -191,6 +191,49 @@ class MCPServerHelperTests(unittest.TestCase):
         self.assertEqual(report["error"]["code"], "file_error")
         self.assertEqual(report["error"]["details"]["errno"], errno.EACCES)
 
+    def test_audit_document_tool_returns_locators_without_modifying_allowed_file(self):
+        record = CitationRecord(
+            citation_id="attention",
+            title="Attention Is All You Need",
+            authors=["Ashish Vaswani"],
+            year=2017,
+            venue="NeurIPS",
+            arxiv_id="1706.03762",
+            source="fixture",
+        )
+        source = InMemoryMetadataSource([record])
+        with tempfile.NamedTemporaryFile("w", encoding="utf-8", suffix=".md", delete=False) as handle:
+            handle.write(
+                "## References\n\n"
+                "1. Vaswani, A. Attention Is All You Need. NeurIPS, 2017. arXiv:1706.03762.\n"
+            )
+            path = handle.name
+        try:
+            with mock.patch.object(self.server, "_SOURCE", None), mock.patch.object(
+                self.server, "_build_source", return_value=source
+            ):
+                report = self.server.audit_document_tool(path)
+        finally:
+            os.unlink(path)
+
+        self.assertTrue(report["ok"])
+        self.assertEqual(report["contract_version"], "v1")
+        self.assertEqual(report["tool"], "audit_document")
+        self.assertEqual(report["extraction"]["candidate_count"], 1)
+        self.assertEqual(report["audit"]["summary"]["verified"], 1)
+        self.assertFalse(report["edit_policy"]["document_modified"])
+        self.assertTrue(report["document"]["snapshot"]["digest"].startswith("sha256:"))
+        self.assertEqual(report["document"]["snapshot"]["file_count"], 1)
+        self.assertTrue(report["document"]["dependencies"]["complete"])
+        self.assertEqual(report["document"]["dependencies"]["missing"], [])
+        self.assertEqual(report["review_status"]["state"], "clear")
+        self.assertFalse(report["review_status"]["review_required"])
+        self.assertEqual(
+            report["review_status"]["snapshot_digest"],
+            report["document"]["snapshot"]["digest"],
+        )
+        self.assertTrue(report["extraction"]["candidates"][0]["document_locator"].endswith("#line-3"))
+
     def test_full_text_file_and_batches_have_hard_size_limits(self):
         with tempfile.NamedTemporaryFile("wb", suffix=".txt", delete=False) as handle:
             handle.truncate(self.server.MAX_EVIDENCE_FILE_BYTES + 1)
@@ -855,7 +898,9 @@ class MCPServerHelperTests(unittest.TestCase):
         self.assertEqual(report["candidates"][0]["signal"], "explicit_contradiction_cue")
         self.assertIn("improvement_negation", {item["role"] for item in report["query_plan"]})
         self.assertEqual(len(report["query_results"]), len(report["queries"]))
+        self.assertTrue(all(item["sources_responded"] == ["memory"] for item in report["query_results"]))
         self.assertIn("improvement_negation", report["candidates"][0]["matched_query_roles"])
+        self.assertEqual(report["candidates"][0]["sources"], ["memory"])
         self.assertEqual(report["review_summary"]["candidate_count"], 1)
         self.assertEqual(report["review_summary"]["signal_counts"]["explicit_contradiction_cue"], 1)
         self.assertEqual(report["review_summary"]["top_candidate"]["signal"], "explicit_contradiction_cue")
@@ -868,6 +913,7 @@ class MCPServerHelperTests(unittest.TestCase):
             [0],
         )
         self.assertEqual(report["review_summary"]["policy"], "review_leads_not_contradiction_verdicts")
+        self.assertEqual(report["sources_responded"], ["memory"])
         self.assertIn("review leads", report["interpretation"])
 
     def test_search_counterevidence_tool_returns_source_outage_safety_candidates(self):
@@ -1042,6 +1088,24 @@ class MCPServerHelperTests(unittest.TestCase):
         self.assertEqual(retry_result["error"]["details"]["source"], "environment")
         self.assertEqual(retry_result["error"]["details"]["expected"], "non-negative integer")
         self.assertEqual(retry_result["error"]["details"]["received"], "-1")
+
+        source = InMemoryMetadataSource(
+            [CitationRecord(citation_id="fixture", title="GhostCite", abstract="Citation validity.", source="fixture")]
+        )
+        with mock.patch.dict(os.environ, {"CITEGUARD_SUPPORT_ENGINE": "turbo"}, clear=False), mock.patch.object(
+            self.server, "_source", return_value=source
+        ):
+            support_result = self.server.check_claim_support_tool(
+                claim="GhostCite studies citation validity.",
+                title="GhostCite",
+            )
+
+        self.assertFalse(support_result["ok"])
+        self.assertEqual(support_result["error"]["code"], "invalid_input")
+        self.assertEqual(support_result["error"]["details"]["tool"], "check_claim_support_tool")
+        self.assertEqual(support_result["error"]["details"]["field"], "CITEGUARD_SUPPORT_ENGINE")
+        self.assertEqual(support_result["error"]["details"]["source"], "environment")
+        self.assertEqual(support_result["error"]["details"]["received"], "turbo")
 
     def test_mcp_batch_tools_return_structured_errors_for_invalid_items(self):
         invalid_citations_shape = self.server.audit_citations_tool(citations="not a list")

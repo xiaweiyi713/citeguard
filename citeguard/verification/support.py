@@ -3,19 +3,22 @@
 from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from enum import Enum
 from typing import Any, Dict, List, Optional, Sequence, Union
 from urllib.parse import urlparse
 
+from citeguard.evidence import build_evidence_object
 from citeguard.graph import CitationRecord
 from citeguard.retrieval.scholarly_clients.base import MetadataSource
+from citeguard.retrieval.scholarly_clients.utils import record_source_names
 from citeguard.verifiers import SupportBackend
 from citeguard.verifiers.support_backends import split_evidence_text
 
 from .models import (
     available_sources,
     batch_execution_summary,
+    build_score_semantics,
     canonical_metadata_quality,
     classify_source_failure_mode,
     input_source_provenance,
@@ -49,6 +52,24 @@ class SupportDecisionPolicy:
 
 
 DEFAULT_SUPPORT_POLICY = SupportDecisionPolicy()
+_EVIDENCE_PROVENANCE_FIELDS = (
+    "source_locator",
+    "source_path",
+    "source_line_start",
+    "source_line_end",
+    "source_paragraph_start",
+    "source_paragraph_end",
+    "char_start",
+    "char_end",
+    "retrieved_at",
+    "retrieval_method",
+    "retrieval_source",
+    "license_status",
+    "license",
+    "license_value",
+    "rights_basis",
+    "content_type",
+)
 
 
 @dataclass(frozen=True)
@@ -58,7 +79,7 @@ class SupportResult:
     verdict: SupportVerdict
     confidence: float
     claim: str
-    evidence: Dict[str, str]
+    evidence: Dict[str, Any]
     nli_scores: Optional[Dict[str, float]]
     engine: str
     resolution: Dict[str, Any]
@@ -66,13 +87,12 @@ class SupportResult:
     lang: str = ""
     evidence_scope: str = "abstract"
     model_failure_details: List[Dict[str, Any]] = field(default_factory=list)
+    supporting_spans: List[Dict[str, Any]] = field(default_factory=list)
+    conflicting_spans: List[Dict[str, Any]] = field(default_factory=list)
+    query_records: List[Dict[str, Any]] = field(default_factory=list)
 
     def to_dict(self) -> Dict[str, Any]:
-        evidence = dict(self.evidence)
-        evidence.setdefault(
-            "source_name",
-            infer_evidence_source_name(evidence.get("source_field", ""), evidence.get("source_url", "")),
-        )
+        evidence = _public_evidence(self.evidence)
         data = {
             "verdict": self.verdict.value,
             "confidence": round(self.confidence, 4),
@@ -89,6 +109,15 @@ class SupportResult:
             "lang": self.lang,
             "model_failure_details": [dict(item) for item in self.model_failure_details],
             "next_action": _support_next_action(self.verdict, self.resolution),
+            "scores": build_score_semantics(
+                primary="support_judgment",
+                identity_match_score=_support_identity_match_score(self.resolution),
+                support_score=self.confidence,
+                evidence_coverage=self.evidence_scope or "none",
+            ),
+            "supporting_spans": [dict(item) for item in self.supporting_spans],
+            "conflicting_spans": [dict(item) for item in self.conflicting_spans],
+            "query_records": [dict(item) for item in self.query_records],
         }
         data.update(_counterevidence_review_for_result(self))
         return data
@@ -202,7 +231,7 @@ class ClaimSupportSetResult:
     claim: str
     summary: Dict[str, int]
     results: List[SupportResult]
-    evidence: List[Dict[str, str]]
+    evidence: List[Dict[str, Any]]
     explanation: str
     risk: str
     recommendation: str
@@ -221,7 +250,7 @@ class ClaimSupportSetResult:
             "claim": self.claim,
             "summary": dict(self.summary),
             "results": [result.to_dict() for result in self.results],
-            "evidence": [dict(item) for item in self.evidence],
+            "evidence": [_public_evidence(item) for item in self.evidence],
             "explanation": self.explanation,
             "risk": self.risk,
             "recommendation": self.recommendation,
@@ -250,11 +279,11 @@ class ClaimSupportSetResult:
         return data
 
 
-def build_evidence_spans(citation: CitationRecord) -> List[Dict[str, str]]:
+def build_evidence_spans(citation: CitationRecord) -> List[Dict[str, Any]]:
     """Candidate evidence spans: title + abstract sentences + metadata chunks."""
 
-    spans: List[Dict[str, str]] = []
-    seen = set()
+    spans: List[Dict[str, Any]] = []
+    seen: Dict[str, int] = {}
 
     def add(
         text: str,
@@ -262,22 +291,33 @@ def build_evidence_spans(citation: CitationRecord) -> List[Dict[str, str]]:
         source_url: str = "",
         evidence_scope: str = "",
         source_name: str = "",
+        provenance: Optional[Dict[str, Any]] = None,
     ) -> None:
         cleaned = " ".join(str(text).split())
-        if not cleaned or cleaned in seen:
+        if not cleaned:
             return
-        seen.add(cleaned)
         scope = evidence_scope or infer_evidence_scope(source_field, source_url)
         source = source_name or infer_evidence_source_name(source_field, source_url)
-        spans.append(
-            {
-                "text": cleaned,
-                "source_field": source_field,
-                "source_url": source_url,
-                "evidence_scope": scope,
-                "source_name": source,
-            }
-        )
+        span: Dict[str, Any] = {
+            "text": cleaned,
+            "source_field": source_field,
+            "source_url": source_url,
+            "evidence_scope": scope,
+            "source_name": source,
+        }
+        if provenance:
+            for key in _EVIDENCE_PROVENANCE_FIELDS:
+                value = provenance.get(key)
+                if value not in (None, ""):
+                    span[key] = value
+        seen_key = cleaned.casefold()
+        existing_index = seen.get(seen_key)
+        if existing_index is not None:
+            if _evidence_span_priority(span) > _evidence_span_priority(spans[existing_index]):
+                spans[existing_index] = span
+            return
+        seen[seen_key] = len(spans)
+        spans.append(span)
 
     citation_source_name = _citation_record_source_name(citation.source)
     if citation.title:
@@ -298,10 +338,34 @@ def build_evidence_spans(citation: CitationRecord) -> List[Dict[str, str]]:
                 str(chunk.get("source_url", "")),
                 str(chunk.get("evidence_scope", "")),
                 str(chunk.get("source_name", "")),
+                provenance=chunk,
             )
         else:
             add(str(chunk), f"metadata_chunk_{index}")
     return spans
+
+
+def _public_evidence(evidence: Dict[str, Any]) -> Dict[str, Any]:
+    """Preserve legacy fields while attaching the canonical evidence object."""
+
+    public = dict(evidence)
+    public.setdefault(
+        "source_name",
+        infer_evidence_source_name(public.get("source_field", ""), public.get("source_url", "")),
+    )
+    public["evidence_object"] = build_evidence_object(public)
+    return public
+
+
+def _evidence_span_priority(span: Dict[str, Any]) -> int:
+    scope = str(span.get("evidence_scope", "") or "")
+    return {
+        "full_text": 50,
+        "metadata_snippet": 40,
+        "abstract": 30,
+        "metadata": 20,
+        "title": 10,
+    }.get(scope, 0)
 
 
 def _citation_record_source_name(source: str) -> str:
@@ -397,47 +461,57 @@ def check_claim_support(
                 f"Could not locate the paper in {', '.join(checked)}; one or more sources failed, "
                 "so support is inconclusive. Retry later or provide a DOI/arXiv id."
             )
-        return SupportResult(
-            verdict=SupportVerdict.INSUFFICIENT_EVIDENCE,
-            confidence=0.0,
-            claim=claim,
-            evidence={
-                "text": "",
-                "source_field": "none",
-                "source_url": "",
-                "evidence_scope": "none",
-                "source_name": "none",
-            },
-            nli_scores=None,
-            engine="none",
-            resolution={"verdict": "not_found", **failure_status, **input_source_provenance(candidate)},
-            explanation=explanation,
-            lang=lang,
-            evidence_scope="none",
+        return _finish_support_result(
+            SupportResult(
+                verdict=SupportVerdict.INSUFFICIENT_EVIDENCE,
+                confidence=0.0,
+                claim=claim,
+                evidence={
+                    "text": "",
+                    "source_field": "none",
+                    "source_url": "",
+                    "evidence_scope": "none",
+                    "source_name": "none",
+                },
+                nli_scores=None,
+                engine="none",
+                resolution={"verdict": "not_found", **failure_status, **input_source_provenance(candidate)},
+                explanation=explanation,
+                lang=lang,
+                evidence_scope="none",
+            ),
+            candidate=candidate,
+            outcome=outcome,
+            oa_fulltext_fetcher=oa_fulltext_fetcher,
         )
     if outcome.ambiguous:
-        return SupportResult(
-            verdict=SupportVerdict.INSUFFICIENT_EVIDENCE,
-            confidence=0.0,
-            claim=claim,
-            evidence={
-                "text": "",
-                "source_field": "none",
-                "source_url": "",
-                "evidence_scope": "none",
-                "source_name": "none",
-            },
-            nli_scores=None,
-            engine="none",
-            resolution={
-                "verdict": "ambiguous",
-                **failure_status,
-                "recovery_code": "ambiguous_citation",
-                **input_source_provenance(candidate),
-            },
-            explanation="The citation is ambiguous; provide a DOI/arXiv id before judging support.",
-            lang=lang,
-            evidence_scope="none",
+        return _finish_support_result(
+            SupportResult(
+                verdict=SupportVerdict.INSUFFICIENT_EVIDENCE,
+                confidence=0.0,
+                claim=claim,
+                evidence={
+                    "text": "",
+                    "source_field": "none",
+                    "source_url": "",
+                    "evidence_scope": "none",
+                    "source_name": "none",
+                },
+                nli_scores=None,
+                engine="none",
+                resolution={
+                    "verdict": "ambiguous",
+                    **failure_status,
+                    "recovery_code": "ambiguous_citation",
+                    **input_source_provenance(candidate),
+                },
+                explanation="The citation is ambiguous; provide a DOI/arXiv id before judging support.",
+                lang=lang,
+                evidence_scope="none",
+            ),
+            candidate=candidate,
+            outcome=outcome,
+            oa_fulltext_fetcher=oa_fulltext_fetcher,
         )
     resolution = {
         "verdict": "matched",
@@ -455,7 +529,87 @@ def check_claim_support(
         oa_report = resolved.metadata.get("oa_fulltext")
         if isinstance(oa_report, dict):
             resolution["oa_fulltext"] = {key: value for key, value in oa_report.items() if key != "chunks"}
-    return assess_support(claim, resolved, backend=backend, policy=policy, lang=lang, resolution=resolution)
+    return _finish_support_result(
+        assess_support(claim, resolved, backend=backend, policy=policy, lang=lang, resolution=resolution),
+        candidate=candidate,
+        outcome=outcome,
+        resolved=resolved,
+        oa_fulltext_fetcher=oa_fulltext_fetcher,
+    )
+
+
+def _support_identity_match_score(resolution: Dict[str, Any]) -> Optional[float]:
+    verdict = str(resolution.get("verdict") or "")
+    if verdict == "matched":
+        return 1.0
+    if verdict == "not_found":
+        return 0.0
+    return None
+
+
+def _query_record(
+    citation_id: str,
+    source: str,
+    operation: str,
+    status: str,
+    reason_code: str,
+) -> Dict[str, Any]:
+    return {
+        "citation_id": citation_id,
+        "source": source,
+        "operation": operation,
+        "status": status,
+        "reason_code": reason_code,
+    }
+
+
+def _evidence_query_records(
+    candidate: CitationRecord,
+    resolved: Optional[CitationRecord],
+    oa_fulltext_fetcher: Optional[Any],
+) -> List[Dict[str, Any]]:
+    citation_id = candidate.citation_id
+    sources = record_source_names(resolved) if resolved is not None else []
+    source_name = sources[0] if sources else (candidate.source or "metadata")
+    records = []
+    if resolved is not None and str(resolved.abstract or "").strip():
+        records.append(_query_record(citation_id, source_name, "abstract_fetch", "hit", "ok"))
+    else:
+        records.append(_query_record(citation_id, source_name, "abstract_fetch", "miss", "no_match"))
+    if oa_fulltext_fetcher is None:
+        return records
+    report = {}
+    if resolved is not None:
+        raw = resolved.metadata.get("oa_fulltext")
+        if isinstance(raw, dict):
+            report = raw
+    oa_status = str(report.get("status") or "unavailable")
+    mapping = {
+        "fetched": ("hit", "ok"),
+        "skipped_not_open_access": ("miss", "no_match"),
+        "skipped_no_oa_url": ("miss", "no_match"),
+        "skipped_blocked_url": ("failed", "source_unavailable"),
+        "pdf_dependency_missing": ("unavailable", "unconfigured"),
+        "unavailable": ("failed", "source_unavailable"),
+    }
+    status, reason = mapping.get(oa_status, ("failed", "source_unavailable"))
+    records.append(_query_record(citation_id, "openalex_oa", "fulltext_fetch", status, reason))
+    return records
+
+
+def _finish_support_result(
+    result: SupportResult,
+    *,
+    candidate: CitationRecord,
+    outcome: Any,
+    resolved: Optional[CitationRecord] = None,
+    oa_fulltext_fetcher: Optional[Any] = None,
+) -> SupportResult:
+    records = [dict(item) for item in getattr(outcome, "query_records", [])]
+    records.extend(_evidence_query_records(candidate, resolved, oa_fulltext_fetcher))
+    resolution = dict(result.resolution)
+    resolution["query_records"] = records
+    return replace(result, query_records=records, resolution=resolution)
 
 
 def _resolution_source_status(outcome) -> Dict[str, Any]:

@@ -45,6 +45,7 @@ def compute_support_label_sidecar_gate(
     reviewed_by_language = _int_mapping(high_risk_review.get("reviewed_by_language", {}))
     unreviewed_by_language = _int_mapping(high_risk_review.get("unreviewed_by_language", {}))
     dual_annotated = _safe_int(maturity.get("dual_annotated_count", 0))
+    dual_independent = _safe_int(maturity.get("dual_independent_count", 0))
     unresolved_disagreements = _safe_int(maturity.get("unresolved_disagreement_count", 0))
     supported_disagreements = _safe_int(maturity.get("supported_disagreement_count", 0))
     raw_dual_agreement_rate = maturity.get("raw_dual_agreement_rate")
@@ -198,6 +199,11 @@ def compute_support_label_sidecar_gate(
             ),
             "policy_boundary_unreviewed_case_ids": list(policy_boundary_review.get("unreviewed_case_ids", [])),
             "dual_annotated": dual_annotated,
+            "dual_independent": dual_independent,
+            "dual_independent_case_ids": list(maturity.get("dual_independent_case_ids", [])),
+            "dual_annotation_missing_independent_ids_case_ids": list(
+                maturity.get("dual_annotation_missing_independent_ids_case_ids", [])
+            ),
             "unresolved_disagreements": unresolved_disagreements,
             "supported_disagreements": supported_disagreements,
             "raw_dual_agreement_rate": raw_dual_agreement_rate,

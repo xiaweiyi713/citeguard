@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
+from citeguard.evidence import local_file_evidence_provenance, utc_now_iso
 from citeguard.errors import error_payload, runtime_config_error_details
 from citeguard.verification import parse_citation
 
@@ -276,13 +277,15 @@ def _batch_limit_error(tool: str, field: str, received: int, index: Optional[int
     )
 
 
-def _chunk(text: str, source_field: str, evidence_scope: str, source_url: str = "") -> dict:
-    return {
+def _chunk(text: str, source_field: str, evidence_scope: str, source_url: str = "", **provenance: Any) -> dict:
+    chunk = {
         "text": text,
         "source_field": source_field,
         "source_url": source_url,
         "evidence_scope": evidence_scope,
     }
+    chunk.update({key: value for key, value in provenance.items() if value not in (None, "")})
+    return chunk
 
 
 def _normalize_evidence_chunks(
@@ -312,9 +315,25 @@ def _normalize_evidence_chunks(
             chunk = dict(value)
             chunk.setdefault("source_field", f"user_full_text_excerpt_{chunk_index}")
             chunk["evidence_scope"] = "full_text"
+            chunk.setdefault("source_name", "user_provided")
+            chunk.setdefault("source_locator", f"user-provided://full-text-{chunk_index}")
+            chunk.setdefault("retrieval_method", "user_provided")
+            chunk.setdefault("license_status", "user_provided_not_verified")
+            chunk.setdefault("rights_basis", "user_provided")
             chunks.append(chunk)
         elif str(value).strip():
-            chunks.append(_chunk(str(value), f"user_full_text_excerpt_{chunk_index}", "full_text"))
+            chunks.append(
+                _chunk(
+                    str(value),
+                    f"user_full_text_excerpt_{chunk_index}",
+                    "full_text",
+                    source_name="user_provided",
+                    source_locator=f"user-provided://full-text-{chunk_index}",
+                    retrieval_method="user_provided",
+                    license_status="user_provided_not_verified",
+                    rights_basis="user_provided",
+                )
+            )
     for file_index, path in enumerate(_as_list(item.get("full_text_file")), start=1):
         if not isinstance(path, str):
             raise MCPInputError(
@@ -323,7 +342,19 @@ def _normalize_evidence_chunks(
             )
         text = _read_evidence_file(path, tool=tool, index=index, citation_index=citation_index)
         if text.strip():
-            chunks.append(_chunk(text, f"user_full_text_file_{file_index}", "full_text"))
+            chunks.append(
+                _chunk(
+                    text,
+                    f"user_full_text_file_{file_index}",
+                    "full_text",
+                    source_name="user_provided",
+                    **local_file_evidence_provenance(path, text),
+                    retrieved_at=utc_now_iso(),
+                    retrieval_method="local_file_read",
+                    license_status="user_provided_not_verified",
+                    rights_basis="user_provided",
+                )
+            )
     if len(chunks) > MAX_EVIDENCE_CHUNKS:
         details = _input_details(tool=tool, index=index, field="evidence_chunks", citation_index=citation_index)
         details.update({"max_items": MAX_EVIDENCE_CHUNKS, "received_items": len(chunks)})

@@ -160,10 +160,28 @@ Verify with a `workflow_dispatch` run of `Publish` before relying on a tag push.
   `scripts/smoke_mcp.py` still covers initialize, list_tools, fixture-backed
   verification, caller-provided full-text support evidence, full-text
   support-audit evidence, status, high-risk filtering, and structured errors.
+  The release gate also validates the checked-in gold-free real-source candidate
+  dataset and v3 blinded packet, including opaque review IDs, absence of
+  internal case types and splits, packet id/digest, hidden candidate metadata
+  digest, case count, and every immutable source locator. A packet integrity
+  failure blocks the release summary even though an incomplete human benchmark remains a visible,
+  non-blocking research status.
+  When real reviewers return completed candidate packets, run
+  `scripts/promote_human_support_candidates.py` in preview mode, inspect the
+  report and source rights with a separate curator, then use `--approve` to
+  stage new dataset and sidecar files. A promotion report does not establish
+  human-benchmark readiness; run the campaign audit and freeze the held-out
+  test split before making that claim.
+  For reviewer disagreements, archive the private content-bound packet from
+  `scripts/prepare_human_support_adjudications.py`; only a third-party decision
+  with a rationale may enter the sidecar as `dual_annotator_adjudicated`.
   The `ci_mcp_smoke_contract` gate checks that `.github/workflows/ci.yml`
   contains a Python 3.10+ `mcp-smoke` job that installs `.[mcp]`, runs the MCP
   extra install smoke, runs the required MCP stdio release gate, and executes
   `python scripts/smoke_mcp.py --require-sdk`.
+  Confirm the published metadata retains `mcp>=1.28,<2`: the current server
+  implements the v1 FastMCP API, so an MCP SDK v2 migration needs its own
+  compatibility work and acceptance run.
   The MCP stdio gate records
   `mcp_stdio_smoke` in the same machine-readable summary; with
   `--require-mcp-stdio-smoke`, missing MCP dependencies or Python <3.10 are
@@ -198,6 +216,17 @@ Verify with a `workflow_dispatch` run of `Publish` before relying on a tag push.
   accidental legacy-package dependencies, package archive cleanliness, and
   documented stable error codes.
 
+- Run the v1 agent-contract compatibility suite:
+
+  ```bash
+  python -m unittest tests.test_agent_output_contract -v
+  ```
+
+  It validates the bundled `citeguard/contracts/v1/agent-output.schema.json`,
+  checks that `contract_version: "v1"` is present on real CLI/MCP success and
+  error responses, and prevents the frozen verdict, risk, evidence-scope, and
+  next-action vocabularies from drifting.
+
 - Run the package install smoke from a fresh virtual environment:
 
   ```bash
@@ -221,6 +250,20 @@ Verify with a `workflow_dispatch` run of `Publish` before relying on a tag push.
   `citeguard status` and `python -m citeguard status` without live scholarly
   queries, and drives the installed stdio server through an offline MCP client.
 
+- Run the supply-chain gate in a release environment:
+
+  ```bash
+  python -m pip install -e ".[models,pdf]" "pip-audit>=2.7,<3"
+  python -m pip_audit --strict
+  python scripts/generate_sbom.py --output citationguard.cdx.json
+  ```
+
+  `Publish` repeats this strict audit after installing the supported runtime
+  extras and before it builds or uploads distributions. The SBOM is a
+  deterministic declaration artifact; it does not replace the resolved
+  dependency audit. Confirm the metadata retains `cryptography>=50` and
+  `pypdf>=6.14.2,<7`; changing either floor requires a fresh clean audit.
+
 - Run offline verification eval:
 
   ```bash
@@ -238,6 +281,8 @@ Verify with a `workflow_dispatch` run of `Publish` before relying on a tag push.
   python scripts/eval_support.py --split test --backend heuristic --quality-gate --review-queue-only --review-queue-limit 5
   python scripts/eval_support.py --report --split test --quality-gate --output-dir experiments --run-id support-release-smoke
   python scripts/compare_support_baselines.py --split test --min-high-risk-reviewed-by-language zh=0 --output-dir experiments --run-id support-baselines-release
+  python scripts/run_support_ablations.py --split test --plan-only
+  python scripts/run_support_ablations.py --split test --output-dir experiments --run-id support-verifier-ablation-release
   python scripts/prepare_support_label_sidecar.py --existing-sidecar data/eval/support_eval_label_sidecar.json --annotation-packet --priority high --split test --limit 3 --output experiments/support-label-packet-high-risk-test-batch1.json --instructions-output experiments/support-label-packet-high-risk-test-batch1-instructions.md
   python scripts/prepare_support_label_sidecar.py --existing-sidecar data/eval/support_eval_label_sidecar.json --merge-annotation-packet experiments/completed-support-label-packet-high-risk-test-batch1.json --output data/eval/support_eval_label_sidecar.merged.json
   python scripts/prepare_support_label_sidecar.py --existing-sidecar data/eval/support_eval_label_sidecar.merged.json --apply-adjudications experiments/resolved-support-label-adjudications.json --output data/eval/support_eval_label_sidecar.adjudicated.json
@@ -323,6 +368,15 @@ Verify with a `workflow_dispatch` run of `Publish` before relying on a tag push.
   the seed benchmark, use `scripts/calibrate_support.py --support-eval-dataset
   data/eval/support_eval.json --split dev`; `dev` is the default split so
   threshold tuning does not touch held-out `test` results. The
+  release gate also records `support_verifier_ablation`: it validates the
+  stable `heuristic_only`, `reranker_only`, `nli_only`,
+  `heuristic_reranker`, `reranker_nli`, and `full_ensemble` plan, then writes
+  one offline heuristic artifact. Rows remain explicitly `completed`,
+  `unavailable`, `model_error`, or `planned`; a missing model is never rendered
+  as a zero-score experiment. The manifest must expose
+  `support_ablation_status_by_name`, `support_ablation_metrics`, and
+  `support_ablation_benchmark_claim_safe=false` while the sidecar still has no
+  qualifying human review.
   label-sidecar gate should report coverage `1.0`. Zero human thresholds are
   valid for an automated ordinary software release, but they do not establish
   human-reviewed benchmark readiness. The tag-publish workflow runs the
@@ -382,14 +436,35 @@ Verify with a `workflow_dispatch` run of `Publish` before relying on a tag push.
 - Review support-label provenance maturity before making benchmark claims:
 
   First validate the trigger dataset and score decisions collected from the
-  actual target agent/client. The lexical release-contract smoke is not model
+  actual target agent/client. The suite-validation release gate is not model
   or client trigger-quality evidence.
 
   ```bash
   python scripts/eval_skill_trigger.py --validate-only
-  python scripts/eval_skill_trigger.py --write-template /tmp/citeguard-trigger-predictions.json
-  python scripts/eval_skill_trigger.py --predictions /tmp/citeguard-trigger-predictions.json
+  python -m citeguard skill status --client codex --scope user
+  python -m citeguard skill status --client claude --scope user
+  python -m citeguard skill status --client cursor --scope user
+  python scripts/eval_skill_trigger.py --client codex --skill-path /absolute/path/to/codex/citeguard-verify --write-template /tmp/citeguard-trigger-codex.json
+  python scripts/eval_skill_trigger.py --client claude --skill-path /absolute/path/to/claude/citeguard-verify --write-template /tmp/citeguard-trigger-claude.json
+  python scripts/eval_skill_trigger.py --client cursor --skill-path /absolute/path/to/cursor/citeguard-verify --write-template /tmp/citeguard-trigger-cursor.json
+  python scripts/eval_skill_trigger.py --client codex --skill-path /absolute/path/to/codex/citeguard-verify --require-run-metadata --predictions /tmp/citeguard-trigger-codex.json
+  python scripts/eval_skill_trigger.py --client claude --skill-path /absolute/path/to/claude/citeguard-verify --require-run-metadata --predictions /tmp/citeguard-trigger-claude.json
+  python scripts/eval_skill_trigger.py --client cursor --skill-path /absolute/path/to/cursor/citeguard-verify --require-run-metadata --predictions /tmp/citeguard-trigger-cursor.json
   ```
+
+  Replace each placeholder with the exact installed Skill directory that the
+  target client loaded. If that directory cannot be inspected on the target
+  machine, pass the recorded `sha256:` value with
+  `--expected-skill-digest`. Completed prediction files must preserve every
+  `request_digest`, record the actual client version, installed Skill digest,
+  suite id, checked-in dataset digest, and collection time. A valid suite or
+  template is not a forward-test result: do not report client trigger quality
+  until the three independently collected prediction artifacts have passed
+  their gates.
+  The published
+  `citeguard/contracts/v1/skill-trigger-prediction.schema.json` distinguishes
+  a label-blind capture template from a completed client artifact; the
+  evaluator additionally verifies the request, dataset, and Skill digests.
 
   ```bash
   python scripts/prepare_support_label_sidecar.py --existing-sidecar data/eval/support_eval_label_sidecar.json --audit
@@ -398,6 +473,9 @@ Verify with a `workflow_dispatch` run of `Publish` before relying on a tag push.
   python scripts/prepare_support_label_sidecar.py --existing-sidecar data/eval/support_eval_label_sidecar.json --annotation-packet --priority high --split test --unreviewed-only --limit-per-language 1 --limit-per-case-type 1 --limit-per-evidence-scope 1 --output experiments/support-label-packet-high-risk-test-balanced-batch1.json --instructions-output experiments/support-label-packet-high-risk-test-balanced-batch1-instructions.md
   python scripts/prepare_support_label_sidecar.py --existing-sidecar data/eval/support_eval_label_sidecar.json --merge-annotation-packet experiments/completed-support-label-packet-high-risk-test-batch1.json --output data/eval/support_eval_label_sidecar.merged.json
   python scripts/prepare_support_label_sidecar.py --existing-sidecar data/eval/support_eval_label_sidecar.merged.json --apply-adjudications experiments/resolved-support-label-adjudications.json --output data/eval/support_eval_label_sidecar.adjudicated.json
+  python scripts/audit_human_support_benchmark.py --label-sidecar data/eval/support_eval_label_sidecar.adjudicated.json
+  python scripts/freeze_human_support_benchmark_test_split.py --dataset data/eval/support_eval.json --label-sidecar data/eval/support_eval_label_sidecar.adjudicated.json --frozen-at 2026-08-07T12:00:00Z
+  python scripts/audit_human_support_benchmark.py --label-sidecar data/eval/support_eval_label_sidecar.adjudicated.json --strict
   python scripts/prepare_support_label_sidecar.py --existing-sidecar data/eval/support_eval_label_sidecar.json --audit --fail-on-high-risk-unreviewed --fail-on-high-risk-unreviewed-language zh
   ```
 
@@ -424,6 +502,27 @@ Verify with a `workflow_dispatch` run of `Publish` before relying on a tag push.
   matching recommended packet. `review_plan_smoke.language_case_type_packet_smoke`
   archives the generated slice packet summary so release evidence proves the
   filter actually selected the intended language and risk category.
+  For a real benchmark claim, also archive the passing
+  `audit_human_support_benchmark.py --strict` report and the matching
+  content-addressed held-out test-split manifest. Any subsequent change to a
+  frozen test case or its sidecar provenance invalidates that manifest and must
+  trigger a new review/freeze cycle.
+
+- Review live retrieval observation coverage separately from the deterministic
+  adapter fixture. Archive each source-facing run, then aggregate only those
+  artifacts without generating new network traffic:
+
+  ```bash
+  python scripts/audit_live_retrieval_benchmark.py
+  python scripts/summarize_live_retrieval_observations.py --artifact-dir experiments/retrieval-observation-2026-08-07 --artifact-dir experiments/retrieval-observation-2026-08-14 --artifact-dir experiments/retrieval-observation-2026-08-21 --strict
+  python scripts/release_package_gate.py --skip-install-smoke --live-retrieval-observation-artifact-dir experiments/retrieval-observation-2026-08-07 --live-retrieval-observation-artifact-dir experiments/retrieval-observation-2026-08-14 --live-retrieval-observation-artifact-dir experiments/retrieval-observation-2026-08-21
+  ```
+
+  The release summary keeps incomplete collection, malformed artifacts, and
+  missing eligible timestamps visible without blocking an ordinary software
+  release. A ready aggregate is only a time-bounded, region-labelled source
+  observation; it never authorizes a permanent source ranking or turns a known
+  record's `not_found` result into a fabrication claim.
 
 - Run production support eval when model dependencies and cached/downloadable
   weights are available:
@@ -484,6 +583,11 @@ Verify with a `workflow_dispatch` run of `Publish` before relying on a tag push.
 - Verify `citeguard-mcp` starts without importing heavy model dependencies.
 - Call `citeguard_status_tool` before live verification.
 - Confirm expected input errors return the machine-readable error contract.
+- Exercise `audit_document_tool` against an in-scope fixture and confirm its
+  exact locator, configured-root rejection, and suggestion-only edit policy.
+- Confirm a local full-text support result and an OA full-text fixture emit the
+  versioned `evidence_object` with fragment hash, locator, honest retrieval
+  time, and license-status provenance.
 - Review `skills/citeguard-verify/SKILL.md` for current tool names, trigger
   rules, safety wording, and progressive-disclosure references. Review
   `skills/citeguard-verify/agents/openai.yaml` so Codex-style skill lists show
@@ -491,6 +595,12 @@ Verify with a `workflow_dispatch` run of `Publish` before relying on a tag push.
 
 ## Safety and Compliance
 
+- Confirm `CITEGUARD_METRICS_PATH` remains opt-in and local-only. When enabled,
+  inspect a sample JSONL event for fixed event name, outcome, duration bucket,
+  and timestamp only; it must contain no request text, citation metadata,
+  evidence, document path, URL, cache value, identity, or network telemetry.
+- Confirm metrics reject a symbolic-link destination and, on POSIX, the regular
+  metrics file is owner read/write only.
 - Confirm no example or test requires gated sources, paywall bypass, CNKI, or
   Wanfang access.
 - Confirm default remote evidence harvesting remains disabled.

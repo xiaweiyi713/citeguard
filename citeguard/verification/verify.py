@@ -56,6 +56,11 @@ def verify_citation(
     failure_mode = classify_source_failure_mode(checked, failed, responded)
     identifier_info = outcome.identifier_lookup or {}
     identifier_status = str(identifier_info.get("status", ""))
+    query_records = [dict(item) for item in getattr(outcome, "query_records", [])]
+
+    def _result(**kwargs: Any) -> VerificationResult:
+        kwargs.setdefault("query_records", query_records)
+        return VerificationResult(**kwargs)
     miss_note = (
         f" Note: the provided {identifier_info.get('kind', 'identifier')} was not found at "
         f"{identifier_info.get('source', 'its home source')}."
@@ -93,7 +98,7 @@ def verify_citation(
                     " The DOI was not found in the global DOI registry either, which lowers confidence"
                     " further but is still not proof of fabrication."
                 )
-        return VerificationResult(
+        return _result(
             verdict=Verdict.NOT_FOUND,
             confidence=round(confidence, 4),
             input_citation=candidate,
@@ -113,7 +118,7 @@ def verify_citation(
         )
 
     if identifier_status == "failed" and outcome.best is not None and outcome.score < 1.0:
-        return VerificationResult(
+        return _result(
             verdict=Verdict.AMBIGUOUS,
             confidence=min(_confidence_with_source_failures(outcome.score, failure_mode), 0.6),
             input_citation=candidate,
@@ -151,7 +156,7 @@ def verify_citation(
             outcome.ambiguity_reason,
             "Multiple plausible matches; cannot disambiguate without a DOI or arXiv id.",
         )
-        return VerificationResult(
+        return _result(
             verdict=Verdict.AMBIGUOUS,
             confidence=_confidence_with_source_failures(outcome.score, failure_mode),
             input_citation=candidate,
@@ -182,7 +187,7 @@ def verify_citation(
             if (identifier_confirmed or not is_suspect_record(outcome.best))
             else ""
         )
-        return VerificationResult(
+        return _result(
             verdict=Verdict.METADATA_MISMATCH,
             confidence=_confidence_with_source_failures(outcome.score, failure_mode),
             input_citation=candidate,
@@ -205,7 +210,7 @@ def verify_citation(
             suggested_gbt7714=formatter.format_gbt7714(outcome.best) if suggested else "",
         )
 
-    return VerificationResult(
+    return _result(
         verdict=Verdict.VERIFIED,
         confidence=_confidence_with_source_failures(outcome.score, failure_mode),
         input_citation=candidate,

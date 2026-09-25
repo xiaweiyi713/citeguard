@@ -2,6 +2,7 @@
 
 from citeguard.graph import CitationRecord
 from citeguard.verifiers import SupportAssessment, SupportBackend
+from citeguard.evidence import EVIDENCE_OBJECT_SCHEMA_VERSION, build_evidence_object
 
 from .models import (
     AuditReport,
@@ -21,6 +22,15 @@ from .models import (
 )
 from .audit import audit_citations
 from .cache import CACHE_SCHEMA_VERSION, CachingMetadataSource, clear_cache, export_cache_records, inspect_cache
+from .document_audit import (
+    ALLOWED_DOCUMENT_SOURCE_FORMATS,
+    ALLOWED_DOCUMENT_SUFFIXES,
+    DOCUMENT_AUDIT_SCHEMA_VERSION,
+    DOCUMENT_AUDIT_SNAPSHOT_SCHEMA_VERSION,
+    DocumentAuditError,
+    audit_document,
+    configured_document_roots,
+)
 from .extract import extract_citation_candidates, load_citation_candidates
 from .parse import parse_citation
 from .resolve import ResolveOutcome, resolve_citation, source_names, verification_match_score
@@ -48,6 +58,8 @@ from .verify import verify_citation
 
 __all__ = [
     "AuditReport",
+    "ALLOWED_DOCUMENT_SOURCE_FORMATS",
+    "ALLOWED_DOCUMENT_SUFFIXES",
     "CACHE_SCHEMA_VERSION",
     "CachingMetadataSource",
     "CitationRecord",
@@ -55,7 +67,11 @@ __all__ = [
     "ClaimSupportAuditItem",
     "ClaimSupportSetResult",
     "CounterEvidenceSearchReport",
+    "DOCUMENT_AUDIT_SCHEMA_VERSION",
+    "DOCUMENT_AUDIT_SNAPSHOT_SCHEMA_VERSION",
     "DEFAULT_SUPPORT_POLICY",
+    "DocumentAuditError",
+    "EVIDENCE_OBJECT_SCHEMA_VERSION",
     "FieldDiff",
     "NEXT_ACTION_DESCRIPTIONS",
     "REVIEW_ACTION_QUEUE_BY_NEXT_ACTION",
@@ -73,11 +89,14 @@ __all__ = [
     "assess_support",
     "audit_claim_support",
     "audit_citations",
+    "audit_document",
     "available_sources",
+    "build_evidence_object",
     "filter_high_risk_payload",
     "check_claim_support",
     "check_claim_support_set",
     "compute_support_release_summary",
+    "configured_document_roots",
     "enrich_support_payload_with_counterevidence",
     "clear_cache",
     "extract_citation_candidates",

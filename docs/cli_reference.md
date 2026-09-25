@@ -108,6 +108,29 @@ Resolved live-source records include `metadata.metadata_quality` with
 when sparse source fields should lower confidence without becoming fabrication
 evidence.
 
+## skill
+
+```bash
+citeguard skill install --client codex
+citeguard skill check --client codex
+citeguard skill status --client claude --scope project
+citeguard skill upgrade --client cursor --scope project --force
+```
+
+`install` copies the bundled `citeguard-verify` user Skill into the chosen
+client's user or project convention. `status` is read-only and reports one of
+`not_installed`, `invalid`, `modified_or_outdated`, or `current`. `check` is the
+post-install self-check: it verifies required files, frontmatter, and the
+bundled tree digest, returning exit code `1` when the installed tree is missing,
+invalid, or differs from this package. It does not modify files.
+
+`upgrade` only applies to an existing CiteGuard Skill. If it differs from the
+bundled version, it returns `requires_force=true` until the caller supplies
+`--force`; this avoids silently discarding local changes. Even with `--force`,
+the installer refuses a symlink or a directory that is not identified as a
+`citeguard-verify` Skill. Successful install and upgrade responses include
+source and installed SHA-256 tree digests and recommend `run_skill_check`.
+
 ## verify
 
 ```bash
@@ -243,6 +266,62 @@ Non-error results can include `recovery_code` from the stable error-code
 registry, such as `ambiguous_citation`, `timeout`, or `source_unavailable`, so
 agents can choose the next step without parsing prose.
 
+## audit-document
+
+```bash
+citeguard audit-document manuscript.md
+citeguard audit-document paper.tex --allowed-root . --format latex
+citeguard audit-document references.docx --high-risk-only --jobs 4
+citeguard audit-document manuscript.md --fail-on-review
+citeguard audit-document manuscript.md --html report.html
+```
+
+Use this command for a user-supplied manuscript or bibliography when the result
+must remain bounded to declared local paths. It accepts Markdown, LaTeX,
+BibTeX, BBL, and DOCX files. By default, the allowed root is the target file's
+parent directory; pass `--allowed-root` one or more times to replace that
+default. LaTeX `\\input` / `\\include` files and referenced `.bib` files are
+resolved through the same boundary.
+
+The output has `tool=audit_document`, the extracted candidates, the ordinary
+citation audit, and a separate `review_queue`. Markdown and LaTeX bodies also
+produce `body_links`, `unlinked_markers`, and `claim_reviews`: citing sentence →
+citation marker → bibliography entry → identity result → available evidence →
+a suggestion-only rewrite hint. Numeric markers include `[1]`, `【1】`, and
+ranges such as `[1-3]`; Chinese HTML reports use Chinese first-screen copy.
+Unlinked markers stay visible instead of
+disappearing. `--html PATH` writes a local HTML report from the same JSON
+model; stdout remains JSON. Each candidate and queue item
+has a `document_locator`: `path#line-N` or `path#lines-N-M` for text files, and
+`path#paragraph-N` or `path#paragraphs-N-M` for DOCX. `--high-risk-only`
+filters the nested audit rows but preserves the full review queue. Claim
+reviews and HTML findings still use the complete identity results by original
+bibliography index, so filtering cannot reassign a paper's verdict to a
+different citing sentence.
+
+`document.snapshot.digest` is a content-addressed snapshot of the resolved files
+read during this call. `document.snapshot.files[]` exposes each file's byte count,
+content hash, and read mode. Treat a review queue as stale when the user's file
+or any included/bibliography file has changed; re-run `audit-document` before
+proposing an edit. The digest identifies the observed input version and is not a
+license or publication hash.
+
+Inspect `document.dependencies.missing` before treating the queue as clear. A
+missing in-root LaTeX include or bibliography keeps the audit partial and sets
+`review_status.incomplete=true` with `next_action=repair_input`; restore the
+file and re-run before relying on the result.
+
+Use `--fail-on-review` in CI when any citation suggestion or incomplete input
+should block the command. The default exit code still reports whether the audit
+operation completed; it does not interpret a review finding as a parser or
+source failure.
+
+This command is suggestion-only. `edit_policy.document_modified=false` and
+`automatic_apply_allowed=false` are invariant; CiteGuard never changes the
+document. A `not_found` result remains a reference-identity problem to review,
+not evidence that a citation was fabricated. One call is bounded to 32 files,
+20 MiB total input, 10 MiB per file, and 100 extracted citations.
+
 ## extract
 
 ```bash
@@ -373,6 +452,12 @@ the same `sources_available`, `source_failure_mode`, `outage_limited`,
 including any `retry_after_seconds` rate-limit hint and `retry_delay_seconds`
 retry provenance, so agents can distinguish source outage from normal
 insufficient evidence.
+Every selected support span also includes `evidence.evidence_object`: a
+versioned source, fragment, locator, SHA-256, retrieval-time, and license-status
+record. Keep its `fragment.text` and locator together when presenting a result.
+`retrieval.retrieved_at=null` means CiteGuard did not fetch/read the source
+itself, and `license.status=user_provided_not_verified` is caller context, not a
+license determination.
 Support results include `next_action`; unresolved or ambiguous support
 resolutions also include `recovery_code` when a stable recovery code is
 available.
@@ -390,7 +475,7 @@ counter-evidence for a claim. Output includes generated `queries`, a richer
 `query_plan` with each query's role and rationale, per-query `query_results`,
 ranked candidate records, source health diagnostics, stable `next_action`,
 `review_summary`, and an `interpretation` reminder. Candidate rows include `matched_queries`,
-`matched_query_roles`, and `match_rationales` so reviewers can see whether a
+`matched_query_roles`, `match_rationales`, and `sources` so reviewers can see whether a
 lead came from the original claim query, an improvement-negation probe, a
 support-negation probe, an absolute-claim exception probe, or a
 `source_outage_safety` probe for claims that overinterpret source outages,
@@ -403,6 +488,10 @@ confidence without proving fabrication. `review_summary` includes
 `explicit_contradiction_candidate_indexes`,
 `source_outage_safety_candidate_indexes`, and `related_candidate_indexes`, plus
 `policy=review_leads_not_contradiction_verdicts` for compact agent triage.
+Each `query_results` row includes `sources_responded` and `sources_failed`.
+Top-level `sources_responded` is computed from the complete retrieved record
+pool before `top_k` truncation and includes every source represented by merged
+records, so ranking cannot erase source-response provenance.
 
 Candidates are review leads only: they are not proof of contradiction, and an
 empty result is not proof that no counter-evidence exists. Run support checks on

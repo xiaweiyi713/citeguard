@@ -1,0 +1,494 @@
+{
+  "artifacts": {
+    "duplicate_artifacts": [],
+    "invalid_artifacts": [],
+    "invalid_count": 0,
+    "supplied_count": 1,
+    "valid_count": 1,
+    "valid_run_ids": [
+      "live-retrieval-observation-20260807T0505Z"
+    ]
+  },
+  "benchmark_claim_safe": false,
+  "by_observation_date": {
+    "2026-08-07": {
+      "ambiguous_count": 3,
+      "attempt_count": 36,
+      "failure_kind_counts": {},
+      "identity_accuracy": 0.5,
+      "identity_accuracy_eligible_count": 36,
+      "identity_correct_count": 18,
+      "latency_ms": {
+        "count": 36,
+        "max": 6386.187,
+        "mean": 1815.851,
+        "p50": 2348.73,
+        "p95": 3622.637
+      },
+      "not_found_count": 13,
+      "outage_limited_count": 0,
+      "rate_limited_count": 0,
+      "resolved_incorrect_count": 2,
+      "source_limited_count": 0
+    }
+  },
+  "by_query_kind": {
+    "arxiv_id": {
+      "ambiguous_count": 2,
+      "attempt_count": 12,
+      "failure_kind_counts": {},
+      "identity_accuracy": 0.5,
+      "identity_accuracy_eligible_count": 12,
+      "identity_correct_count": 6,
+      "latency_ms": {
+        "count": 12,
+        "max": 3622.637,
+        "mean": 2982.058,
+        "p50": 2934.68,
+        "p95": 3622.637
+      },
+      "not_found_count": 3,
+      "outage_limited_count": 0,
+      "rate_limited_count": 0,
+      "resolved_incorrect_count": 1,
+      "source_limited_count": 0
+    },
+    "doi": {
+      "ambiguous_count": 0,
+      "attempt_count": 12,
+      "failure_kind_counts": {},
+      "identity_accuracy": 0.6667,
+      "identity_accuracy_eligible_count": 12,
+      "identity_correct_count": 8,
+      "latency_ms": {
+        "count": 12,
+        "max": 6386.187,
+        "mean": 2464.063,
+        "p50": 2348.73,
+        "p95": 6386.187
+      },
+      "not_found_count": 3,
+      "outage_limited_count": 0,
+      "rate_limited_count": 0,
+      "resolved_incorrect_count": 1,
+      "source_limited_count": 0
+    },
+    "title": {
+      "ambiguous_count": 1,
+      "attempt_count": 12,
+      "failure_kind_counts": {},
+      "identity_accuracy": 0.3333,
+      "identity_accuracy_eligible_count": 12,
+      "identity_correct_count": 4,
+      "latency_ms": {
+        "count": 12,
+        "max": 5.599,
+        "mean": 1.431,
+        "p50": 0.713,
+        "p95": 5.599
+      },
+      "not_found_count": 7,
+      "outage_limited_count": 0,
+      "rate_limited_count": 0,
+      "resolved_incorrect_count": 0,
+      "source_limited_count": 0
+    }
+  },
+  "by_region": {
+    "CN-Shanghai": {
+      "ambiguous_count": 3,
+      "attempt_count": 36,
+      "failure_kind_counts": {},
+      "identity_accuracy": 0.5,
+      "identity_accuracy_eligible_count": 36,
+      "identity_correct_count": 18,
+      "latency_ms": {
+        "count": 36,
+        "max": 6386.187,
+        "mean": 1815.851,
+        "p50": 2348.73,
+        "p95": 3622.637
+      },
+      "not_found_count": 13,
+      "outage_limited_count": 0,
+      "rate_limited_count": 0,
+      "resolved_incorrect_count": 2,
+      "source_limited_count": 0
+    }
+  },
+  "by_source": {
+    "arxiv": {
+      "ambiguous_count": 0,
+      "attempt_count": 12,
+      "failure_kind_counts": {},
+      "identity_accuracy": 0.4167,
+      "identity_accuracy_eligible_count": 12,
+      "identity_correct_count": 5,
+      "latency_ms": {
+        "count": 12,
+        "max": 6386.187,
+        "mean": 2157.562,
+        "p50": 2853.992,
+        "p95": 6386.187
+      },
+      "not_found_count": 6,
+      "outage_limited_count": 0,
+      "rate_limited_count": 0,
+      "resolved_incorrect_count": 1,
+      "source_limited_count": 0
+    },
+    "crossref": {
+      "ambiguous_count": 1,
+      "attempt_count": 12,
+      "failure_kind_counts": {},
+      "identity_accuracy": 0.5,
+      "identity_accuracy_eligible_count": 12,
+      "identity_correct_count": 6,
+      "latency_ms": {
+        "count": 12,
+        "max": 2844.088,
+        "mean": 1610.394,
+        "p50": 2287.114,
+        "p95": 2844.088
+      },
+      "not_found_count": 5,
+      "outage_limited_count": 0,
+      "rate_limited_count": 0,
+      "resolved_incorrect_count": 0,
+      "source_limited_count": 0
+    },
+    "openalex": {
+      "ambiguous_count": 2,
+      "attempt_count": 12,
+      "failure_kind_counts": {},
+      "identity_accuracy": 0.5833,
+      "identity_accuracy_eligible_count": 12,
+      "identity_correct_count": 7,
+      "latency_ms": {
+        "count": 12,
+        "max": 3622.637,
+        "mean": 1679.596,
+        "p50": 1874.53,
+        "p95": 3622.637
+      },
+      "not_found_count": 2,
+      "outage_limited_count": 0,
+      "rate_limited_count": 0,
+      "resolved_incorrect_count": 1,
+      "source_limited_count": 0
+    }
+  },
+  "campaign_id": "citeguard-live-retrieval-v1",
+  "collection": {
+    "benchmark_claim_safe": false,
+    "campaign_id": "citeguard-live-retrieval-v1",
+    "cataloged_case_ids": [
+      "pilot-arxiv-bert",
+      "pilot-arxiv-gpt3",
+      "pilot-arxiv-resnet",
+      "pilot-arxiv-transformer",
+      "pilot-doi-alphafold-nature",
+      "pilot-doi-bart-acl",
+      "pilot-doi-cvpr-resnet",
+      "pilot-doi-transformer-arxiv-doi",
+      "pilot-title-alphafold",
+      "pilot-title-bert",
+      "pilot-title-resnet",
+      "pilot-title-transformer"
+    ],
+    "counts": {
+      "cataloged_real_cases": 12,
+      "invalid_real_cases": 0,
+      "qualified_by_domain": {
+        "biomedicine": 2,
+        "computer_science": 10
+      },
+      "qualified_by_language": {
+        "en": 12
+      },
+      "qualified_by_query_kind": {
+        "arxiv_id": 4,
+        "doi": 4,
+        "title": 4
+      },
+      "qualified_real_cases": 12
+    },
+    "deficits": [
+      {
+        "actual": 12,
+        "direction": "at_least",
+        "metric": "minimum_case_count",
+        "threshold": 200
+      },
+      {
+        "actual": 4,
+        "direction": "at_least",
+        "metric": "minimum_by_query_kind",
+        "threshold": 50,
+        "value": "doi"
+      },
+      {
+        "actual": 4,
+        "direction": "at_least",
+        "metric": "minimum_by_query_kind",
+        "threshold": 50,
+        "value": "arxiv_id"
+      },
+      {
+        "actual": 4,
+        "direction": "at_least",
+        "metric": "minimum_by_query_kind",
+        "threshold": 100,
+        "value": "title"
+      }
+    ],
+    "invalid_cases": [],
+    "next_action": "continue_balanced_case_collection",
+    "ok": true,
+    "policy": {
+      "known_real_records_only": true,
+      "not_found_is_not_fabrication_evidence": true,
+      "permanent_source_ranking_forbidden": true,
+      "source_outages_are_inconclusive": true
+    },
+    "qualified_case_ids": [
+      "pilot-arxiv-bert",
+      "pilot-arxiv-gpt3",
+      "pilot-arxiv-resnet",
+      "pilot-arxiv-transformer",
+      "pilot-doi-alphafold-nature",
+      "pilot-doi-bart-acl",
+      "pilot-doi-cvpr-resnet",
+      "pilot-doi-transformer-arxiv-doi",
+      "pilot-title-alphafold",
+      "pilot-title-bert",
+      "pilot-title-resnet",
+      "pilot-title-transformer"
+    ],
+    "schema_version": 1,
+    "status": "collection_incomplete",
+    "targets": {
+      "minimum_by_query_kind": {
+        "arxiv_id": 50,
+        "doi": 50,
+        "title": 100
+      },
+      "minimum_case_count": 200,
+      "minimum_observations_per_case": 3
+    }
+  },
+  "counts": {
+    "distinct_observed_at_count": 1,
+    "observation_row_count": 36,
+    "observation_run_count": 1
+  },
+  "coverage": {
+    "by_case": {
+      "pilot-arxiv-bert": {
+        "eligible_observation_count": 1,
+        "eligible_observed_at": [
+          "2026-08-07T04:35:23.035281Z"
+        ],
+        "observed_at": [
+          "2026-08-07T04:35:23.035281Z"
+        ],
+        "recorded_observation_count": 1,
+        "source_limited_only_observation_count": 0
+      },
+      "pilot-arxiv-gpt3": {
+        "eligible_observation_count": 1,
+        "eligible_observed_at": [
+          "2026-08-07T04:35:23.035281Z"
+        ],
+        "observed_at": [
+          "2026-08-07T04:35:23.035281Z"
+        ],
+        "recorded_observation_count": 1,
+        "source_limited_only_observation_count": 0
+      },
+      "pilot-arxiv-resnet": {
+        "eligible_observation_count": 1,
+        "eligible_observed_at": [
+          "2026-08-07T04:35:23.035281Z"
+        ],
+        "observed_at": [
+          "2026-08-07T04:35:23.035281Z"
+        ],
+        "recorded_observation_count": 1,
+        "source_limited_only_observation_count": 0
+      },
+      "pilot-arxiv-transformer": {
+        "eligible_observation_count": 1,
+        "eligible_observed_at": [
+          "2026-08-07T04:35:23.035281Z"
+        ],
+        "observed_at": [
+          "2026-08-07T04:35:23.035281Z"
+        ],
+        "recorded_observation_count": 1,
+        "source_limited_only_observation_count": 0
+      },
+      "pilot-doi-alphafold-nature": {
+        "eligible_observation_count": 1,
+        "eligible_observed_at": [
+          "2026-08-07T04:35:23.035281Z"
+        ],
+        "observed_at": [
+          "2026-08-07T04:35:23.035281Z"
+        ],
+        "recorded_observation_count": 1,
+        "source_limited_only_observation_count": 0
+      },
+      "pilot-doi-bart-acl": {
+        "eligible_observation_count": 1,
+        "eligible_observed_at": [
+          "2026-08-07T04:35:23.035281Z"
+        ],
+        "observed_at": [
+          "2026-08-07T04:35:23.035281Z"
+        ],
+        "recorded_observation_count": 1,
+        "source_limited_only_observation_count": 0
+      },
+      "pilot-doi-cvpr-resnet": {
+        "eligible_observation_count": 1,
+        "eligible_observed_at": [
+          "2026-08-07T04:35:23.035281Z"
+        ],
+        "observed_at": [
+          "2026-08-07T04:35:23.035281Z"
+        ],
+        "recorded_observation_count": 1,
+        "source_limited_only_observation_count": 0
+      },
+      "pilot-doi-transformer-arxiv-doi": {
+        "eligible_observation_count": 1,
+        "eligible_observed_at": [
+          "2026-08-07T04:35:23.035281Z"
+        ],
+        "observed_at": [
+          "2026-08-07T04:35:23.035281Z"
+        ],
+        "recorded_observation_count": 1,
+        "source_limited_only_observation_count": 0
+      },
+      "pilot-title-alphafold": {
+        "eligible_observation_count": 1,
+        "eligible_observed_at": [
+          "2026-08-07T04:35:23.035281Z"
+        ],
+        "observed_at": [
+          "2026-08-07T04:35:23.035281Z"
+        ],
+        "recorded_observation_count": 1,
+        "source_limited_only_observation_count": 0
+      },
+      "pilot-title-bert": {
+        "eligible_observation_count": 1,
+        "eligible_observed_at": [
+          "2026-08-07T04:35:23.035281Z"
+        ],
+        "observed_at": [
+          "2026-08-07T04:35:23.035281Z"
+        ],
+        "recorded_observation_count": 1,
+        "source_limited_only_observation_count": 0
+      },
+      "pilot-title-resnet": {
+        "eligible_observation_count": 1,
+        "eligible_observed_at": [
+          "2026-08-07T04:35:23.035281Z"
+        ],
+        "observed_at": [
+          "2026-08-07T04:35:23.035281Z"
+        ],
+        "recorded_observation_count": 1,
+        "source_limited_only_observation_count": 0
+      },
+      "pilot-title-transformer": {
+        "eligible_observation_count": 1,
+        "eligible_observed_at": [
+          "2026-08-07T04:35:23.035281Z"
+        ],
+        "observed_at": [
+          "2026-08-07T04:35:23.035281Z"
+        ],
+        "recorded_observation_count": 1,
+        "source_limited_only_observation_count": 0
+      }
+    },
+    "case_ids_below_minimum_eligible_observations": [
+      "pilot-arxiv-bert",
+      "pilot-arxiv-gpt3",
+      "pilot-arxiv-resnet",
+      "pilot-arxiv-transformer",
+      "pilot-doi-alphafold-nature",
+      "pilot-doi-bart-acl",
+      "pilot-doi-cvpr-resnet",
+      "pilot-doi-transformer-arxiv-doi",
+      "pilot-title-alphafold",
+      "pilot-title-bert",
+      "pilot-title-resnet",
+      "pilot-title-transformer"
+    ],
+    "cases_meeting_minimum_eligible_observations": 0,
+    "minimum_eligible_observations_per_case": 3,
+    "qualified_case_count": 12
+  },
+  "interpretation": "This is a time-bounded, region-labelled observation aggregate. Identity accuracy excludes source-limited attempts, and not_found for a known record remains a retrieval issue to investigate rather than fabrication evidence.",
+  "next_action": "continue_balanced_case_collection",
+  "ok": true,
+  "permanent_source_ranking_allowed": false,
+  "policy": {
+    "minimum_coverage_uses_distinct_eligible_timestamps": true,
+    "observation_artifacts_only": true,
+    "permanent_source_ranking_forbidden": true,
+    "source_limited_attempts_excluded_from_identity_accuracy": true,
+    "source_outages_are_inconclusive": true
+  },
+  "schema_version": 1,
+  "source_version_snapshots": {
+    "arxiv": [
+      {
+        "adapter_version": "0.1.3",
+        "source": "arxiv",
+        "source_api_version": "not_disclosed"
+      }
+    ],
+    "crossref": [
+      {
+        "adapter_version": "0.1.3",
+        "source": "crossref",
+        "source_api_version": "not_disclosed"
+      }
+    ],
+    "openalex": [
+      {
+        "adapter_version": "0.1.3",
+        "source": "openalex",
+        "source_api_version": "not_disclosed"
+      }
+    ]
+  },
+  "status": "collection_incomplete",
+  "summary": {
+    "ambiguous_count": 3,
+    "attempt_count": 36,
+    "failure_kind_counts": {},
+    "identity_accuracy": 0.5,
+    "identity_accuracy_eligible_count": 36,
+    "identity_correct_count": 18,
+    "latency_ms": {
+      "count": 36,
+      "max": 6386.187,
+      "mean": 1815.851,
+      "p50": 2348.73,
+      "p95": 3622.637
+    },
+    "not_found_count": 13,
+    "outage_limited_count": 0,
+    "rate_limited_count": 0,
+    "resolved_incorrect_count": 2,
+    "source_limited_count": 0
+  }
+}

@@ -158,8 +158,10 @@ class CLITests(unittest.TestCase):
 
     def test_status_prints_json_without_live_source(self):
         stdout = io.StringIO()
-        with mock.patch.dict(os.environ, {}, clear=True):
-            code = run(["status"], stdout=stdout, source=self.source)
+        with tempfile.TemporaryDirectory() as tmpdir:
+            cache_path = os.path.join(tmpdir, "verification_cache.sqlite")
+            with mock.patch.dict(os.environ, {"CITEGUARD_CACHE": cache_path}, clear=True):
+                code = run(["status"], stdout=stdout, source=self.source)
 
         self.assertEqual(code, 0)
         payload = json.loads(stdout.getvalue())
@@ -1197,6 +1199,25 @@ class CLITests(unittest.TestCase):
         self.assertEqual(payload["error"]["details"]["source"], "environment")
         self.assertEqual(payload["error"]["details"]["expected"], "positive integer")
         self.assertEqual(payload["error"]["details"]["received"], "0")
+
+    def test_support_engine_configuration_error_is_machine_readable(self):
+        stderr = io.StringIO()
+
+        with mock.patch.dict(os.environ, {"CITEGUARD_SUPPORT_ENGINE": "turbo"}, clear=False):
+            code = run(
+                ["support", "--claim", "GhostCite studies citation validity.", "--title", "GhostCite"],
+                source=self.source,
+                stderr=stderr,
+            )
+
+        self.assertEqual(code, 2)
+        payload = json.loads(stderr.getvalue())
+        self.assertFalse(payload["ok"])
+        self.assertEqual(payload["error"]["code"], "invalid_input")
+        self.assertEqual(payload["error"]["details"]["command"], "support")
+        self.assertEqual(payload["error"]["details"]["field"], "CITEGUARD_SUPPORT_ENGINE")
+        self.assertEqual(payload["error"]["details"]["source"], "environment")
+        self.assertEqual(payload["error"]["details"]["received"], "turbo")
 
     def test_support_audit_reads_claim_citation_pairs(self):
         stdout = io.StringIO()
@@ -2294,7 +2315,9 @@ class CLITests(unittest.TestCase):
         self.assertEqual(payload["candidates"][0]["signal"], "explicit_contradiction_cue")
         self.assertIn("improvement_negation", {item["role"] for item in payload["query_plan"]})
         self.assertEqual(len(payload["query_results"]), len(payload["queries"]))
+        self.assertTrue(all(item["sources_responded"] == ["memory"] for item in payload["query_results"]))
         self.assertIn("improvement_negation", payload["candidates"][0]["matched_query_roles"])
+        self.assertEqual(payload["candidates"][0]["sources"], ["memory"])
         self.assertEqual(payload["review_summary"]["candidate_count"], 1)
         self.assertEqual(payload["review_summary"]["signal_counts"]["explicit_contradiction_cue"], 1)
         self.assertEqual(payload["review_summary"]["top_candidate"]["signal"], "explicit_contradiction_cue")
@@ -2308,6 +2331,7 @@ class CLITests(unittest.TestCase):
         )
         self.assertEqual(payload["review_summary"]["policy"], "review_leads_not_contradiction_verdicts")
         self.assertEqual(payload["source_failure_mode"], "none")
+        self.assertEqual(payload["sources_responded"], ["memory"])
         self.assertEqual(payload["next_action"], "review_counterevidence_leads")
 
     def test_counterevidence_search_flags_source_outage_safety_leads(self):

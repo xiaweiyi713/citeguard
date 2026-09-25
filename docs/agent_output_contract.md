@@ -4,6 +4,21 @@ This document is the field-level reference for the machine-readable output
 CiteGuard returns to agents from the CLI and MCP tools. The README keeps only
 the high-level surface; everything an agent needs to parse lives here.
 
+## Contract version and JSON Schema
+
+Every public CLI and MCP response has a root `contract_version: "v1"`. Batch
+rows inherit the enclosing response contract and do not repeat the marker. The
+schema shipped with the installed package is
+`citeguard/contracts/v1/agent-output.schema.json`; callers can locate and load
+it with `citeguard.contract_schema_path()` and `citeguard.load_contract_schema()`.
+
+The v1 schema freezes the citation `verdict`, support `verdict`, `risk`,
+`evidence_scope`, and `next_action` vocabularies. Adding optional fields is
+compatible. Removing a field, changing a field type, adding a required field,
+or changing any frozen enum requires a new `contract_version`. Clients should
+branch on structured fields rather than prose, and retain the root marker when
+storing a response for later replay.
+
 ## Single-result and batch `next_action`
 
 Single verification/support results and batch `risk_ranking` rows include a
@@ -27,6 +42,29 @@ Common `next_action` values include
 `inspect_full_text_or_find_stronger_citation`, and
 `rewrite_or_replace_evidence`.
 
+## Score semantics (`scores`)
+
+Public citation and support results keep the legacy `confidence` number for
+compatibility. That number is **not** a calibrated probability. The additive
+`scores` block says what it is:
+
+- `confidence_meaning=uncalibrated_score` and `not_a_probability=true`
+- `calibration_status=uncalibrated` until a labeled slice is large enough
+- `identity_match.score`: is the retrieved record the cited paper?
+- `support_judgment.score`: does the inspected evidence support the claim?
+  Null on citation-only verification.
+- `evidence_coverage.scope`: `none`, `metadata`, `abstract`, `full_text`, or
+  mixed. `complete_paper_reviewed` is false unless a later contract says a
+  full-paper review actually happened. Finding one supporting span is not that.
+
+Do not mix model logits, lexical overlap, and statistical probability. A value
+of `0.85` is an uncalibrated score, not "85% likely correct."
+
+Support results also include `supporting_spans` and `conflicting_spans`. These
+are the evidence windows inspected for the claim. A non-empty supporting span
+list is not a complete-paper review; `scores.evidence_coverage.complete_paper_reviewed`
+stays false unless a later contract says otherwise.
+
 ## Identifier authority (`identifier_lookup`)
 
 Single verification results include `identifier_lookup` (`null` when the input
@@ -36,6 +74,16 @@ carries no DOI/arXiv id): an object with `kind` (`arxiv_id` or `doi`), `value`,
 home source), `miss` (home source answered but the id was not found), `failed`
 (authority lookup errored; the result is source-limited, not fabrication
 evidence), or `unavailable` (home source not configured).
+
+## Query provenance (`query_records`)
+
+Citation and support results include `query_records`: one row per attempted
+query with `citation_id`, `source`, `operation`, `status`, and `reason_code`.
+Operations are `identifier_lookup`, `title_search`, `abstract_fetch`, and
+`fulltext_fetch`. `reason_code` is one of `ok`, `no_match`, `timeout`,
+`rate_limited`, `unconfigured`, or a source-failure kind. A title-search miss
+after an identifier hit is a separate fact; it does not put the authority
+source into `sources_failed`.
 
 ## Batch `review_summary`
 
@@ -82,6 +130,60 @@ live source returned sparse metadata, so compact tables can flag incomplete
 source metadata without calling the citation fake or treating missing fields as
 claim-support evidence.
 
+## Evidence object
+
+Every claim-support result now keeps its legacy `evidence.text`,
+`source_field`, `source_url`, and `evidence_scope` fields and also includes a
+versioned `evidence.evidence_object`. Citation-set `evidence[]` entries carry
+the same nested object. It is an additive v1 field, so existing clients can
+continue reading the legacy fields while new clients use one provenance shape:
+
+- `source`: source name, URL, input field, and local path when known.
+- `fragment`: the exact returned text fragment plus its `sha256` digest.
+- `locator`: an exact line/paragraph range when supplied, otherwise an explicit
+  file, URL, chunk, or source-field locator with its available granularity.
+- `retrieval`: the retrieval method and `retrieved_at`. `retrieved_at=null`
+  means CiteGuard did not fetch or read the source itself, rather than inventing
+  a provenance time for a user-pasted excerpt.
+- `license`: source-reported or caller-context status, value, and rights basis.
+`user_provided_not_verified` means the caller supplied the text; it is not a
+  license determination. `open_access_license_*` records only that a source
+  marked the fetched location as open access.
+
+The digest is for `fragment.text` after CiteGuard's text normalization. It is a
+stable integrity handle for the returned snippet, not a hash of the entire PDF,
+web page, or paper and not a claim that the text is licensed for redistribution.
+An OA body that exceeds CiteGuard's fetch budget is rejected as unavailable
+instead of being silently truncated and labelled `full_text` evidence.
+
+## Document-audit snapshot
+
+The `audit_document` CLI/MCP response is defined by the v1
+`document_audit_response` schema. In addition to extracted candidates and the
+suggestion-only queue, `document.snapshot` contains a digest over the resolved
+file paths, byte counts, content hashes, and read modes used by that call.
+`document.snapshot.files[]` makes included LaTeX and BibTeX dependencies
+visible. A client must treat a queue as stale when that digest no longer
+describes the current files and request a fresh audit before proposing a change.
+This is an input-integrity handle, not a publication hash or a license claim.
+`document.dependencies.missing` lists in-root `\input`/`\include` or
+`\bibliography` files that were referenced but unavailable; such a partial
+read sets `review_status.incomplete=true` and `next_action=repair_input` even
+when the citation queue itself is empty.
+The additive `review_status` block gives agents one branch point: `state` is
+`clear` or `review_required`, `next_action` is from the frozen v1 action
+vocabulary, and `snapshot_digest` binds that status to the exact input version.
+Re-run the audit when the current snapshot digest differs before acting on the
+queue.
+
+Markdown and LaTeX audits also emit `body_links`, `unlinked_markers`, and
+`claim_reviews`, tracing citing sentence → marker → bibliography entry →
+identity result → available evidence → a suggestion-only rewrite. Unlinked
+markers remain in the payload instead of disappearing. `--html` writes a local
+HTML view of the same model.
+An empty in-scope document is valid and returns a clear audit with
+`document.read.total_bytes=0`; it is not treated as a file error.
+
 ## High-risk filtering (`--high-risk-only`)
 
 When using `--high-risk-only`, the `filtered` block includes
@@ -97,7 +199,7 @@ Use `--with-counterevidence` on support batch commands when you want CiteGuard t
 attach possible counter-evidence candidates to review-worthy items; these
 are leads to inspect, not contradiction verdicts. Counter-evidence reports
 include `next_action`, `query_plan`, `query_results`, `review_summary`, and
-per-candidate `matched_query_roles` so agents can explain whether a lead came
+per-candidate `matched_query_roles` / `sources` so agents can explain whether a lead came
 from the original claim search, a negation probe, an exception probe, or a
 `source_outage_safety` probe for overclaims that treat source failures as
 fabrication evidence, including Chinese claims such as "源不可达/未找到证明引用伪造".
@@ -109,6 +211,9 @@ such as `explicit_contradiction_candidate_indexes`,
 agent can show the safest review order without treating candidates as verdicts.
 `signal=source_outage_safety_cue` is still only a review lead, not a
 contradiction verdict.
+Use each query row's `sources_responded` / `sources_failed` for query-level
+diagnostics. Top-level `sources_responded` covers the full retrieved pool before
+`top_k` truncation and preserves all sources represented by merged records.
 
 ## Citation-set support (`support-set`)
 
@@ -125,7 +230,7 @@ set-level evidence provenance without expanding every child result.
 
 Support results include a machine-readable `evidence_scope` (`title`,
 `abstract`, `metadata`, `metadata_snippet`, `full_text`, `mixed`,
-`mixed_with_full_text`, or `none`) so agents can avoid presenting abstract-level
+`mixed_with_full_text`, `unknown`, or `none`) so agents can avoid presenting abstract-level
 evidence as a full-text conclusion. Full-text support is opt-in: callers can
 provide short lawful excerpts via CLI/MCP/JSON inputs or local text/PDF
 `--full-text-file` / JSON `full_text_file` paths. PDF extraction uses optional
@@ -143,8 +248,10 @@ with `error_code=model_unavailable` and fall back to available weaker scoring.
 After connecting the MCP server, call `citeguard_status_tool` once. It reports the
 configured scholarly sources, cache path and non-sensitive `cache_status`,
 MCP/Python readiness, contact-email status, Semantic Scholar key presence, and
-whether deep claim-support model dependencies are installed, without querying
-live sources or loading model weights. It also includes `remote_evidence_policy`
+the configured support profile. `support_models.requested_engine` is `auto`,
+`heuristic`, or `production`; `model_loading_enabled=false` means the user chose
+the low-resource heuristic profile, so do not call it a missing-model failure.
+The status call itself does not query live sources or load model weights. It also includes `remote_evidence_policy`
 and a source-level
 `source_health` block that says which sources are configured, whether a fixture
 is bypassing live sources, whether gated-source host suffixes are blocked, and

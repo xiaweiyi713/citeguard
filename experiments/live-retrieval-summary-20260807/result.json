@@ -1,0 +1,476 @@
+{
+  "artifacts": {
+    "duplicate_artifacts": [],
+    "invalid_artifacts": [],
+    "invalid_count": 0,
+    "supplied_count": 1,
+    "valid_count": 1,
+    "valid_run_ids": [
+      "live-retrieval-observation-20260807T0435Z"
+    ]
+  },
+  "benchmark_claim_safe": false,
+  "by_observation_date": {
+    "2026-08-07": {
+      "attempt_count": 36,
+      "failure_kind_counts": {},
+      "identity_accuracy": 0.4444,
+      "identity_accuracy_eligible_count": 36,
+      "identity_correct_count": 16,
+      "latency_ms": {
+        "count": 36,
+        "max": 6845.624,
+        "mean": 1994.008,
+        "p50": 2373.767,
+        "p95": 4741.37
+      },
+      "not_found_count": 13,
+      "outage_limited_count": 0,
+      "rate_limited_count": 0,
+      "source_limited_count": 0
+    }
+  },
+  "by_query_kind": {
+    "arxiv_id": {
+      "attempt_count": 12,
+      "failure_kind_counts": {},
+      "identity_accuracy": 0.3333,
+      "identity_accuracy_eligible_count": 12,
+      "identity_correct_count": 4,
+      "latency_ms": {
+        "count": 12,
+        "max": 3698.056,
+        "mean": 3227.646,
+        "p50": 3189.183,
+        "p95": 3698.056
+      },
+      "not_found_count": 3,
+      "outage_limited_count": 0,
+      "rate_limited_count": 0,
+      "source_limited_count": 0
+    },
+    "doi": {
+      "attempt_count": 12,
+      "failure_kind_counts": {},
+      "identity_accuracy": 0.6667,
+      "identity_accuracy_eligible_count": 12,
+      "identity_correct_count": 8,
+      "latency_ms": {
+        "count": 12,
+        "max": 6845.624,
+        "mean": 2752.691,
+        "p50": 2373.767,
+        "p95": 6845.624
+      },
+      "not_found_count": 3,
+      "outage_limited_count": 0,
+      "rate_limited_count": 0,
+      "source_limited_count": 0
+    },
+    "title": {
+      "attempt_count": 12,
+      "failure_kind_counts": {},
+      "identity_accuracy": 0.3333,
+      "identity_accuracy_eligible_count": 12,
+      "identity_correct_count": 4,
+      "latency_ms": {
+        "count": 12,
+        "max": 4.765,
+        "mean": 1.686,
+        "p50": 1.384,
+        "p95": 4.765
+      },
+      "not_found_count": 7,
+      "outage_limited_count": 0,
+      "rate_limited_count": 0,
+      "source_limited_count": 0
+    }
+  },
+  "by_region": {
+    "CN-Shanghai": {
+      "attempt_count": 36,
+      "failure_kind_counts": {},
+      "identity_accuracy": 0.4444,
+      "identity_accuracy_eligible_count": 36,
+      "identity_correct_count": 16,
+      "latency_ms": {
+        "count": 36,
+        "max": 6845.624,
+        "mean": 1994.008,
+        "p50": 2373.767,
+        "p95": 4741.37
+      },
+      "not_found_count": 13,
+      "outage_limited_count": 0,
+      "rate_limited_count": 0,
+      "source_limited_count": 0
+    }
+  },
+  "by_source": {
+    "arxiv": {
+      "attempt_count": 12,
+      "failure_kind_counts": {},
+      "identity_accuracy": 0.4167,
+      "identity_accuracy_eligible_count": 12,
+      "identity_correct_count": 5,
+      "latency_ms": {
+        "count": 12,
+        "max": 6845.624,
+        "mean": 2623.523,
+        "p50": 3485.935,
+        "p95": 6845.624
+      },
+      "not_found_count": 6,
+      "outage_limited_count": 0,
+      "rate_limited_count": 0,
+      "source_limited_count": 0
+    },
+    "crossref": {
+      "attempt_count": 12,
+      "failure_kind_counts": {},
+      "identity_accuracy": 0.4167,
+      "identity_accuracy_eligible_count": 12,
+      "identity_correct_count": 5,
+      "latency_ms": {
+        "count": 12,
+        "max": 3172.952,
+        "mean": 1647.769,
+        "p50": 2262.476,
+        "p95": 3172.952
+      },
+      "not_found_count": 5,
+      "outage_limited_count": 0,
+      "rate_limited_count": 0,
+      "source_limited_count": 0
+    },
+    "openalex": {
+      "attempt_count": 12,
+      "failure_kind_counts": {},
+      "identity_accuracy": 0.5,
+      "identity_accuracy_eligible_count": 12,
+      "identity_correct_count": 6,
+      "latency_ms": {
+        "count": 12,
+        "max": 3662.816,
+        "mean": 1710.731,
+        "p50": 1966.99,
+        "p95": 3662.816
+      },
+      "not_found_count": 2,
+      "outage_limited_count": 0,
+      "rate_limited_count": 0,
+      "source_limited_count": 0
+    }
+  },
+  "campaign_id": "citeguard-live-retrieval-v1",
+  "collection": {
+    "benchmark_claim_safe": false,
+    "campaign_id": "citeguard-live-retrieval-v1",
+    "cataloged_case_ids": [
+      "pilot-arxiv-bert",
+      "pilot-arxiv-gpt3",
+      "pilot-arxiv-resnet",
+      "pilot-arxiv-transformer",
+      "pilot-doi-alphafold-nature",
+      "pilot-doi-bart-acl",
+      "pilot-doi-cvpr-resnet",
+      "pilot-doi-transformer-arxiv-doi",
+      "pilot-title-alphafold",
+      "pilot-title-bert",
+      "pilot-title-resnet",
+      "pilot-title-transformer"
+    ],
+    "counts": {
+      "cataloged_real_cases": 12,
+      "invalid_real_cases": 0,
+      "qualified_by_domain": {
+        "biomedicine": 2,
+        "computer_science": 10
+      },
+      "qualified_by_language": {
+        "en": 12
+      },
+      "qualified_by_query_kind": {
+        "arxiv_id": 4,
+        "doi": 4,
+        "title": 4
+      },
+      "qualified_real_cases": 12
+    },
+    "deficits": [
+      {
+        "actual": 12,
+        "direction": "at_least",
+        "metric": "minimum_case_count",
+        "threshold": 200
+      },
+      {
+        "actual": 4,
+        "direction": "at_least",
+        "metric": "minimum_by_query_kind",
+        "threshold": 50,
+        "value": "doi"
+      },
+      {
+        "actual": 4,
+        "direction": "at_least",
+        "metric": "minimum_by_query_kind",
+        "threshold": 50,
+        "value": "arxiv_id"
+      },
+      {
+        "actual": 4,
+        "direction": "at_least",
+        "metric": "minimum_by_query_kind",
+        "threshold": 100,
+        "value": "title"
+      }
+    ],
+    "invalid_cases": [],
+    "next_action": "continue_balanced_case_collection",
+    "ok": true,
+    "policy": {
+      "known_real_records_only": true,
+      "not_found_is_not_fabrication_evidence": true,
+      "permanent_source_ranking_forbidden": true,
+      "source_outages_are_inconclusive": true
+    },
+    "qualified_case_ids": [
+      "pilot-arxiv-bert",
+      "pilot-arxiv-gpt3",
+      "pilot-arxiv-resnet",
+      "pilot-arxiv-transformer",
+      "pilot-doi-alphafold-nature",
+      "pilot-doi-bart-acl",
+      "pilot-doi-cvpr-resnet",
+      "pilot-doi-transformer-arxiv-doi",
+      "pilot-title-alphafold",
+      "pilot-title-bert",
+      "pilot-title-resnet",
+      "pilot-title-transformer"
+    ],
+    "schema_version": 1,
+    "status": "collection_incomplete",
+    "targets": {
+      "minimum_by_query_kind": {
+        "arxiv_id": 50,
+        "doi": 50,
+        "title": 100
+      },
+      "minimum_case_count": 200,
+      "minimum_observations_per_case": 3
+    }
+  },
+  "counts": {
+    "distinct_observed_at_count": 1,
+    "observation_row_count": 36,
+    "observation_run_count": 1
+  },
+  "coverage": {
+    "by_case": {
+      "pilot-arxiv-bert": {
+        "eligible_observation_count": 1,
+        "eligible_observed_at": [
+          "2026-08-07T04:20:01.574756Z"
+        ],
+        "observed_at": [
+          "2026-08-07T04:20:01.574756Z"
+        ],
+        "recorded_observation_count": 1,
+        "source_limited_only_observation_count": 0
+      },
+      "pilot-arxiv-gpt3": {
+        "eligible_observation_count": 1,
+        "eligible_observed_at": [
+          "2026-08-07T04:20:01.574756Z"
+        ],
+        "observed_at": [
+          "2026-08-07T04:20:01.574756Z"
+        ],
+        "recorded_observation_count": 1,
+        "source_limited_only_observation_count": 0
+      },
+      "pilot-arxiv-resnet": {
+        "eligible_observation_count": 1,
+        "eligible_observed_at": [
+          "2026-08-07T04:20:01.574756Z"
+        ],
+        "observed_at": [
+          "2026-08-07T04:20:01.574756Z"
+        ],
+        "recorded_observation_count": 1,
+        "source_limited_only_observation_count": 0
+      },
+      "pilot-arxiv-transformer": {
+        "eligible_observation_count": 1,
+        "eligible_observed_at": [
+          "2026-08-07T04:20:01.574756Z"
+        ],
+        "observed_at": [
+          "2026-08-07T04:20:01.574756Z"
+        ],
+        "recorded_observation_count": 1,
+        "source_limited_only_observation_count": 0
+      },
+      "pilot-doi-alphafold-nature": {
+        "eligible_observation_count": 1,
+        "eligible_observed_at": [
+          "2026-08-07T04:20:01.574756Z"
+        ],
+        "observed_at": [
+          "2026-08-07T04:20:01.574756Z"
+        ],
+        "recorded_observation_count": 1,
+        "source_limited_only_observation_count": 0
+      },
+      "pilot-doi-bart-acl": {
+        "eligible_observation_count": 1,
+        "eligible_observed_at": [
+          "2026-08-07T04:20:01.574756Z"
+        ],
+        "observed_at": [
+          "2026-08-07T04:20:01.574756Z"
+        ],
+        "recorded_observation_count": 1,
+        "source_limited_only_observation_count": 0
+      },
+      "pilot-doi-cvpr-resnet": {
+        "eligible_observation_count": 1,
+        "eligible_observed_at": [
+          "2026-08-07T04:20:01.574756Z"
+        ],
+        "observed_at": [
+          "2026-08-07T04:20:01.574756Z"
+        ],
+        "recorded_observation_count": 1,
+        "source_limited_only_observation_count": 0
+      },
+      "pilot-doi-transformer-arxiv-doi": {
+        "eligible_observation_count": 1,
+        "eligible_observed_at": [
+          "2026-08-07T04:20:01.574756Z"
+        ],
+        "observed_at": [
+          "2026-08-07T04:20:01.574756Z"
+        ],
+        "recorded_observation_count": 1,
+        "source_limited_only_observation_count": 0
+      },
+      "pilot-title-alphafold": {
+        "eligible_observation_count": 1,
+        "eligible_observed_at": [
+          "2026-08-07T04:20:01.574756Z"
+        ],
+        "observed_at": [
+          "2026-08-07T04:20:01.574756Z"
+        ],
+        "recorded_observation_count": 1,
+        "source_limited_only_observation_count": 0
+      },
+      "pilot-title-bert": {
+        "eligible_observation_count": 1,
+        "eligible_observed_at": [
+          "2026-08-07T04:20:01.574756Z"
+        ],
+        "observed_at": [
+          "2026-08-07T04:20:01.574756Z"
+        ],
+        "recorded_observation_count": 1,
+        "source_limited_only_observation_count": 0
+      },
+      "pilot-title-resnet": {
+        "eligible_observation_count": 1,
+        "eligible_observed_at": [
+          "2026-08-07T04:20:01.574756Z"
+        ],
+        "observed_at": [
+          "2026-08-07T04:20:01.574756Z"
+        ],
+        "recorded_observation_count": 1,
+        "source_limited_only_observation_count": 0
+      },
+      "pilot-title-transformer": {
+        "eligible_observation_count": 1,
+        "eligible_observed_at": [
+          "2026-08-07T04:20:01.574756Z"
+        ],
+        "observed_at": [
+          "2026-08-07T04:20:01.574756Z"
+        ],
+        "recorded_observation_count": 1,
+        "source_limited_only_observation_count": 0
+      }
+    },
+    "case_ids_below_minimum_eligible_observations": [
+      "pilot-arxiv-bert",
+      "pilot-arxiv-gpt3",
+      "pilot-arxiv-resnet",
+      "pilot-arxiv-transformer",
+      "pilot-doi-alphafold-nature",
+      "pilot-doi-bart-acl",
+      "pilot-doi-cvpr-resnet",
+      "pilot-doi-transformer-arxiv-doi",
+      "pilot-title-alphafold",
+      "pilot-title-bert",
+      "pilot-title-resnet",
+      "pilot-title-transformer"
+    ],
+    "cases_meeting_minimum_eligible_observations": 0,
+    "minimum_eligible_observations_per_case": 3,
+    "qualified_case_count": 12
+  },
+  "interpretation": "This is a time-bounded, region-labelled observation aggregate. Identity accuracy excludes source-limited attempts, and not_found for a known record remains a retrieval issue to investigate rather than fabrication evidence.",
+  "next_action": "continue_balanced_case_collection",
+  "ok": true,
+  "permanent_source_ranking_allowed": false,
+  "policy": {
+    "minimum_coverage_uses_distinct_eligible_timestamps": true,
+    "observation_artifacts_only": true,
+    "permanent_source_ranking_forbidden": true,
+    "source_limited_attempts_excluded_from_identity_accuracy": true,
+    "source_outages_are_inconclusive": true
+  },
+  "schema_version": 1,
+  "source_version_snapshots": {
+    "arxiv": [
+      {
+        "adapter_version": "0.1.3",
+        "source": "arxiv",
+        "source_api_version": "not_disclosed"
+      }
+    ],
+    "crossref": [
+      {
+        "adapter_version": "0.1.3",
+        "source": "crossref",
+        "source_api_version": "not_disclosed"
+      }
+    ],
+    "openalex": [
+      {
+        "adapter_version": "0.1.3",
+        "source": "openalex",
+        "source_api_version": "not_disclosed"
+      }
+    ]
+  },
+  "status": "collection_incomplete",
+  "summary": {
+    "attempt_count": 36,
+    "failure_kind_counts": {},
+    "identity_accuracy": 0.4444,
+    "identity_accuracy_eligible_count": 36,
+    "identity_correct_count": 16,
+    "latency_ms": {
+      "count": 36,
+      "max": 6845.624,
+      "mean": 1994.008,
+      "p50": 2373.767,
+      "p95": 4741.37
+    },
+    "not_found_count": 13,
+    "outage_limited_count": 0,
+    "rate_limited_count": 0,
+    "source_limited_count": 0
+  }
+}

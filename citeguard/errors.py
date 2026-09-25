@@ -5,6 +5,8 @@ from __future__ import annotations
 import re
 from typing import Dict, Mapping, Optional, Set
 
+from citeguard.contracts import CONTRACT_VERSION
+
 
 ERROR_SCHEMA_VERSION = 1
 
@@ -147,6 +149,7 @@ def error_payload(
 
     return {
         "ok": False,
+        "contract_version": CONTRACT_VERSION,
         "schema_version": ERROR_SCHEMA_VERSION,
         "error": {
             "code": code,

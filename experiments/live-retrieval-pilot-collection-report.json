@@ -1,0 +1,27 @@
+{
+  "accepted_case_ids": [
+    "pilot-doi-cvpr-resnet",
+    "pilot-doi-bart-acl",
+    "pilot-doi-alphafold-nature",
+    "pilot-doi-transformer-arxiv-doi",
+    "pilot-arxiv-transformer",
+    "pilot-arxiv-bert",
+    "pilot-arxiv-resnet",
+    "pilot-arxiv-gpt3",
+    "pilot-title-transformer",
+    "pilot-title-resnet",
+    "pilot-title-bert",
+    "pilot-title-alphafold"
+  ],
+  "accepted_count": 12,
+  "policy": {
+    "ambiguous_candidates_are_rejected": true,
+    "identifier_match_required": true,
+    "public_metadata_only": true,
+    "source_failures_are_not_benchmark_cases": true,
+    "title_match_must_be_exact_or_expected_identifier": true
+  },
+  "rejected": [],
+  "rejected_count": 0,
+  "requested_count": 12
+}

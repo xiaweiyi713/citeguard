@@ -50,6 +50,15 @@ class ModelsTests(unittest.TestCase):
         self.assertEqual(data["recovery_code"], "")
         self.assertEqual(data["next_action"], "review_metadata")
         self.assertEqual(data["alternatives"], [])
+        scores = data["scores"]
+        self.assertEqual(scores["calibration_status"], "uncalibrated")
+        self.assertEqual(scores["confidence_meaning"], "uncalibrated_score")
+        self.assertTrue(scores["not_a_probability"])
+        self.assertEqual(scores["primary"], "identity_match")
+        self.assertEqual(scores["identity_match"]["score"], 0.91)
+        self.assertIsNone(scores["support_judgment"]["score"])
+        self.assertEqual(scores["evidence_coverage"]["scope"], "none")
+        self.assertFalse(scores["evidence_coverage"]["complete_paper_reviewed"])
 
     def test_available_sources_preserves_checked_order_and_excludes_failed(self):
         self.assertEqual(available_sources(["openalex", "crossref", "arxiv"], ["crossref"]), ["openalex", "arxiv"])

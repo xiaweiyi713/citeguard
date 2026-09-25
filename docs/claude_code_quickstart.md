@@ -44,10 +44,14 @@ From the project where Claude Code should use CiteGuard:
 
 ```bash
 citeguard skill install --client claude --scope project
+citeguard skill check --client claude --scope project
 ```
 
-The installer is idempotent and refuses to overwrite a different skill unless
-you pass `--force`.
+The installer is idempotent. `skill check` verifies the installed files and
+bundle digest without contacting sources. Use `citeguard skill status --client
+claude --scope project` to inspect a local install. The installer refuses to
+overwrite a different skill; after reviewing local customization, use
+`citeguard skill upgrade --client claude --scope project --force` to replace it.
 
 ## 4. Verify the connection
 

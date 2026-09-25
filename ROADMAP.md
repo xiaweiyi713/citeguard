@@ -7,10 +7,13 @@ agent-facing package toward a stable skeptical citation auditor.
 
 - Status: `Alpha agent-auditor package`
 - Strength: end-to-end falsification-first verification, batch audit workflows,
-  MCP stdio integration, source-health reporting, cache replay, and agent skill
-  guidance are working
-- Main gap: claim-support benchmark scale, human label rigor, full-text support
-  boundaries, and release hardening still lag behind the system architecture
+  MCP stdio integration, source-health reporting, cache replay, agent skill
+  guidance, manuscript HTML review reports, query-level provenance, and
+  region-tagged full-text locators are working
+- Main gap: claim-support benchmark scale and dual-annotator label rigor still
+  lag behind the system architecture. Full-text support is locatable but not a
+  complete-paper review. Release hardening foundations are in place and need
+  routine maintenance rather than a new architecture.
 
 Implemented foundations:
 
@@ -30,6 +33,10 @@ Implemented foundations:
 - Support calibration artifacts with false-support case ids, confusion-bucket
   score summaries, and decision-path diagnostics for NLI/reranker threshold
   tuning.
+- A six-row verifier-component ablation runner with dependency-aware
+  completed/unavailable/model-error states, strict false-support gates,
+  standardized artifacts, CI planning smoke, and release-gated label maturity.
+  Production model execution and retrieval-source ablations remain open.
 - Agent skill instructions that define triggers, forbidden behaviors, MCP client
   setup notes, compact risk-first presentation, and cautious wording for
   not-found, outage, ambiguous, metadata-mismatch, and support results.
@@ -52,7 +59,9 @@ Definition of done:
 
 Status: current
 
-- Expand support verification examples into a larger real dev/test split
+- Expand support verification examples into a larger real dev/test split.
+  A maintainer-reviewed hard-case slice now exists under
+  `data/eval/support_hard_cases_v1.json`; dual-annotator coverage is still open
 - Raise human-reviewed support label coverage and resolve supported-label
   disagreements
 - Keep calibration data separate from final reporting data
@@ -74,7 +83,9 @@ Definition of done:
 Status: planned
 
 - Improve lawful live evidence harvesting beyond title and abstract fallbacks
-- Add more robust source-aware chunk filtering and provenance metadata
+- Add more robust source-aware chunk filtering and provenance metadata.
+  Open-access full text is now split into region-tagged units with character
+  locators; located spans are not a complete-paper review
 - Investigate contradiction-aware retrieval and stronger negative evidence handling
 - Continue improving calibration diagnostics for NLI neutral vs entailment
   behavior on larger, human-reviewed slices
@@ -112,8 +123,8 @@ Status: current
 - Add better configuration management for source selection, thresholds, and
   experiment presets
 - Improve developer ergonomics around model setup and experiment execution
-- Harden PyPI/MCP release checks, published-package smoke plans, and client setup
-  docs
+- Maintain the hardened PyPI/MCP release checks, published-package smoke plans,
+  dependency audit floors, and client setup docs
 - Consider lightweight visualization or review tooling for `CCEG`
 
 Definition of done:

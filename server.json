@@ -26,6 +26,16 @@
           "name": "CITEGUARD_MAILTO",
           "description": "Contact email for polite OpenAlex/Crossref access.",
           "isRequired": false
+        },
+        {
+          "name": "CITEGUARD_SUPPORT_ENGINE",
+          "description": "Claim-support profile: auto (default), heuristic (no model loading), or production.",
+          "isRequired": false
+        },
+        {
+          "name": "CITEGUARD_ALLOWED_FILE_ROOTS",
+          "description": "Path-separated roots for bounded local evidence and document audits; the server working directory is used when unset.",
+          "isRequired": false
         }
       ]
     }

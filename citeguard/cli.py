@@ -4,11 +4,16 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import sys
+import tempfile
+import time
+from pathlib import Path
 from typing import Any, Dict, Iterable, NoReturn, Optional, TextIO
 
 from citeguard import cli_input as _cli_input
+from citeguard.contracts import with_contract_version
 from citeguard.cli_input import (
     CLIUsageError,
     _has_citation_input,
@@ -35,13 +40,16 @@ from citeguard.runtime import (
     cache_path,
     environment_status,
 )
-from citeguard.skill_install import install_skill
+from citeguard.runtime_metrics import cli_metric_event, record_runtime_metric
+from citeguard.skill_install import check_skill, install_skill, skill_status, upgrade_skill
 from citeguard.verification import (
     audit_citations,
     audit_claim_support,
     check_claim_support,
     check_claim_support_set,
     clear_cache,
+    DocumentAuditError,
+    audit_document,
     enrich_support_payload_with_counterevidence,
     export_cache_records,
     filter_high_risk_payload,
@@ -112,28 +120,32 @@ def build_parser() -> argparse.ArgumentParser:
         help="Query used by --check-sources; defaults to a well-known paper title.",
     )
 
-    skill_parser = subparsers.add_parser("skill", help="Install the bundled agent skill into a supported client.")
+    skill_parser = subparsers.add_parser("skill", help="Install, inspect, and upgrade the bundled agent skill.")
     _add_output_args(skill_parser)
     skill_subparsers = skill_parser.add_subparsers(
         dest="skill_command", required=True, parser_class=CiteGuardArgumentParser
     )
     skill_install_parser = skill_subparsers.add_parser("install", help="Install CiteGuard's verification skill.")
-    skill_install_parser.add_argument("--client", choices=["codex", "claude", "cursor"], default="codex")
-    skill_install_parser.add_argument("--scope", choices=["user", "project"], default="user")
-    skill_install_parser.add_argument(
-        "--project-dir",
-        default="",
-        help="Project root for --scope project; defaults to the current directory.",
-    )
-    skill_install_parser.add_argument(
-        "--destination",
-        default="",
-        help="Explicit destination directory; overrides --client and --scope path selection.",
-    )
+    _add_skill_target_args(skill_install_parser)
     skill_install_parser.add_argument(
         "--force",
         action="store_true",
-        help="Replace an existing, different CiteGuard skill directory.",
+        help="Replace an existing, identified CiteGuard skill directory.",
+    )
+    skill_status_parser = skill_subparsers.add_parser("status", help="Show whether an installed skill matches this package.")
+    _add_skill_target_args(skill_status_parser)
+    skill_check_parser = skill_subparsers.add_parser(
+        "check", help="Run the post-install required-file and digest self-check."
+    )
+    _add_skill_target_args(skill_check_parser)
+    skill_upgrade_parser = skill_subparsers.add_parser(
+        "upgrade", help="Upgrade an existing CiteGuard skill after explicit overwrite consent."
+    )
+    _add_skill_target_args(skill_upgrade_parser)
+    skill_upgrade_parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Replace an installed skill that differs from the bundled version.",
     )
 
     models_parser = subparsers.add_parser("models", help="Manage optional claim-support models.")
@@ -312,11 +324,65 @@ def build_parser() -> argparse.ArgumentParser:
         default=4,
         help="Concurrent batch items (1-16; each scholarly source remains serialized).",
     )
+
+    document_audit_parser = subparsers.add_parser(
+        "audit-document",
+        help="Read a bounded manuscript/bibliography file, verify extracted citations, and return a suggestion-only review queue.",
+    )
+    _add_output_args(document_audit_parser)
+    document_audit_parser.add_argument("path", help="Markdown, LaTeX, BibTeX, BBL, or DOCX file to audit.")
+    document_audit_parser.add_argument(
+        "--format",
+        choices=["auto", "markdown", "md", "latex", "tex", "bibtex", "bbl", "docx"],
+        default="auto",
+        help="Input format; defaults to extension-based auto detection.",
+    )
+    document_audit_parser.add_argument(
+        "--allowed-root",
+        action="append",
+        default=[],
+        help="Directory allowed for the document and any local LaTeX includes/BibTeX files; repeat as needed.",
+    )
+    document_audit_parser.add_argument(
+        "--high-risk-only", action="store_true", help="Only return high-risk audit result rows while preserving the full review queue."
+    )
+    document_audit_parser.add_argument(
+        "--fail-on-review",
+        action="store_true",
+        help="Return exit code 1 when the audit requires citation or input review.",
+    )
+    document_audit_parser.add_argument(
+        "--jobs",
+        type=int,
+        choices=range(1, 17),
+        default=4,
+        help="Concurrent citation checks (1-16; each scholarly source remains serialized).",
+    )
+    document_audit_parser.add_argument(
+        "--html",
+        default="",
+        help="Write a human-readable HTML report without overwriting audited files. JSON still prints to stdout.",
+    )
     return parser
 
 
 def _add_output_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--compact", action="store_true", default=argparse.SUPPRESS, help="Print compact JSON.")
+
+
+def _add_skill_target_args(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--client", choices=["codex", "claude", "cursor"], default="codex")
+    parser.add_argument("--scope", choices=["user", "project"], default="user")
+    parser.add_argument(
+        "--project-dir",
+        default="",
+        help="Project root for --scope project; defaults to the current directory.",
+    )
+    parser.add_argument(
+        "--destination",
+        default="",
+        help="Explicit destination directory; overrides --client and --scope path selection.",
+    )
 
 
 def _add_citation_args(parser: argparse.ArgumentParser) -> None:
@@ -397,19 +463,21 @@ def run(
                 compact=args.compact,
             )
             return 0
-        if args.command == "skill" and args.skill_command == "install":
-            _print_json(
-                install_skill(
-                    args.client,
-                    args.scope,
-                    destination=args.destination,
-                    project_dir=args.project_dir,
-                    force=args.force,
-                ),
-                out,
-                compact=args.compact,
-            )
-            return 0
+        if args.command == "skill":
+            common_skill_args = {
+                "destination": args.destination,
+                "project_dir": args.project_dir,
+            }
+            if args.skill_command == "install":
+                payload = install_skill(args.client, args.scope, force=args.force, **common_skill_args)
+            elif args.skill_command == "status":
+                payload = skill_status(args.client, args.scope, **common_skill_args)
+            elif args.skill_command == "check":
+                payload = check_skill(args.client, args.scope, **common_skill_args)
+            else:
+                payload = upgrade_skill(args.client, args.scope, force=args.force, **common_skill_args)
+            _print_json(payload, out, compact=args.compact)
+            return 0 if payload["ok"] else 1
         if args.command == "models" and args.models_command == "warmup":
             try:
                 payload = warmup_support_models(
@@ -622,6 +690,42 @@ def run(
                 raise _input_file_error(exc, command=args.command, path=args.path) from exc
             _print_json(extracted_candidates, out, compact=args.compact)
             return 0
+        if args.command == "audit-document":
+            try:
+                payload = audit_document(
+                    args.path,
+                    source=source,
+                    source_factory=(lambda: build_configured_source()) if source is None else None,
+                    doi_registry_factory=build_doi_registry_probe,
+                    source_format=args.format,
+                    allowed_roots=args.allowed_root or None,
+                    max_workers=args.jobs,
+                    high_risk_only=args.high_risk_only,
+                )
+            except DocumentAuditError as exc:
+                raise CLIUsageError(
+                    exc.code,
+                    str(exc),
+                    details={"command": args.command, **exc.details},
+                ) from exc
+            html_path = str(getattr(args, "html", "") or "").strip()
+            if html_path:
+                from citeguard.verification.document_report import render_document_audit_html
+
+                try:
+                    output = Path(html_path).expanduser()
+                    _guard_document_html_output(output, payload)
+                    _write_text_atomically(output, render_document_audit_html(payload))
+                except OSError as exc:
+                    raise _output_file_error(exc, command=args.command, path=html_path) from exc
+            _print_json(payload, out, compact=args.compact)
+            review_status = payload.get("review_status")
+            review_required = (
+                bool(review_status.get("review_required"))
+                if isinstance(review_status, dict)
+                else bool(payload.get("review_queue"))
+            )
+            return 1 if args.fail_on_review and review_required else 0
         if args.command == "audit":
             citations = _load_audit_input(args.path)
             for index, item in enumerate(citations, start=1):
@@ -717,6 +821,8 @@ def _write_error(
 
 
 def _print_json(payload: Any, out: TextIO, compact: bool = False) -> None:
+    if isinstance(payload, dict):
+        payload = with_contract_version(payload)
     if compact:
         out.write(json.dumps(payload, sort_keys=True, separators=(",", ":")))
     else:
@@ -724,8 +830,57 @@ def _print_json(payload: Any, out: TextIO, compact: bool = False) -> None:
     out.write("\n")
 
 
+def _guard_document_html_output(output: Path, payload: Dict[str, Any]) -> None:
+    document = payload.get("document")
+    snapshot = document.get("snapshot") if isinstance(document, dict) else None
+    files = snapshot.get("files", []) if isinstance(snapshot, dict) else []
+    dependencies = document.get("dependencies") if isinstance(document, dict) else None
+    missing = dependencies.get("missing", []) if isinstance(dependencies, dict) else []
+    resolved_output = output.resolve()
+    for item in [*files, *missing]:
+        if not isinstance(item, dict) or not item.get("path"):
+            continue
+        input_path = Path(str(item["path"]))
+        if resolved_output == input_path.resolve() or (output.exists() and output.samefile(input_path)):
+            raise CLIUsageError(
+                "invalid_input",
+                "HTML output must not replace the audited document or one of its dependencies.",
+                details={"command": "audit-document", "field": "html", "path": str(output)},
+            )
+    if output.is_symlink():
+        raise CLIUsageError(
+            "invalid_input",
+            "HTML output must not be a symlink.",
+            details={"command": "audit-document", "field": "html", "path": str(output)},
+        )
+
+
+def _write_text_atomically(output: Path, content: str) -> None:
+    temporary_path: Optional[Path] = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w", encoding="utf-8", dir=output.parent, prefix=f".{output.name}.", suffix=".tmp", delete=False
+        ) as handle:
+            temporary_path = Path(handle.name)
+            handle.write(content)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary_path, output)
+    finally:
+        if temporary_path is not None:
+            temporary_path.unlink(missing_ok=True)
+
+
 def main(argv: Optional[Iterable[str]] = None) -> None:
-    raise SystemExit(run(argv))
+    raw_argv = list(argv) if argv is not None else list(sys.argv[1:])
+    started = time.monotonic()
+    exit_code = run(raw_argv)
+    record_runtime_metric(
+        cli_metric_event(raw_argv),
+        "success" if exit_code == 0 else "failure",
+        time.monotonic() - started,
+    )
+    raise SystemExit(exit_code)
 
 
 if __name__ == "__main__":

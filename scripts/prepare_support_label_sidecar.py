@@ -506,6 +506,7 @@ def _merge_annotation_packet(sidecar: dict, cases: list, annotation_rows: list) 
         item = sidecar_by_id[case_id]
         item["annotator_count"] = len(case_annotations)
         item["annotator_labels"] = labels
+        item["annotator_ids"] = annotator_ids
         item["adjudicated_label"] = case.gold
         item["adjudication_status"] = "dual_annotator_agreed" if len(case_annotations) >= 2 else "single_annotator"
         item["disagreement"] = "none"

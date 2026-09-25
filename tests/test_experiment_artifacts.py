@@ -52,6 +52,7 @@ class ExperimentArtifactTests(unittest.TestCase):
                             "full_text_required_unreviewed": 7,
                             "policy_boundary_unreviewed": 2,
                             "dual_annotated": 2,
+                            "dual_independent": 2,
                             "unresolved_disagreements": 1,
                             "supported_disagreements": 1,
                             "raw_dual_agreement_rate": 0.5,
@@ -103,6 +104,7 @@ class ExperimentArtifactTests(unittest.TestCase):
         self.assertEqual(summary["support_label_full_text_required_unreviewed"], 7)
         self.assertEqual(summary["support_label_policy_boundary_unreviewed"], 2)
         self.assertEqual(summary["support_label_dual_annotated"], 2)
+        self.assertEqual(summary["support_label_dual_independent"], 2)
         self.assertEqual(summary["support_label_unresolved_disagreements"], 1)
         self.assertEqual(summary["support_label_supported_disagreements"], 1)
         self.assertEqual(summary["support_label_raw_dual_agreement_rate"], 0.5)
@@ -233,6 +235,7 @@ class ExperimentArtifactTests(unittest.TestCase):
                         "label_maturity": {
                             "human_reviewed": 0,
                             "dual_annotated": 0,
+                            "dual_independent": 0,
                             "published_benchmark": 0,
                             "high_risk_unreviewed": 35,
                         },
@@ -251,6 +254,7 @@ class ExperimentArtifactTests(unittest.TestCase):
         self.assertEqual(summary["support_release_next_action"], "block_release_until_high_risk_reviewed")
         self.assertEqual(summary["support_release_quality_gate_ok"], False)
         self.assertEqual(summary["support_release_label_sidecar_gate_ok"], True)
+        self.assertEqual(summary["support_release_label_dual_independent"], 0)
         self.assertFalse(summary["support_release_benchmark_claim_safe"])
         self.assertTrue(summary["support_release_ok_to_accept_supported"])
         self.assertEqual(summary["support_release_case_count"], 19)
@@ -575,6 +579,18 @@ class ExperimentArtifactTests(unittest.TestCase):
         self.assertIsNone(manifest["result_summary"]["false_support_top_overcall_backend"])
         self.assertIsNone(manifest["result_summary"]["false_support_top_risk_slice_id"])
         self.assertEqual(manifest["result_summary"]["false_support_top_risk_slice_case_ids"], [])
+        self.assertEqual(
+            manifest["result_summary"]["false_support_top_overcall_review_plan_packet_ids"],
+            [],
+        )
+        self.assertEqual(
+            manifest["result_summary"]["false_support_top_overcall_review_plan_packet_count"],
+            0,
+        )
+        self.assertEqual(
+            manifest["result_summary"]["false_support_top_overcall_review_plan_packet_case_ids"],
+            [],
+        )
 
     def test_compare_support_baselines_cli_writes_reproducible_table(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -637,6 +653,21 @@ class ExperimentArtifactTests(unittest.TestCase):
             payload["comparison"][1]["top_false_support_risk_slice"]["id"],
             payload["comparison"][1]["false_support_risk_slices"][0]["id"],
         )
+        self.assertEqual(payload["comparison"][0]["false_support_review_plan_packet_ids"], [])
+        self.assertEqual(payload["comparison"][0]["false_support_review_plan_packet_count"], 0)
+        self.assertEqual(payload["comparison"][0]["false_support_review_plan_packet_case_ids"], [])
+        self.assertEqual(
+            payload["comparison"][1]["false_support_review_plan_packet_ids"],
+            [
+                "support-label-packet-weak-support-overcall-review",
+                "support-label-packet-highest-risk-slice-review",
+            ],
+        )
+        self.assertEqual(payload["comparison"][1]["false_support_review_plan_packet_count"], 2)
+        self.assertEqual(
+            payload["comparison"][1]["false_support_review_plan_packet_case_ids"],
+            ["s39", "s48"],
+        )
         self.assertIn("label_sidecar_gate", payload)
         self.assertEqual(artifact["run_id"], "support-baselines-smoke")
         self.assertEqual(manifest["result_summary"]["false_support_overcall_backends"], ["heuristic"])
@@ -648,6 +679,18 @@ class ExperimentArtifactTests(unittest.TestCase):
         self.assertEqual(
             manifest["result_summary"]["false_support_top_risk_slice_case_ids"],
             payload["comparison"][1]["top_false_support_risk_slice"]["case_ids"],
+        )
+        self.assertEqual(
+            manifest["result_summary"]["false_support_top_overcall_review_plan_packet_ids"],
+            payload["comparison"][1]["false_support_review_plan_packet_ids"],
+        )
+        self.assertEqual(
+            manifest["result_summary"]["false_support_top_overcall_review_plan_packet_count"],
+            payload["comparison"][1]["false_support_review_plan_packet_count"],
+        )
+        self.assertEqual(
+            manifest["result_summary"]["false_support_top_overcall_review_plan_packet_case_ids"],
+            payload["comparison"][1]["false_support_review_plan_packet_case_ids"],
         )
         self.assertEqual(manifest["result_summary"]["support_set_policy_case_count"], 3)
         self.assertEqual(
@@ -663,6 +706,7 @@ class ExperimentArtifactTests(unittest.TestCase):
         self.assertEqual(manifest["result_summary"]["support_label_full_text_required_unreviewed"], 7)
         self.assertEqual(manifest["result_summary"]["support_label_policy_boundary_unreviewed"], 2)
         self.assertEqual(manifest["result_summary"]["support_label_dual_annotated"], 0)
+        self.assertEqual(manifest["result_summary"]["support_label_dual_independent"], 0)
         self.assertEqual(manifest["result_summary"]["support_label_unresolved_disagreements"], 0)
         self.assertEqual(manifest["result_summary"]["support_label_supported_disagreements"], 0)
         self.assertIsNone(manifest["result_summary"]["support_label_raw_dual_agreement_rate"])
@@ -744,6 +788,96 @@ class ExperimentArtifactTests(unittest.TestCase):
         self.assertEqual(
             payload["label_sidecar_gate"]["failures"][0]["code"],
             "sidecar_high_risk_reviewed_by_language",
+        )
+
+    def test_support_verifier_ablation_cli_writes_reproducible_matrix_artifact(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            completed = subprocess.run(
+                [
+                    sys.executable,
+                    "scripts/run_support_ablations.py",
+                    "--split",
+                    "test",
+                    "--ablation",
+                    "heuristic_only",
+                    "--output-dir",
+                    tmpdir,
+                    "--run-id",
+                    "support-ablation-smoke",
+                ],
+                check=True,
+                cwd=os.getcwd(),
+                capture_output=True,
+                text=True,
+            )
+            payload = json.loads(completed.stdout)
+            run_path = Path(payload["experiment_artifact"]["path"])
+            manifest = json.loads((run_path / "manifest.json").read_text(encoding="utf-8"))
+            result = json.loads((run_path / "result.json").read_text(encoding="utf-8"))
+            config = json.loads((run_path / "config.json").read_text(encoding="utf-8"))
+
+        self.assertEqual(payload["requested_ablations"], ["heuristic_only"])
+        self.assertEqual(payload["completed_ablations"], ["heuristic_only"])
+        self.assertTrue(payload["matrix_complete"])
+        self.assertEqual(payload["comparison"][0]["status"], "completed")
+        self.assertIn("false_support_rate", payload["comparison"][0])
+        self.assertFalse(payload["label_provenance"]["benchmark_claim_safe"])
+        self.assertEqual(payload["label_provenance"]["human_reviewed"], 0)
+        summary = manifest["result_summary"]
+        self.assertEqual(summary["support_ablation_axis"], "verifier_components")
+        self.assertEqual(summary["support_ablation_requested"], ["heuristic_only"])
+        self.assertEqual(summary["support_ablation_completed"], ["heuristic_only"])
+        self.assertEqual(summary["support_ablation_status_by_name"], {"heuristic_only": "completed"})
+        self.assertIn("heuristic_only", summary["support_ablation_metrics"])
+        self.assertIn("false_support_rate", summary["support_ablation_metrics"]["heuristic_only"])
+        self.assertEqual(summary["support_ablation_label_human_reviewed"], 0)
+        self.assertFalse(summary["support_ablation_benchmark_claim_safe"])
+        self.assertEqual(result["comparison"], payload["comparison"])
+        self.assertEqual(config["script"], "scripts/run_support_ablations.py")
+        self.assertEqual(config["ablations"], ["heuristic_only"])
+
+    def test_support_verifier_ablation_cli_can_fail_on_incomplete_or_unsafe_rows(self):
+        incomplete = subprocess.run(
+            [
+                sys.executable,
+                "scripts/run_support_ablations.py",
+                "--split",
+                "test",
+                "--plan-only",
+                "--fail-on-unavailable",
+            ],
+            check=False,
+            cwd=os.getcwd(),
+            capture_output=True,
+            text=True,
+        )
+        incomplete_payload = json.loads(incomplete.stdout)
+        quality = subprocess.run(
+            [
+                sys.executable,
+                "scripts/run_support_ablations.py",
+                "--split",
+                "test",
+                "--ablation",
+                "heuristic_only",
+                "--fail-on-quality-gate",
+            ],
+            check=False,
+            cwd=os.getcwd(),
+            capture_output=True,
+            text=True,
+        )
+        quality_payload = json.loads(quality.stdout)
+
+        self.assertEqual(incomplete.returncode, 1)
+        self.assertFalse(incomplete_payload["matrix_complete"])
+        self.assertEqual(incomplete_payload["completed_ablations"], [])
+        self.assertEqual(quality.returncode, 1)
+        self.assertTrue(quality_payload["matrix_complete"])
+        self.assertFalse(quality_payload["quality_gates_ok"])
+        self.assertIn(
+            "weak_false_support_count",
+            quality_payload["comparison"][0]["quality_gate_failure_codes"],
         )
 
 

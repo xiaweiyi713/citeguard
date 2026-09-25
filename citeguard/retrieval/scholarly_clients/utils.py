@@ -254,6 +254,18 @@ def merge_record_list(records: Iterable[CitationRecord]) -> List[CitationRecord]
     return list(merged.values())
 
 
+def record_source_names(record: CitationRecord) -> List[str]:
+    """Return every scholarly source represented by a possibly merged record."""
+
+    names = set()
+    if record.source:
+        names.add(str(record.source))
+    merged_sources = record.metadata.get("merged_sources", [])
+    if isinstance(merged_sources, (list, tuple, set)):
+        names.update(str(source) for source in merged_sources if source)
+    return sorted(names)
+
+
 def canonical_record_key(record: CitationRecord) -> str:
     """Prefer DOI, then arXiv id, then normalized title for deduplication."""
 

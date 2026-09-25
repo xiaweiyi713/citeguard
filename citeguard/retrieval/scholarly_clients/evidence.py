@@ -330,7 +330,7 @@ def merge_evidence_chunks(*collections: Iterable[dict]) -> List[dict]:
         for item in collection or []:
             if not isinstance(item, dict):
                 text = _clean_text(str(item))
-                candidate = {"text": text, "source_field": "metadata_span", "source_url": ""}
+                candidate: Dict[str, object] = {"text": text, "source_field": "metadata_span", "source_url": ""}
             else:
                 text = _clean_text(str(item.get("text", "")))
                 candidate = {
@@ -338,11 +338,31 @@ def merge_evidence_chunks(*collections: Iterable[dict]) -> List[dict]:
                     "source_field": str(item.get("source_field", "metadata_span")),
                     "source_url": str(item.get("source_url", "")),
                 }
-                for key in ("source_name", "evidence_scope", "retrieved_at", "retrieval_source"):
-                    if item.get(key):
-                        candidate[key] = str(item.get(key, ""))
+                for key in (
+                    "source_name",
+                    "evidence_scope",
+                    "source_locator",
+                    "source_path",
+                    "source_line_start",
+                    "source_line_end",
+                    "source_paragraph_start",
+                    "source_paragraph_end",
+                    "char_start",
+                    "char_end",
+                    "retrieved_at",
+                    "retrieval_method",
+                    "retrieval_source",
+                    "license_status",
+                    "license",
+                    "license_value",
+                    "rights_basis",
+                    "content_type",
+                ):
+                    value = item.get(key)
+                    if value not in (None, ""):
+                        candidate[key] = value
                 if not candidate.get("source_name"):
-                    inferred_source = _infer_chunk_source_name(candidate["source_field"])
+                    inferred_source = _infer_chunk_source_name(str(candidate["source_field"]))
                     if inferred_source:
                         candidate["source_name"] = inferred_source
             if not text:
@@ -353,8 +373,30 @@ def merge_evidence_chunks(*collections: Iterable[dict]) -> List[dict]:
                 if not existing.get("source_url") and candidate.get("source_url"):
                     merged[text_to_index[key]] = candidate
                 else:
-                    for metadata_key in ("source_name", "evidence_scope", "retrieved_at", "retrieval_source"):
-                        if not existing.get(metadata_key) and candidate.get(metadata_key):
+                    for metadata_key in (
+                        "source_name",
+                        "evidence_scope",
+                        "source_locator",
+                        "source_path",
+                        "source_line_start",
+                        "source_line_end",
+                        "source_paragraph_start",
+                        "source_paragraph_end",
+                        "char_start",
+                        "char_end",
+                        "retrieved_at",
+                        "retrieval_method",
+                        "retrieval_source",
+                        "license_status",
+                        "license",
+                        "license_value",
+                        "rights_basis",
+                        "content_type",
+                    ):
+                        if (
+                            existing.get(metadata_key) in (None, "")
+                            and candidate.get(metadata_key) not in (None, "")
+                        ):
                             existing[metadata_key] = candidate[metadata_key]
                 continue
             text_to_index[key] = len(merged)

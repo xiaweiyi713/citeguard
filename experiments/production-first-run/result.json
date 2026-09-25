@@ -1,0 +1,1862 @@
+{
+  "abstention_analysis": {
+    "by_case_type": {
+      "full_text_required": {
+        "case_ids": [
+          "s17",
+          "s30",
+          "s43"
+        ],
+        "correct_abstention": 3,
+        "correct_case_ids": [
+          "s17",
+          "s30",
+          "s43"
+        ],
+        "incorrect_abstention": 0,
+        "incorrect_case_ids": [],
+        "total": 3
+      },
+      "hard_negative": {
+        "case_ids": [
+          "s23",
+          "s31",
+          "s41"
+        ],
+        "correct_abstention": 3,
+        "correct_case_ids": [
+          "s23",
+          "s31",
+          "s41"
+        ],
+        "incorrect_abstention": 0,
+        "incorrect_case_ids": [],
+        "total": 3
+      }
+    },
+    "by_evidence_scope": {
+      "abstract": {
+        "case_ids": [
+          "s17",
+          "s23",
+          "s30",
+          "s31",
+          "s43"
+        ],
+        "correct_abstention": 5,
+        "correct_case_ids": [
+          "s17",
+          "s23",
+          "s30",
+          "s31",
+          "s43"
+        ],
+        "incorrect_abstention": 0,
+        "incorrect_case_ids": [],
+        "total": 5
+      },
+      "mixed": {
+        "case_ids": [
+          "s41"
+        ],
+        "correct_abstention": 1,
+        "correct_case_ids": [
+          "s41"
+        ],
+        "incorrect_abstention": 0,
+        "incorrect_case_ids": [],
+        "total": 1
+      }
+    },
+    "by_language": {
+      "en": {
+        "case_ids": [
+          "s17",
+          "s23",
+          "s30",
+          "s31",
+          "s41"
+        ],
+        "correct_abstention": 5,
+        "correct_case_ids": [
+          "s17",
+          "s23",
+          "s30",
+          "s31",
+          "s41"
+        ],
+        "incorrect_abstention": 0,
+        "incorrect_case_ids": [],
+        "total": 5
+      },
+      "zh": {
+        "case_ids": [
+          "s43"
+        ],
+        "correct_abstention": 1,
+        "correct_case_ids": [
+          "s43"
+        ],
+        "incorrect_abstention": 0,
+        "incorrect_case_ids": [],
+        "total": 1
+      }
+    },
+    "by_split": {
+      "test": {
+        "case_ids": [
+          "s17",
+          "s23",
+          "s30",
+          "s31",
+          "s41",
+          "s43"
+        ],
+        "correct_abstention": 6,
+        "correct_case_ids": [
+          "s17",
+          "s23",
+          "s30",
+          "s31",
+          "s41",
+          "s43"
+        ],
+        "incorrect_abstention": 0,
+        "incorrect_case_ids": [],
+        "total": 6
+      }
+    },
+    "case_ids": [
+      "s17",
+      "s23",
+      "s30",
+      "s31",
+      "s41",
+      "s43"
+    ],
+    "correct_abstention_count": 6,
+    "correct_case_ids": [
+      "s17",
+      "s23",
+      "s30",
+      "s31",
+      "s41",
+      "s43"
+    ],
+    "incorrect_abstention_count": 0,
+    "incorrect_case_ids": [],
+    "interpretation": "Correct abstentions are conservative behavior on insufficient-evidence cases; incorrect abstentions are recall-loss cases to inspect before tightening abstention thresholds.",
+    "review_case_ids": [],
+    "total_abstention_count": 6
+  },
+  "acceptance_guard": {
+    "block_acceptance_case_ids": [],
+    "block_acceptance_count": 0,
+    "interpretation": "A supported prediction for a non-supporting gold case blocks acceptance. A weakly_supported prediction for a non-supporting gold case must be reviewed before it is treated as support.",
+    "next_action": "accept_supported_predictions",
+    "ok_to_accept_supported": true,
+    "policy": "supported_overcalls_block_acceptance; weak_overcalls_require_review",
+    "review_before_accepting_case_ids": [],
+    "review_before_accepting_count": 0
+  },
+  "acceptance_slices": [
+    {
+      "case_count": 6,
+      "case_ids": [
+        "s10",
+        "s16",
+        "s27",
+        "s36",
+        "s39",
+        "s48"
+      ],
+      "false_support_case_ids": [],
+      "false_support_count": 0,
+      "id": "contradiction",
+      "policy": "contradicted_cases_must_not_be_called_supported",
+      "recommended_action": "continue",
+      "severity": "critical",
+      "status": "clear",
+      "weak_false_support_case_ids": [],
+      "weak_false_support_count": 0
+    },
+    {
+      "case_count": 6,
+      "case_ids": [
+        "s23",
+        "s31",
+        "s41",
+        "s45",
+        "s46",
+        "s47"
+      ],
+      "false_support_case_ids": [],
+      "false_support_count": 0,
+      "id": "hard_negative",
+      "policy": "real_or_related_papers_without_claim_support_must_not_be_called_supported",
+      "recommended_action": "continue",
+      "severity": "critical",
+      "status": "clear",
+      "weak_false_support_case_ids": [],
+      "weak_false_support_count": 0
+    },
+    {
+      "case_count": 4,
+      "case_ids": [
+        "s17",
+        "s27",
+        "s30",
+        "s43"
+      ],
+      "false_support_case_ids": [],
+      "false_support_count": 0,
+      "id": "full_text_boundary",
+      "policy": "abstract_or_metadata_evidence_must_not_be_upgraded_to_full_text_support",
+      "recommended_action": "continue",
+      "severity": "high",
+      "status": "clear",
+      "weak_false_support_case_ids": [],
+      "weak_false_support_count": 0
+    },
+    {
+      "case_count": 19,
+      "case_ids": [
+        "s05",
+        "s09",
+        "s10",
+        "s16",
+        "s17",
+        "s18",
+        "s23",
+        "s24",
+        "s27",
+        "s30",
+        "s31",
+        "s36",
+        "s39",
+        "s41",
+        "s43",
+        "s45",
+        "s46",
+        "s47",
+        "s48"
+      ],
+      "false_support_case_ids": [],
+      "false_support_count": 0,
+      "id": "test_split",
+      "policy": "heldout_test_overcalls_require_release_review",
+      "recommended_action": "continue",
+      "severity": "high",
+      "status": "clear",
+      "weak_false_support_case_ids": [],
+      "weak_false_support_count": 0
+    },
+    {
+      "case_count": 6,
+      "case_ids": [
+        "s05",
+        "s10",
+        "s18",
+        "s36",
+        "s39",
+        "s43"
+      ],
+      "false_support_case_ids": [],
+      "false_support_count": 0,
+      "id": "non_english",
+      "policy": "non_english_overcalls_require_language_specific_review",
+      "recommended_action": "continue",
+      "severity": "high",
+      "status": "clear",
+      "weak_false_support_case_ids": [],
+      "weak_false_support_count": 0
+    }
+  ],
+  "by_case_type": {
+    "contradiction": {
+      "abstention_rate": 0.0,
+      "accuracy": 1.0,
+      "contradiction_recall": 1.0,
+      "false_support_rate": 0.0,
+      "macro_f1": 0.25,
+      "macro_precision": 0.25,
+      "macro_recall": 0.25,
+      "misjudged_support_rate": 0.0,
+      "n": 6,
+      "per_label": {
+        "contradicted": {
+          "f1": 1.0,
+          "gold": 6,
+          "precision": 1.0,
+          "predicted": 6,
+          "recall": 1.0,
+          "tp": 6
+        },
+        "insufficient_evidence": {
+          "f1": 0.0,
+          "gold": 0,
+          "precision": 0.0,
+          "predicted": 0,
+          "recall": 0.0,
+          "tp": 0
+        },
+        "supported": {
+          "f1": 0.0,
+          "gold": 0,
+          "precision": 0.0,
+          "predicted": 0,
+          "recall": 0.0,
+          "tp": 0
+        },
+        "weakly_supported": {
+          "f1": 0.0,
+          "gold": 0,
+          "precision": 0.0,
+          "predicted": 0,
+          "recall": 0.0,
+          "tp": 0
+        }
+      },
+      "support_overcall_count": 0,
+      "support_overcall_rate": 0.0,
+      "supported_f1": 0.0,
+      "supported_precision": 0.0,
+      "supported_recall": 0.0,
+      "weighted_f1": 1.0,
+      "weighted_precision": 1.0,
+      "weighted_recall": 1.0
+    },
+    "direct_support": {
+      "abstention_rate": 0.0,
+      "accuracy": 0.6667,
+      "contradiction_recall": 0.0,
+      "false_support_rate": 0.0,
+      "macro_f1": 0.2,
+      "macro_precision": 0.25,
+      "macro_recall": 0.1667,
+      "misjudged_support_rate": 0.3333,
+      "n": 3,
+      "per_label": {
+        "contradicted": {
+          "f1": 0.0,
+          "gold": 0,
+          "precision": 0.0,
+          "predicted": 1,
+          "recall": 0.0,
+          "tp": 0
+        },
+        "insufficient_evidence": {
+          "f1": 0.0,
+          "gold": 0,
+          "precision": 0.0,
+          "predicted": 0,
+          "recall": 0.0,
+          "tp": 0
+        },
+        "supported": {
+          "f1": 0.8,
+          "gold": 3,
+          "precision": 1.0,
+          "predicted": 2,
+          "recall": 0.6667,
+          "tp": 2
+        },
+        "weakly_supported": {
+          "f1": 0.0,
+          "gold": 0,
+          "precision": 0.0,
+          "predicted": 0,
+          "recall": 0.0,
+          "tp": 0
+        }
+      },
+      "support_overcall_count": 0,
+      "support_overcall_rate": 0.0,
+      "supported_f1": 0.8,
+      "supported_precision": 1.0,
+      "supported_recall": 0.6667,
+      "weighted_f1": 0.8,
+      "weighted_precision": 1.0,
+      "weighted_recall": 0.6667
+    },
+    "full_text_required": {
+      "abstention_rate": 1.0,
+      "accuracy": 1.0,
+      "contradiction_recall": 0.0,
+      "false_support_rate": 0.0,
+      "macro_f1": 0.25,
+      "macro_precision": 0.25,
+      "macro_recall": 0.25,
+      "misjudged_support_rate": 0.0,
+      "n": 3,
+      "per_label": {
+        "contradicted": {
+          "f1": 0.0,
+          "gold": 0,
+          "precision": 0.0,
+          "predicted": 0,
+          "recall": 0.0,
+          "tp": 0
+        },
+        "insufficient_evidence": {
+          "f1": 1.0,
+          "gold": 3,
+          "precision": 1.0,
+          "predicted": 3,
+          "recall": 1.0,
+          "tp": 3
+        },
+        "supported": {
+          "f1": 0.0,
+          "gold": 0,
+          "precision": 0.0,
+          "predicted": 0,
+          "recall": 0.0,
+          "tp": 0
+        },
+        "weakly_supported": {
+          "f1": 0.0,
+          "gold": 0,
+          "precision": 0.0,
+          "predicted": 0,
+          "recall": 0.0,
+          "tp": 0
+        }
+      },
+      "support_overcall_count": 0,
+      "support_overcall_rate": 0.0,
+      "supported_f1": 0.0,
+      "supported_precision": 0.0,
+      "supported_recall": 0.0,
+      "weighted_f1": 1.0,
+      "weighted_precision": 1.0,
+      "weighted_recall": 1.0
+    },
+    "hard_negative": {
+      "abstention_rate": 0.5,
+      "accuracy": 0.5,
+      "contradiction_recall": 0.0,
+      "false_support_rate": 0.0,
+      "macro_f1": 0.1667,
+      "macro_precision": 0.25,
+      "macro_recall": 0.125,
+      "misjudged_support_rate": 0.0,
+      "n": 6,
+      "per_label": {
+        "contradicted": {
+          "f1": 0.0,
+          "gold": 0,
+          "precision": 0.0,
+          "predicted": 3,
+          "recall": 0.0,
+          "tp": 0
+        },
+        "insufficient_evidence": {
+          "f1": 0.6667,
+          "gold": 6,
+          "precision": 1.0,
+          "predicted": 3,
+          "recall": 0.5,
+          "tp": 3
+        },
+        "supported": {
+          "f1": 0.0,
+          "gold": 0,
+          "precision": 0.0,
+          "predicted": 0,
+          "recall": 0.0,
+          "tp": 0
+        },
+        "weakly_supported": {
+          "f1": 0.0,
+          "gold": 0,
+          "precision": 0.0,
+          "predicted": 0,
+          "recall": 0.0,
+          "tp": 0
+        }
+      },
+      "support_overcall_count": 0,
+      "support_overcall_rate": 0.0,
+      "supported_f1": 0.0,
+      "supported_precision": 0.0,
+      "supported_recall": 0.0,
+      "weighted_f1": 0.6667,
+      "weighted_precision": 1.0,
+      "weighted_recall": 0.5
+    },
+    "weak_support": {
+      "abstention_rate": 0.0,
+      "accuracy": 1.0,
+      "contradiction_recall": 0.0,
+      "false_support_rate": 0.0,
+      "macro_f1": 0.25,
+      "macro_precision": 0.25,
+      "macro_recall": 0.25,
+      "misjudged_support_rate": 0.0,
+      "n": 1,
+      "per_label": {
+        "contradicted": {
+          "f1": 0.0,
+          "gold": 0,
+          "precision": 0.0,
+          "predicted": 0,
+          "recall": 0.0,
+          "tp": 0
+        },
+        "insufficient_evidence": {
+          "f1": 0.0,
+          "gold": 0,
+          "precision": 0.0,
+          "predicted": 0,
+          "recall": 0.0,
+          "tp": 0
+        },
+        "supported": {
+          "f1": 0.0,
+          "gold": 0,
+          "precision": 0.0,
+          "predicted": 0,
+          "recall": 0.0,
+          "tp": 0
+        },
+        "weakly_supported": {
+          "f1": 1.0,
+          "gold": 1,
+          "precision": 1.0,
+          "predicted": 1,
+          "recall": 1.0,
+          "tp": 1
+        }
+      },
+      "support_overcall_count": 0,
+      "support_overcall_rate": 0.0,
+      "supported_f1": 0.0,
+      "supported_precision": 0.0,
+      "supported_recall": 0.0,
+      "weighted_f1": 1.0,
+      "weighted_precision": 1.0,
+      "weighted_recall": 1.0
+    }
+  },
+  "by_evidence_scope": {
+    "abstract": {
+      "abstention_rate": 0.3846,
+      "accuracy": 0.7692,
+      "contradiction_recall": 1.0,
+      "false_support_rate": 0.0,
+      "macro_f1": 0.609,
+      "macro_precision": 0.625,
+      "macro_recall": 0.6562,
+      "misjudged_support_rate": 0.0,
+      "n": 13,
+      "per_label": {
+        "contradicted": {
+          "f1": 0.6667,
+          "gold": 3,
+          "precision": 0.5,
+          "predicted": 6,
+          "recall": 1.0,
+          "tp": 3
+        },
+        "insufficient_evidence": {
+          "f1": 0.7692,
+          "gold": 8,
+          "precision": 1.0,
+          "predicted": 5,
+          "recall": 0.625,
+          "tp": 5
+        },
+        "supported": {
+          "f1": 1.0,
+          "gold": 2,
+          "precision": 1.0,
+          "predicted": 2,
+          "recall": 1.0,
+          "tp": 2
+        },
+        "weakly_supported": {
+          "f1": 0.0,
+          "gold": 0,
+          "precision": 0.0,
+          "predicted": 0,
+          "recall": 0.0,
+          "tp": 0
+        }
+      },
+      "support_overcall_count": 0,
+      "support_overcall_rate": 0.0,
+      "supported_f1": 1.0,
+      "supported_precision": 1.0,
+      "supported_recall": 1.0,
+      "weighted_f1": 0.7811,
+      "weighted_precision": 0.8846,
+      "weighted_recall": 0.7692
+    },
+    "metadata_snippet": {
+      "abstention_rate": 0.0,
+      "accuracy": 0.6667,
+      "contradiction_recall": 1.0,
+      "false_support_rate": 0.0,
+      "macro_f1": 0.2,
+      "macro_precision": 0.1667,
+      "macro_recall": 0.25,
+      "misjudged_support_rate": 1.0,
+      "n": 3,
+      "per_label": {
+        "contradicted": {
+          "f1": 0.8,
+          "gold": 2,
+          "precision": 0.6667,
+          "predicted": 3,
+          "recall": 1.0,
+          "tp": 2
+        },
+        "insufficient_evidence": {
+          "f1": 0.0,
+          "gold": 0,
+          "precision": 0.0,
+          "predicted": 0,
+          "recall": 0.0,
+          "tp": 0
+        },
+        "supported": {
+          "f1": 0.0,
+          "gold": 1,
+          "precision": 0.0,
+          "predicted": 0,
+          "recall": 0.0,
+          "tp": 0
+        },
+        "weakly_supported": {
+          "f1": 0.0,
+          "gold": 0,
+          "precision": 0.0,
+          "predicted": 0,
+          "recall": 0.0,
+          "tp": 0
+        }
+      },
+      "support_overcall_count": 0,
+      "support_overcall_rate": 0.0,
+      "supported_f1": 0.0,
+      "supported_precision": 0.0,
+      "supported_recall": 0.0,
+      "weighted_f1": 0.5333,
+      "weighted_precision": 0.4445,
+      "weighted_recall": 0.6667
+    },
+    "mixed": {
+      "abstention_rate": 1.0,
+      "accuracy": 1.0,
+      "contradiction_recall": 0.0,
+      "false_support_rate": 0.0,
+      "macro_f1": 0.25,
+      "macro_precision": 0.25,
+      "macro_recall": 0.25,
+      "misjudged_support_rate": 0.0,
+      "n": 1,
+      "per_label": {
+        "contradicted": {
+          "f1": 0.0,
+          "gold": 0,
+          "precision": 0.0,
+          "predicted": 0,
+          "recall": 0.0,
+          "tp": 0
+        },
+        "insufficient_evidence": {
+          "f1": 1.0,
+          "gold": 1,
+          "precision": 1.0,
+          "predicted": 1,
+          "recall": 1.0,
+          "tp": 1
+        },
+        "supported": {
+          "f1": 0.0,
+          "gold": 0,
+          "precision": 0.0,
+          "predicted": 0,
+          "recall": 0.0,
+          "tp": 0
+        },
+        "weakly_supported": {
+          "f1": 0.0,
+          "gold": 0,
+          "precision": 0.0,
+          "predicted": 0,
+          "recall": 0.0,
+          "tp": 0
+        }
+      },
+      "support_overcall_count": 0,
+      "support_overcall_rate": 0.0,
+      "supported_f1": 0.0,
+      "supported_precision": 0.0,
+      "supported_recall": 0.0,
+      "weighted_f1": 1.0,
+      "weighted_precision": 1.0,
+      "weighted_recall": 1.0
+    },
+    "mixed_with_full_text": {
+      "abstention_rate": 0.0,
+      "accuracy": 1.0,
+      "contradiction_recall": 1.0,
+      "false_support_rate": 0.0,
+      "macro_f1": 0.25,
+      "macro_precision": 0.25,
+      "macro_recall": 0.25,
+      "misjudged_support_rate": 0.0,
+      "n": 1,
+      "per_label": {
+        "contradicted": {
+          "f1": 1.0,
+          "gold": 1,
+          "precision": 1.0,
+          "predicted": 1,
+          "recall": 1.0,
+          "tp": 1
+        },
+        "insufficient_evidence": {
+          "f1": 0.0,
+          "gold": 0,
+          "precision": 0.0,
+          "predicted": 0,
+          "recall": 0.0,
+          "tp": 0
+        },
+        "supported": {
+          "f1": 0.0,
+          "gold": 0,
+          "precision": 0.0,
+          "predicted": 0,
+          "recall": 0.0,
+          "tp": 0
+        },
+        "weakly_supported": {
+          "f1": 0.0,
+          "gold": 0,
+          "precision": 0.0,
+          "predicted": 0,
+          "recall": 0.0,
+          "tp": 0
+        }
+      },
+      "support_overcall_count": 0,
+      "support_overcall_rate": 0.0,
+      "supported_f1": 0.0,
+      "supported_precision": 0.0,
+      "supported_recall": 0.0,
+      "weighted_f1": 1.0,
+      "weighted_precision": 1.0,
+      "weighted_recall": 1.0
+    },
+    "title": {
+      "abstention_rate": 0.0,
+      "accuracy": 1.0,
+      "contradiction_recall": 0.0,
+      "false_support_rate": 0.0,
+      "macro_f1": 0.25,
+      "macro_precision": 0.25,
+      "macro_recall": 0.25,
+      "misjudged_support_rate": 0.0,
+      "n": 1,
+      "per_label": {
+        "contradicted": {
+          "f1": 0.0,
+          "gold": 0,
+          "precision": 0.0,
+          "predicted": 0,
+          "recall": 0.0,
+          "tp": 0
+        },
+        "insufficient_evidence": {
+          "f1": 0.0,
+          "gold": 0,
+          "precision": 0.0,
+          "predicted": 0,
+          "recall": 0.0,
+          "tp": 0
+        },
+        "supported": {
+          "f1": 0.0,
+          "gold": 0,
+          "precision": 0.0,
+          "predicted": 0,
+          "recall": 0.0,
+          "tp": 0
+        },
+        "weakly_supported": {
+          "f1": 1.0,
+          "gold": 1,
+          "precision": 1.0,
+          "predicted": 1,
+          "recall": 1.0,
+          "tp": 1
+        }
+      },
+      "support_overcall_count": 0,
+      "support_overcall_rate": 0.0,
+      "supported_f1": 0.0,
+      "supported_precision": 0.0,
+      "supported_recall": 0.0,
+      "weighted_f1": 1.0,
+      "weighted_precision": 1.0,
+      "weighted_recall": 1.0
+    }
+  },
+  "by_language": {
+    "en": {
+      "abstention_rate": 0.3846,
+      "accuracy": 0.6923,
+      "contradiction_recall": 1.0,
+      "false_support_rate": 0.0,
+      "macro_f1": 0.509,
+      "macro_precision": 0.6071,
+      "macro_recall": 0.5312,
+      "misjudged_support_rate": 0.5,
+      "n": 13,
+      "per_label": {
+        "contradicted": {
+          "f1": 0.6,
+          "gold": 3,
+          "precision": 0.4286,
+          "predicted": 7,
+          "recall": 1.0,
+          "tp": 3
+        },
+        "insufficient_evidence": {
+          "f1": 0.7692,
+          "gold": 8,
+          "precision": 1.0,
+          "predicted": 5,
+          "recall": 0.625,
+          "tp": 5
+        },
+        "supported": {
+          "f1": 0.6667,
+          "gold": 2,
+          "precision": 1.0,
+          "predicted": 1,
+          "recall": 0.5,
+          "tp": 1
+        },
+        "weakly_supported": {
+          "f1": 0.0,
+          "gold": 0,
+          "precision": 0.0,
+          "predicted": 0,
+          "recall": 0.0,
+          "tp": 0
+        }
+      },
+      "support_overcall_count": 0,
+      "support_overcall_rate": 0.0,
+      "supported_f1": 0.6667,
+      "supported_precision": 1.0,
+      "supported_recall": 0.5,
+      "weighted_f1": 0.7144,
+      "weighted_precision": 0.8681,
+      "weighted_recall": 0.6923
+    },
+    "zh": {
+      "abstention_rate": 0.1667,
+      "accuracy": 1.0,
+      "contradiction_recall": 1.0,
+      "false_support_rate": 0.0,
+      "macro_f1": 1.0,
+      "macro_precision": 1.0,
+      "macro_recall": 1.0,
+      "misjudged_support_rate": 0.0,
+      "n": 6,
+      "per_label": {
+        "contradicted": {
+          "f1": 1.0,
+          "gold": 3,
+          "precision": 1.0,
+          "predicted": 3,
+          "recall": 1.0,
+          "tp": 3
+        },
+        "insufficient_evidence": {
+          "f1": 1.0,
+          "gold": 1,
+          "precision": 1.0,
+          "predicted": 1,
+          "recall": 1.0,
+          "tp": 1
+        },
+        "supported": {
+          "f1": 1.0,
+          "gold": 1,
+          "precision": 1.0,
+          "predicted": 1,
+          "recall": 1.0,
+          "tp": 1
+        },
+        "weakly_supported": {
+          "f1": 1.0,
+          "gold": 1,
+          "precision": 1.0,
+          "predicted": 1,
+          "recall": 1.0,
+          "tp": 1
+        }
+      },
+      "support_overcall_count": 0,
+      "support_overcall_rate": 0.0,
+      "supported_f1": 1.0,
+      "supported_precision": 1.0,
+      "supported_recall": 1.0,
+      "weighted_f1": 1.0,
+      "weighted_precision": 1.0,
+      "weighted_recall": 1.0
+    }
+  },
+  "by_split": {
+    "test": {
+      "abstention_rate": 0.3158,
+      "accuracy": 0.7895,
+      "contradiction_recall": 1.0,
+      "false_support_rate": 0.0,
+      "macro_f1": 0.8375,
+      "macro_precision": 0.9,
+      "macro_recall": 0.8334,
+      "misjudged_support_rate": 0.3333,
+      "n": 19,
+      "per_label": {
+        "contradicted": {
+          "f1": 0.75,
+          "gold": 6,
+          "precision": 0.6,
+          "predicted": 10,
+          "recall": 1.0,
+          "tp": 6
+        },
+        "insufficient_evidence": {
+          "f1": 0.8,
+          "gold": 9,
+          "precision": 1.0,
+          "predicted": 6,
+          "recall": 0.6667,
+          "tp": 6
+        },
+        "supported": {
+          "f1": 0.8,
+          "gold": 3,
+          "precision": 1.0,
+          "predicted": 2,
+          "recall": 0.6667,
+          "tp": 2
+        },
+        "weakly_supported": {
+          "f1": 1.0,
+          "gold": 1,
+          "precision": 1.0,
+          "predicted": 1,
+          "recall": 1.0,
+          "tp": 1
+        }
+      },
+      "support_overcall_count": 0,
+      "support_overcall_rate": 0.0,
+      "supported_f1": 0.8,
+      "supported_precision": 1.0,
+      "supported_recall": 0.6667,
+      "weighted_f1": 0.7947,
+      "weighted_precision": 0.8737,
+      "weighted_recall": 0.7895
+    }
+  },
+  "cases": [
+    {
+      "case_id": "s05",
+      "case_type": "direct_support",
+      "correct": true,
+      "evidence_scope": "abstract",
+      "gold": "supported",
+      "label_source": "maintainer_synthetic",
+      "lang": "zh",
+      "predicted": "supported",
+      "split": "test"
+    },
+    {
+      "case_id": "s09",
+      "case_type": "direct_support",
+      "correct": true,
+      "evidence_scope": "abstract",
+      "gold": "supported",
+      "label_source": "maintainer_synthetic",
+      "lang": "en",
+      "predicted": "supported",
+      "split": "test"
+    },
+    {
+      "case_id": "s10",
+      "case_type": "contradiction",
+      "correct": true,
+      "evidence_scope": "abstract",
+      "gold": "contradicted",
+      "label_source": "maintainer_synthetic",
+      "lang": "zh",
+      "predicted": "contradicted",
+      "split": "test"
+    },
+    {
+      "case_id": "s16",
+      "case_type": "contradiction",
+      "correct": true,
+      "evidence_scope": "abstract",
+      "gold": "contradicted",
+      "label_source": "maintainer_synthetic",
+      "lang": "en",
+      "predicted": "contradicted",
+      "split": "test"
+    },
+    {
+      "case_id": "s17",
+      "case_type": "full_text_required",
+      "correct": true,
+      "evidence_scope": "abstract",
+      "gold": "insufficient_evidence",
+      "label_source": "maintainer_synthetic",
+      "lang": "en",
+      "predicted": "insufficient_evidence",
+      "split": "test"
+    },
+    {
+      "case_id": "s18",
+      "case_type": "weak_support",
+      "correct": true,
+      "evidence_scope": "title",
+      "gold": "weakly_supported",
+      "label_source": "maintainer_synthetic",
+      "lang": "zh",
+      "predicted": "weakly_supported",
+      "split": "test"
+    },
+    {
+      "case_id": "s23",
+      "case_type": "hard_negative",
+      "correct": true,
+      "evidence_scope": "abstract",
+      "gold": "insufficient_evidence",
+      "label_source": "maintainer_synthetic",
+      "lang": "en",
+      "predicted": "insufficient_evidence",
+      "split": "test"
+    },
+    {
+      "case_id": "s24",
+      "case_type": "direct_support",
+      "correct": false,
+      "evidence_scope": "metadata_snippet",
+      "gold": "supported",
+      "label_source": "maintainer_synthetic",
+      "lang": "en",
+      "predicted": "contradicted",
+      "split": "test"
+    },
+    {
+      "case_id": "s27",
+      "case_type": "contradiction",
+      "correct": true,
+      "evidence_scope": "mixed_with_full_text",
+      "gold": "contradicted",
+      "label_source": "maintainer_synthetic",
+      "lang": "en",
+      "predicted": "contradicted",
+      "split": "test"
+    },
+    {
+      "case_id": "s30",
+      "case_type": "full_text_required",
+      "correct": true,
+      "evidence_scope": "abstract",
+      "gold": "insufficient_evidence",
+      "label_source": "maintainer_synthetic",
+      "lang": "en",
+      "predicted": "insufficient_evidence",
+      "split": "test"
+    },
+    {
+      "case_id": "s31",
+      "case_type": "hard_negative",
+      "correct": true,
+      "evidence_scope": "abstract",
+      "gold": "insufficient_evidence",
+      "label_source": "maintainer_synthetic",
+      "lang": "en",
+      "predicted": "insufficient_evidence",
+      "split": "test"
+    },
+    {
+      "case_id": "s36",
+      "case_type": "contradiction",
+      "correct": true,
+      "evidence_scope": "metadata_snippet",
+      "gold": "contradicted",
+      "label_source": "maintainer_synthetic",
+      "lang": "zh",
+      "predicted": "contradicted",
+      "split": "test"
+    },
+    {
+      "case_id": "s39",
+      "case_type": "contradiction",
+      "correct": true,
+      "evidence_scope": "metadata_snippet",
+      "gold": "contradicted",
+      "label_source": "maintainer_synthetic",
+      "lang": "zh",
+      "predicted": "contradicted",
+      "split": "test"
+    },
+    {
+      "case_id": "s41",
+      "case_type": "hard_negative",
+      "correct": true,
+      "evidence_scope": "mixed",
+      "gold": "insufficient_evidence",
+      "label_source": "maintainer_synthetic",
+      "lang": "en",
+      "predicted": "insufficient_evidence",
+      "split": "test"
+    },
+    {
+      "case_id": "s43",
+      "case_type": "full_text_required",
+      "correct": true,
+      "evidence_scope": "abstract",
+      "gold": "insufficient_evidence",
+      "label_source": "maintainer_synthetic",
+      "lang": "zh",
+      "predicted": "insufficient_evidence",
+      "split": "test"
+    },
+    {
+      "case_id": "s45",
+      "case_type": "hard_negative",
+      "correct": false,
+      "evidence_scope": "abstract",
+      "gold": "insufficient_evidence",
+      "label_source": "maintainer_synthetic",
+      "lang": "en",
+      "predicted": "contradicted",
+      "split": "test"
+    },
+    {
+      "case_id": "s46",
+      "case_type": "hard_negative",
+      "correct": false,
+      "evidence_scope": "abstract",
+      "gold": "insufficient_evidence",
+      "label_source": "maintainer_synthetic",
+      "lang": "en",
+      "predicted": "contradicted",
+      "split": "test"
+    },
+    {
+      "case_id": "s47",
+      "case_type": "hard_negative",
+      "correct": false,
+      "evidence_scope": "abstract",
+      "gold": "insufficient_evidence",
+      "label_source": "maintainer_synthetic",
+      "lang": "en",
+      "predicted": "contradicted",
+      "split": "test"
+    },
+    {
+      "case_id": "s48",
+      "case_type": "contradiction",
+      "correct": true,
+      "evidence_scope": "abstract",
+      "gold": "contradicted",
+      "label_source": "maintainer_synthetic",
+      "lang": "en",
+      "predicted": "contradicted",
+      "split": "test"
+    }
+  ],
+  "confusion_matrix": {
+    "contradicted": {
+      "contradicted": 6,
+      "insufficient_evidence": 0,
+      "supported": 0,
+      "weakly_supported": 0
+    },
+    "insufficient_evidence": {
+      "contradicted": 3,
+      "insufficient_evidence": 6,
+      "supported": 0,
+      "weakly_supported": 0
+    },
+    "supported": {
+      "contradicted": 1,
+      "insufficient_evidence": 0,
+      "supported": 2,
+      "weakly_supported": 0
+    },
+    "weakly_supported": {
+      "contradicted": 0,
+      "insufficient_evidence": 0,
+      "supported": 0,
+      "weakly_supported": 1
+    }
+  },
+  "dataset": {
+    "case_types": {
+      "contradiction": 6,
+      "direct_support": 3,
+      "full_text_required": 3,
+      "hard_negative": 6,
+      "weak_support": 1
+    },
+    "evidence_scopes": {
+      "abstract": 13,
+      "metadata_snippet": 3,
+      "mixed": 1,
+      "mixed_with_full_text": 1,
+      "title": 1
+    },
+    "gold_labels": {
+      "contradicted": 6,
+      "insufficient_evidence": 9,
+      "supported": 3,
+      "weakly_supported": 1
+    },
+    "label_sources": [
+      "maintainer_synthetic"
+    ],
+    "languages": {
+      "en": 13,
+      "zh": 6
+    },
+    "n": 19,
+    "splits": {
+      "test": 19
+    }
+  },
+  "diagnostics": {
+    "backend": "ensemble_support",
+    "contradiction_recall": 1.0,
+    "false_support_case_ids": [],
+    "false_support_rate": 0.0,
+    "heuristic_limited": false,
+    "missed_contradiction_case_ids": [],
+    "needs_nli_contradiction_review": false,
+    "recommendations": [],
+    "warnings": [],
+    "weak_false_support_case_ids": []
+  },
+  "error_bucket_counts": {
+    "correct_abstention": 6,
+    "false_support": 0,
+    "incorrect_abstention": 0,
+    "missed_contradiction": 0,
+    "supported_rejected": 1,
+    "weak_false_support": 0
+  },
+  "error_buckets": {
+    "correct_abstention": [
+      {
+        "case_id": "s17",
+        "case_type": "full_text_required",
+        "evidence_scope": "abstract",
+        "gold": "insufficient_evidence",
+        "label_source": "maintainer_synthetic",
+        "lang": "en",
+        "predicted": "insufficient_evidence",
+        "split": "test"
+      },
+      {
+        "case_id": "s23",
+        "case_type": "hard_negative",
+        "evidence_scope": "abstract",
+        "gold": "insufficient_evidence",
+        "label_source": "maintainer_synthetic",
+        "lang": "en",
+        "predicted": "insufficient_evidence",
+        "split": "test"
+      },
+      {
+        "case_id": "s30",
+        "case_type": "full_text_required",
+        "evidence_scope": "abstract",
+        "gold": "insufficient_evidence",
+        "label_source": "maintainer_synthetic",
+        "lang": "en",
+        "predicted": "insufficient_evidence",
+        "split": "test"
+      },
+      {
+        "case_id": "s31",
+        "case_type": "hard_negative",
+        "evidence_scope": "abstract",
+        "gold": "insufficient_evidence",
+        "label_source": "maintainer_synthetic",
+        "lang": "en",
+        "predicted": "insufficient_evidence",
+        "split": "test"
+      },
+      {
+        "case_id": "s41",
+        "case_type": "hard_negative",
+        "evidence_scope": "mixed",
+        "gold": "insufficient_evidence",
+        "label_source": "maintainer_synthetic",
+        "lang": "en",
+        "predicted": "insufficient_evidence",
+        "split": "test"
+      },
+      {
+        "case_id": "s43",
+        "case_type": "full_text_required",
+        "evidence_scope": "abstract",
+        "gold": "insufficient_evidence",
+        "label_source": "maintainer_synthetic",
+        "lang": "zh",
+        "predicted": "insufficient_evidence",
+        "split": "test"
+      }
+    ],
+    "false_support": [],
+    "incorrect_abstention": [],
+    "missed_contradiction": [],
+    "supported_rejected": [
+      {
+        "case_id": "s24",
+        "case_type": "direct_support",
+        "evidence_scope": "metadata_snippet",
+        "gold": "supported",
+        "label_source": "maintainer_synthetic",
+        "lang": "en",
+        "predicted": "contradicted",
+        "split": "test"
+      }
+    ],
+    "weak_false_support": []
+  },
+  "false_support_analysis": {
+    "acceptance_guard": {
+      "block_acceptance_case_ids": [],
+      "block_acceptance_count": 0,
+      "interpretation": "A supported prediction for a non-supporting gold case blocks acceptance. A weakly_supported prediction for a non-supporting gold case must be reviewed before it is treated as support.",
+      "next_action": "accept_supported_predictions",
+      "ok_to_accept_supported": true,
+      "policy": "supported_overcalls_block_acceptance; weak_overcalls_require_review",
+      "review_before_accepting_case_ids": [],
+      "review_before_accepting_count": 0
+    },
+    "by_case_type": {},
+    "by_evidence_scope": {},
+    "by_language": {},
+    "by_split": {},
+    "case_ids": [],
+    "false_support_case_ids": [],
+    "false_support_count": 0,
+    "high_risk_case_ids": [],
+    "high_risk_overcall_case_ids": [],
+    "interpretation": "False-support overcalls are the highest-risk support failures. Review these cases before relaxing support thresholds or shipping a support backend.",
+    "review_plan": {
+      "block_acceptance_case_ids": [],
+      "next_action": "continue",
+      "phases": [
+        {
+          "annotation_packet": {
+            "case_ids": [],
+            "command_template": [
+              "python",
+              "scripts/prepare_support_label_sidecar.py",
+              "--dataset",
+              "data/eval/support_eval.json",
+              "--existing-sidecar",
+              "data/eval/support_eval_label_sidecar.json",
+              "--annotation-packet",
+              "--review-phase",
+              "supported_overcall_blockers",
+              "--packet-purpose",
+              "Review false supported overcalls that block release acceptance.",
+              "--output",
+              "experiments/support-label-packet-supported-overcall-blockers.json",
+              "--instructions-output",
+              "experiments/support-label-packet-supported-overcall-blockers-instructions.md"
+            ],
+            "count": 0,
+            "instructions_output": "experiments/support-label-packet-supported-overcall-blockers-instructions.md",
+            "output": "experiments/support-label-packet-supported-overcall-blockers.json",
+            "packet_id": "support-label-packet-supported-overcall-blockers",
+            "packet_purpose": "Review false supported overcalls that block release acceptance.",
+            "policy": "create_blinded_annotation_packet_before_changing_labels_or_accepting_support_overcalls",
+            "priority": 1,
+            "review_phase": "supported_overcall_blockers",
+            "schema_version": 1,
+            "status": "clear"
+          },
+          "case_ids": [],
+          "command_template": [
+            "python",
+            "scripts/prepare_support_label_sidecar.py",
+            "--dataset",
+            "data/eval/support_eval.json",
+            "--existing-sidecar",
+            "data/eval/support_eval_label_sidecar.json",
+            "--annotation-packet",
+            "--review-phase",
+            "supported_overcall_blockers",
+            "--packet-purpose",
+            "Review false supported overcalls that block release acceptance.",
+            "--output",
+            "experiments/support-label-packet-supported-overcall-blockers.json",
+            "--instructions-output",
+            "experiments/support-label-packet-supported-overcall-blockers-instructions.md"
+          ],
+          "count": 0,
+          "id": "supported_overcall_blockers",
+          "instructions_output": "experiments/support-label-packet-supported-overcall-blockers-instructions.md",
+          "output": "experiments/support-label-packet-supported-overcall-blockers.json",
+          "packet_id": "support-label-packet-supported-overcall-blockers",
+          "priority": 1,
+          "recommended_action": "rewrite_or_replace_evidence",
+          "status": "clear"
+        },
+        {
+          "annotation_packet": {
+            "case_ids": [],
+            "command_template": [
+              "python",
+              "scripts/prepare_support_label_sidecar.py",
+              "--dataset",
+              "data/eval/support_eval.json",
+              "--existing-sidecar",
+              "data/eval/support_eval_label_sidecar.json",
+              "--annotation-packet",
+              "--review-phase",
+              "weak_support_overcall_review",
+              "--packet-purpose",
+              "Review weak-support overcalls before accepting weak support behavior.",
+              "--output",
+              "experiments/support-label-packet-weak-support-overcall-review.json",
+              "--instructions-output",
+              "experiments/support-label-packet-weak-support-overcall-review-instructions.md"
+            ],
+            "count": 0,
+            "instructions_output": "experiments/support-label-packet-weak-support-overcall-review-instructions.md",
+            "output": "experiments/support-label-packet-weak-support-overcall-review.json",
+            "packet_id": "support-label-packet-weak-support-overcall-review",
+            "packet_purpose": "Review weak-support overcalls before accepting weak support behavior.",
+            "policy": "create_blinded_annotation_packet_before_changing_labels_or_accepting_support_overcalls",
+            "priority": 2,
+            "review_phase": "weak_support_overcall_review",
+            "schema_version": 1,
+            "status": "clear"
+          },
+          "case_ids": [],
+          "command_template": [
+            "python",
+            "scripts/prepare_support_label_sidecar.py",
+            "--dataset",
+            "data/eval/support_eval.json",
+            "--existing-sidecar",
+            "data/eval/support_eval_label_sidecar.json",
+            "--annotation-packet",
+            "--review-phase",
+            "weak_support_overcall_review",
+            "--packet-purpose",
+            "Review weak-support overcalls before accepting weak support behavior.",
+            "--output",
+            "experiments/support-label-packet-weak-support-overcall-review.json",
+            "--instructions-output",
+            "experiments/support-label-packet-weak-support-overcall-review-instructions.md"
+          ],
+          "count": 0,
+          "id": "weak_support_overcall_review",
+          "instructions_output": "experiments/support-label-packet-weak-support-overcall-review-instructions.md",
+          "output": "experiments/support-label-packet-weak-support-overcall-review.json",
+          "packet_id": "support-label-packet-weak-support-overcall-review",
+          "priority": 2,
+          "recommended_action": "downgrade_or_find_stronger_evidence",
+          "status": "clear"
+        },
+        {
+          "annotation_packet": {
+            "case_ids": [],
+            "command_template": [
+              "python",
+              "scripts/prepare_support_label_sidecar.py",
+              "--dataset",
+              "data/eval/support_eval.json",
+              "--existing-sidecar",
+              "data/eval/support_eval_label_sidecar.json",
+              "--annotation-packet",
+              "--review-phase",
+              "highest_risk_slice_review",
+              "--packet-purpose",
+              "Review the highest-risk false-support slice: highest_risk_slice.",
+              "--output",
+              "experiments/support-label-packet-highest-risk-slice-review.json",
+              "--instructions-output",
+              "experiments/support-label-packet-highest-risk-slice-review-instructions.md"
+            ],
+            "count": 0,
+            "instructions_output": "experiments/support-label-packet-highest-risk-slice-review-instructions.md",
+            "output": "experiments/support-label-packet-highest-risk-slice-review.json",
+            "packet_id": "support-label-packet-highest-risk-slice-review",
+            "packet_purpose": "Review the highest-risk false-support slice: highest_risk_slice.",
+            "policy": "create_blinded_annotation_packet_before_changing_labels_or_accepting_support_overcalls",
+            "priority": 3,
+            "review_phase": "highest_risk_slice_review",
+            "schema_version": 1,
+            "status": "clear"
+          },
+          "case_ids": [],
+          "command_template": [
+            "python",
+            "scripts/prepare_support_label_sidecar.py",
+            "--dataset",
+            "data/eval/support_eval.json",
+            "--existing-sidecar",
+            "data/eval/support_eval_label_sidecar.json",
+            "--annotation-packet",
+            "--review-phase",
+            "highest_risk_slice_review",
+            "--packet-purpose",
+            "Review the highest-risk false-support slice: highest_risk_slice.",
+            "--output",
+            "experiments/support-label-packet-highest-risk-slice-review.json",
+            "--instructions-output",
+            "experiments/support-label-packet-highest-risk-slice-review-instructions.md"
+          ],
+          "count": 0,
+          "id": "highest_risk_slice_review",
+          "instructions_output": "experiments/support-label-packet-highest-risk-slice-review-instructions.md",
+          "output": "experiments/support-label-packet-highest-risk-slice-review.json",
+          "packet_id": "support-label-packet-highest-risk-slice-review",
+          "priority": 3,
+          "recommended_action": "continue",
+          "risk_slice_id": null,
+          "status": "clear"
+        }
+      ],
+      "policy": "supported_overcalls_block_release; weak_overcalls_require_review; top_risk_slice_sets_triage_order; annotation_packets_are_review_assignments_not_label_changes",
+      "recommended_annotation_case_ids": [],
+      "recommended_annotation_packet_count": 0,
+      "recommended_annotation_packets": [],
+      "review_before_accepting_case_ids": [],
+      "schema_version": 1,
+      "status": "clear",
+      "top_risk_slice_case_ids": [],
+      "top_risk_slice_id": null
+    },
+    "risk_slices": [],
+    "top_risk_slice": null,
+    "total_overcall_count": 0,
+    "weak_false_support_case_ids": [],
+    "weak_false_support_count": 0
+  },
+  "overall": {
+    "abstention_rate": 0.3158,
+    "accuracy": 0.7895,
+    "contradiction_recall": 1.0,
+    "false_support_rate": 0.0,
+    "macro_f1": 0.8375,
+    "macro_precision": 0.9,
+    "macro_recall": 0.8334,
+    "misjudged_support_rate": 0.3333,
+    "n": 19,
+    "per_label": {
+      "contradicted": {
+        "f1": 0.75,
+        "gold": 6,
+        "precision": 0.6,
+        "predicted": 10,
+        "recall": 1.0,
+        "tp": 6
+      },
+      "insufficient_evidence": {
+        "f1": 0.8,
+        "gold": 9,
+        "precision": 1.0,
+        "predicted": 6,
+        "recall": 0.6667,
+        "tp": 6
+      },
+      "supported": {
+        "f1": 0.8,
+        "gold": 3,
+        "precision": 1.0,
+        "predicted": 2,
+        "recall": 0.6667,
+        "tp": 2
+      },
+      "weakly_supported": {
+        "f1": 1.0,
+        "gold": 1,
+        "precision": 1.0,
+        "predicted": 1,
+        "recall": 1.0,
+        "tp": 1
+      }
+    },
+    "support_overcall_count": 0,
+    "support_overcall_rate": 0.0,
+    "supported_f1": 0.8,
+    "supported_precision": 1.0,
+    "supported_recall": 0.6667,
+    "weighted_f1": 0.7947,
+    "weighted_precision": 0.8737,
+    "weighted_recall": 0.7895
+  },
+  "release_blocker_summary": {
+    "benchmark_claim_safe": false,
+    "blocking_buckets": {},
+    "blocking_case_ids": [],
+    "blocking_count": 0,
+    "blocking_recommended_actions": {},
+    "interpretation": "Critical/high support-eval rows block release-readiness claims. Medium rows still require review before making unqualified benchmark claims.",
+    "next_action": "review_medium_risk_before_benchmark_claims",
+    "policy": "critical_or_high_support_eval_rows_block_release_claims",
+    "release_blocked": false,
+    "review_required_case_ids": [
+      "s24"
+    ],
+    "review_required_count": 1
+  },
+  "release_summary": {
+    "abstention": {
+      "correct_count": 6,
+      "incorrect_count": 0,
+      "review_case_ids": [],
+      "total_count": 6
+    },
+    "acceptance": {
+      "block_acceptance_case_ids": [],
+      "review_before_accepting_case_ids": [],
+      "top_risk_slice_case_ids": [],
+      "top_risk_slice_id": null
+    },
+    "benchmark_claim_safe": false,
+    "label_maturity": {
+      "dual_annotated": 0,
+      "high_risk_reviewed": 0,
+      "high_risk_unreviewed": 0,
+      "human_reviewed": 0,
+      "published_benchmark": 0,
+      "sidecar_provenance_complete_fraction": 0.0
+    },
+    "label_sidecar_gate_ok": null,
+    "labels_mature_for_benchmark_claims": false,
+    "metrics": {
+      "abstention_rate": 0.3158,
+      "case_count": 19,
+      "contradiction_recall": 1.0,
+      "false_support_rate": 0.0,
+      "macro_f1": 0.8375,
+      "support_overcall_count": 0,
+      "support_overcall_rate": 0.0,
+      "supported_f1": 0.8,
+      "supported_precision": 1.0,
+      "supported_recall": 0.6667,
+      "weighted_f1": 0.7947
+    },
+    "model_acceptance_ok": true,
+    "next_action": "complete_human_label_review",
+    "ok_to_accept_supported": false,
+    "policy": "treat_supported_as_release_ready_only_when_status_clear; false_support_blocks_release; weak_support_overcalls_require_review; label_sidecar_maturity_controls_benchmark_claims",
+    "quality_gate_ok": null,
+    "review_queue": {
+      "blocking_case_ids": [],
+      "count": 1,
+      "critical_case_ids": [],
+      "review_required_case_ids": [
+        "s24"
+      ],
+      "top_case_ids": [
+        "s24"
+      ]
+    },
+    "risk_counts": {
+      "correct_abstention": 6,
+      "false_support": 0,
+      "incorrect_abstention": 0,
+      "missed_contradiction": 0,
+      "weak_false_support": 0
+    },
+    "schema_version": 1,
+    "status": "evaluation_passed_but_labels_immature"
+  },
+  "review_queue": [
+    {
+      "buckets": [
+        "supported_rejected"
+      ],
+      "case_id": "s24",
+      "case_type": "direct_support",
+      "evidence_scope": "metadata_snippet",
+      "gold": "supported",
+      "lang": "en",
+      "predicted": "contradicted",
+      "reason": "A supported case was rejected or contradicted.",
+      "recommended_action": "inspect_recall_loss",
+      "risk_score": 50,
+      "severity": "medium",
+      "split": "test"
+    }
+  ],
+  "review_queue_summary": {
+    "by_bucket": {
+      "supported_rejected": 1
+    },
+    "by_recommended_action": {
+      "inspect_recall_loss": 1
+    },
+    "by_severity": {
+      "medium": 1
+    },
+    "count": 1,
+    "critical_case_ids": [],
+    "top_case_ids": [
+      "s24"
+    ]
+  },
+  "support_set_policy": {
+    "backend": "support_set_policy_fixture",
+    "cases": [
+      {
+        "case_id": "ss02",
+        "case_type": "weak_set_boundary",
+        "citation_verdicts": [
+          "weakly_supported",
+          "weakly_supported"
+        ],
+        "claim": "Multiple topically related papers prove the stronger causal claim.",
+        "correct": true,
+        "gold": "weakly_supported",
+        "label_notes": "Multiple weak citations must remain tentative and must not be upgraded to supported.",
+        "label_source": "maintainer_synthetic",
+        "lang": "en",
+        "predicted": "weakly_supported",
+        "split": "test"
+      },
+      {
+        "case_id": "ss03",
+        "case_type": "contradiction_set",
+        "citation_verdicts": [
+          "supported",
+          "contradicted"
+        ],
+        "claim": "Method M improves task T accuracy.",
+        "correct": true,
+        "gold": "contradicted",
+        "label_notes": "Contradictory evidence should dominate the aggregate and trigger high-risk review.",
+        "label_source": "maintainer_synthetic",
+        "lang": "en",
+        "predicted": "contradicted",
+        "split": "test"
+      },
+      {
+        "case_id": "ss05",
+        "case_type": "weak_set_boundary",
+        "citation_verdicts": [
+          "weakly_supported",
+          "weakly_supported",
+          "insufficient_evidence"
+        ],
+        "claim": "多篇主题相关论文共同证明该工具可以替代人工审稿。",
+        "correct": true,
+        "gold": "weakly_supported",
+        "label_notes": "Chinese citation-set boundary: multiple weak or unresolved citations remain tentative and must not be upgraded to supported.",
+        "label_source": "maintainer_synthetic",
+        "lang": "zh",
+        "predicted": "weakly_supported",
+        "split": "test"
+      }
+    ],
+    "confusion_matrix": {
+      "contradicted": {
+        "contradicted": 1,
+        "weakly_supported": 0
+      },
+      "weakly_supported": {
+        "contradicted": 0,
+        "weakly_supported": 2
+      }
+    },
+    "dataset": {
+      "case_types": {
+        "contradiction_set": 1,
+        "weak_set_boundary": 2
+      },
+      "gold_labels": {
+        "contradicted": 1,
+        "insufficient_evidence": 0,
+        "supported": 0,
+        "weakly_supported": 2
+      },
+      "languages": {
+        "en": 2,
+        "zh": 1
+      },
+      "n": 3,
+      "splits": {
+        "test": 3
+      }
+    },
+    "interpretation": "This fixture evaluates claim-level citation-set aggregation only. It does not measure retrieval or model quality.",
+    "overall": {
+      "abstention_rate": 0.0,
+      "accuracy": 1.0,
+      "contradiction_recall": 1.0,
+      "false_support_rate": 0.0,
+      "macro_f1": 0.5,
+      "macro_precision": 0.5,
+      "macro_recall": 0.5,
+      "misjudged_support_rate": 0.0,
+      "n": 3,
+      "per_label": {
+        "contradicted": {
+          "f1": 1.0,
+          "gold": 1,
+          "precision": 1.0,
+          "predicted": 1,
+          "recall": 1.0,
+          "tp": 1
+        },
+        "insufficient_evidence": {
+          "f1": 0.0,
+          "gold": 0,
+          "precision": 0.0,
+          "predicted": 0,
+          "recall": 0.0,
+          "tp": 0
+        },
+        "supported": {
+          "f1": 0.0,
+          "gold": 0,
+          "precision": 0.0,
+          "predicted": 0,
+          "recall": 0.0,
+          "tp": 0
+        },
+        "weakly_supported": {
+          "f1": 1.0,
+          "gold": 2,
+          "precision": 1.0,
+          "predicted": 2,
+          "recall": 1.0,
+          "tp": 2
+        }
+      },
+      "support_overcall_count": 0,
+      "support_overcall_rate": 0.0,
+      "supported_f1": 0.0,
+      "supported_precision": 0.0,
+      "supported_recall": 0.0,
+      "weighted_f1": 1.0,
+      "weighted_precision": 1.0,
+      "weighted_recall": 1.0
+    }
+  }
+}

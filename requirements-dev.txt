@@ -1,5 +1,6 @@
 # Reproducible contributor tooling. Runtime dependencies remain in pyproject.toml.
 build>=1.2,<2
+jsonschema>=4.23,<5
 mypy>=1.10,<2
 ruff>=0.9,<1
 twine>=5,<7

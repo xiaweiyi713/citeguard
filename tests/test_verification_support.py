@@ -110,6 +110,17 @@ class SupportModelTests(unittest.TestCase):
         self.assertEqual(data["next_action"], "keep_claim")
         self.assertFalse(data["counterevidence_review"])
         self.assertEqual(data["counterevidence_reason"], "")
+        scores = data["scores"]
+        self.assertEqual(scores["calibration_status"], "uncalibrated")
+        self.assertEqual(scores["confidence_meaning"], "uncalibrated_score")
+        self.assertTrue(scores["not_a_probability"])
+        self.assertEqual(scores["primary"], "support_judgment")
+        self.assertEqual(scores["support_judgment"]["score"], 0.8)
+        self.assertEqual(scores["identity_match"]["score"], 1.0)
+        self.assertEqual(scores["evidence_coverage"]["scope"], "abstract")
+        self.assertFalse(scores["evidence_coverage"]["complete_paper_reviewed"])
+        self.assertEqual(data["supporting_spans"], [])
+        self.assertEqual(data["conflicting_spans"], [])
 
     def test_support_result_to_dict_carries_next_action_for_unresolved_source_outage(self):
         result = SupportResult(
@@ -706,6 +717,12 @@ class AssessSupportTests(unittest.TestCase):
         self.assertEqual(result.evidence_scope, "full_text")
         self.assertEqual(result.evidence["source_field"], "oa_full_text_1")
         self.assertEqual(result.resolution["oa_fulltext"]["status"], "fetched")
+        operations = {
+            (item["operation"], item["status"], item["reason_code"])
+            for item in result.to_dict()["query_records"]
+        }
+        self.assertIn(("abstract_fetch", "hit", "ok"), operations)
+        self.assertIn(("fulltext_fetch", "hit", "ok"), operations)
 
     def test_oa_fetch_failure_never_blocks_abstract_level_support(self):
         record = CitationRecord(
@@ -737,6 +754,12 @@ class AssessSupportTests(unittest.TestCase):
         self.assertNotEqual(result.verdict, SupportVerdict.CONTRADICTED)
         self.assertEqual(result.resolution["oa_fulltext"]["status"], "unavailable")
         self.assertIn(result.evidence_scope, ("abstract", "title", "mixed"))
+        operations = {
+            (item["operation"], item["status"], item["reason_code"])
+            for item in result.to_dict()["query_records"]
+        }
+        self.assertIn(("abstract_fetch", "hit", "ok"), operations)
+        self.assertIn(("fulltext_fetch", "failed", "source_unavailable"), operations)
 
 
 if __name__ == "__main__":

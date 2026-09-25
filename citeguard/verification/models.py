@@ -34,6 +34,9 @@ INPUT_SOURCE_METADATA_KEYS = [
     "input_source_locator",
     "input_source_line_start",
     "input_source_line_end",
+    "input_source_paragraph_start",
+    "input_source_paragraph_end",
+    "input_document_locator",
 ]
 
 
@@ -58,6 +61,48 @@ NEXT_ACTION_DESCRIPTIONS = {
 }
 
 STABLE_NEXT_ACTIONS = frozenset(NEXT_ACTION_DESCRIPTIONS)
+
+
+def build_score_semantics(
+    *,
+    primary: str,
+    identity_match_score: Optional[float],
+    support_score: Optional[float],
+    evidence_coverage: str,
+) -> Dict[str, Any]:
+    """Describe what numeric scores mean without treating them as probabilities."""
+
+    def _score_block(score: Optional[float], kind: str, question: str) -> Dict[str, Any]:
+        return {
+            "score": None if score is None else round(float(score), 4),
+            "kind": kind,
+            "question": question,
+            "calibration_status": "uncalibrated",
+        }
+
+    return {
+        "schema_version": 1,
+        "primary": primary,
+        "confidence_meaning": "uncalibrated_score",
+        "not_a_probability": True,
+        "calibration_status": "uncalibrated",
+        "identity_match": _score_block(
+            identity_match_score,
+            "identity_match",
+            "Is the retrieved record the cited paper?",
+        ),
+        "support_judgment": _score_block(
+            support_score,
+            "support_judgment",
+            "Does the currently inspected evidence support the claim?",
+        ),
+        "evidence_coverage": {
+            "scope": evidence_coverage,
+            "question": "Was the inspected evidence metadata, an abstract, a full-text span, or none?",
+            "complete_paper_reviewed": False,
+            "note": "Finding a supporting span is not a complete-paper review.",
+        },
+    }
 
 REVIEW_ACTION_QUEUE_KEYS = (
     "rewrite_or_replace_indexes",
@@ -190,6 +235,7 @@ class VerificationResult:
     identifier_lookup: Optional[Dict[str, Any]] = None
     suggested_bibtex: str = ""
     suggested_gbt7714: str = ""
+    query_records: List[Dict[str, Any]] = field(default_factory=list)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -212,9 +258,16 @@ class VerificationResult:
             "outage_limited": self.outage_limited,
             "doi_registration": self.doi_registration,
             "identifier_lookup": dict(self.identifier_lookup) if self.identifier_lookup else None,
+            "query_records": [dict(item) for item in self.query_records],
             "recovery_code": verification_recovery_code(self.verdict, self.source_failure_details),
             "next_action": verification_next_action(self.verdict, self.source_failure_mode, self.sources_failed),
             "alternatives": [asdict(record) for record in self.alternatives],
+            "scores": build_score_semantics(
+                primary="identity_match",
+                identity_match_score=self.confidence,
+                support_score=None,
+                evidence_coverage="none",
+            ),
         }
 
 

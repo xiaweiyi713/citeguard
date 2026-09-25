@@ -16,16 +16,19 @@ python -m citeguard status
 
 `citeguard status` prints JSON and does not query live scholarly sources unless
 `--check-sources` is set. The payload includes `configured_sources`,
-`requested_sources`, `source_health`, `cache_status`, `polite_access`,
-`remote_evidence_policy`, `support_models`, and warnings for missing optional
+`requested_sources`, `source_health`, `cache_status`, `runtime_metrics`, `polite_access`,
+`remote_evidence_policy`, top-level `support_engine`, `support_models`, and warnings for missing optional
 dependencies or unsafe live-source configuration.
 
 `support_models` is machine-readable: it includes `engine`
-(`production_ensemble` or `heuristic_fallback`), `deep_models_available`,
+(`production_ensemble` or `heuristic_fallback`), `requested_engine`,
+`effective_engine`, `model_loading_enabled`, `deep_models_available`,
 `model_dependencies`, `missing_dependencies`, `next_action`, `install_hint`, and
 `warmup_command`. Agents should branch on `support_models.next_action`; when it
 is `install_or_configure_dependency`, report that claim-support checks are using
-the conservative heuristic fallback rather than deep reranker/NLI support.
+the conservative heuristic fallback rather than deep reranker/NLI support. When
+`requested_engine=heuristic`, that fallback is intentional and
+`model_loading_enabled=false`; do not present it as a missing-dependency error.
 Quote `support_models.install_hint` for dependency recovery: it recommends
 `citationguard[models]` for installed or published packages before the editable
 source-checkout fallback.
@@ -36,6 +39,7 @@ source-checkout fallback.
 |---|---:|---|
 | `CITEGUARD_SOURCES` | `openalex,crossref,arxiv` | Comma-separated live metadata sources. Valid names are `openalex`, `crossref`, `arxiv`, `semantic_scholar`, plus aliases `semantic-scholar`, `semanticscholar`, and `s2`. Unknown names are reported as `invalid_input` / `fix_configuration`. |
 | `CITEGUARD_CACHE` | OS user cache directory | SQLite cache path for live verification (`~/Library/Caches/citeguard/...` on macOS, `$XDG_CACHE_HOME/citeguard/...` on Linux). Use `:memory:` for process-local tests. |
+| `CITEGUARD_METRICS_PATH` | empty (disabled) | Explicit local JSONL destination for aggregate operational metrics. It never sends network telemetry and records only fixed event names, outcome, duration bucket, and timestamp; status does not expose the path. CiteGuard rejects symbolic-link and non-regular destinations, and restricts file permissions to the owner where the platform supports it. |
 | `CITEGUARD_CACHE_TTL` | `86400` | Positive-result cache TTL in seconds. Cache keys are namespaced by source set, adapter configuration, and package version. |
 | `CITEGUARD_NEGATIVE_CACHE_TTL` | `900` | Shorter TTL in seconds for empty lookup/search results. |
 | `CITEGUARD_FIXTURE_CITATIONS` | empty | JSON or JSONL citation fixture path. When set, live sources are bypassed and `source_health.mode` is `fixture`. |
@@ -49,8 +53,9 @@ source-checkout fallback.
 | `CITEGUARD_OA_FULLTEXT` | `0` | Fetches open-access paper bodies for full-text claim support when set to `1`; OA locations only, gated hosts stay blocked, never bypasses paywalls. Disabled by default. |
 | `CITEGUARD_DOI_REGISTRY` | `1` | Checks unresolved DOIs against the global doi.org Handle registry (covers all registrars, including China DOI/ISTIC) and reports `doi_registration` on `not_found` results. Set `0` to disable; automatically skipped in offline fixture mode. |
 | `CITEGUARD_EVIDENCE_TIMEOUT` | `2` | Positive integer timeout in seconds for optional remote evidence fetching. |
-| `CITEGUARD_ALLOWED_FILE_ROOTS` | server working directory | `os.pathsep`-separated roots from which MCP `full_text_file` evidence may be read. Symlinks are resolved before checking. |
+| `CITEGUARD_ALLOWED_FILE_ROOTS` | server working directory | `os.pathsep`-separated roots from which MCP `full_text_file` evidence and `audit_document_tool` documents may be read. Local LaTeX includes and BibTeX files use the same boundary; symlinks are resolved before checking, and document audit reopens only regular files without following a replacement leaf symlink. |
 | `SEMANTIC_SCHOLAR_API_KEY` | empty | Optional Semantic Scholar API key. Status reports only whether it is configured. |
+| `CITEGUARD_SUPPORT_ENGINE` | `auto` | `auto` uses the production ensemble when dependencies are available; `heuristic` disables model loading and uses the lexical backend; `production` requests deep mode but still reports an honest fallback when dependencies are missing. Invalid values are reported in `status.warnings` and reject support calls. |
 | `CITEGUARD_RERANKER_MODEL` | packaged default | Optional reranker model name for deep claim-support mode. |
 | `CITEGUARD_NLI_MODEL` | packaged default | Optional NLI model name for deep claim-support mode. |
 

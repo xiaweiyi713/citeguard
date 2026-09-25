@@ -417,6 +417,26 @@ class CitationExtractionTests(unittest.TestCase):
         self.assertEqual(candidates[0]["source_locator"], f"{path}#citation-1")
         self.assertEqual(candidates[0]["arxiv_id"], "1706.03762")
 
+    def test_rejects_docx_with_dtd_or_entity_declarations(self):
+        with tempfile.NamedTemporaryFile("wb", suffix=".docx", delete=False) as handle:
+            with zipfile.ZipFile(handle, "w") as archive:
+                archive.writestr(
+                    "word/document.xml",
+                    """<?xml version="1.0" encoding="UTF-8"?>
+                    <!DOCTYPE document [<!ENTITY oversized "not evidence">]>
+                    <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+                      <w:body><w:p><w:r><w:t>&oversized;</w:t></w:r></w:p></w:body>
+                    </w:document>
+                    """,
+                )
+            path = handle.name
+
+        try:
+            with self.assertRaisesRegex(OSError, "prohibited DTD or entity"):
+                load_citation_candidates(path)
+        finally:
+            os.unlink(path)
+
     def test_malformed_docx_bad_zip_raises_os_error(self):
         with tempfile.NamedTemporaryFile("wb", suffix=".docx", delete=False) as handle:
             handle.write(b"not a zip")

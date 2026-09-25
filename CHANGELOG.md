@@ -2,6 +2,84 @@
 
 ## Unreleased
 
+- Manuscript audits now present bibliography/identity fixes separately from
+  claim-wording rewrites (`family=metadata|claim`, distinct `suggested_fix.kind`
+  values). HTML reports split those queues instead of mixing them.
+- Hardened release operations with a deterministic CycloneDX SBOM, immutable
+  GitHub Action pins, Dependabot coverage, strict dependency audits in both CI
+  and `Publish`, and audited security floors for MCP/PDF runtime dependencies.
+- Added opt-in local-only runtime metrics with allowlisted aggregate events,
+  bounded regular-file writes, symlink rejection, owner-only POSIX permissions,
+  and no request/evidence content.
+- Added a reproducible six-row claim-support verifier ablation matrix covering
+  heuristic-only, reranker-only, NLI-only, heuristic+reranker, reranker+NLI,
+  and the full ensemble. Unavailable or failed model rows are never reported as
+  zero-score runs; completed rows retain strict false-support gates, standard
+  experiment artifacts, label-maturity provenance, CI coverage, and a release
+  gate contract.
+- Preserved complete source-response provenance across merged scholarly
+  records and counter-evidence retrieval. Query rows now expose responding
+  sources, candidate rows retain every merged source, and `top_k` truncation no
+  longer erases evidence that a source returned records.
+- Added stable false-support annotation-packet queues to support-eval review
+  plans and experiment manifests. Packets remain blinded review assignments,
+  not automatic label changes or permission to accept support predictions.
+- Added an additive document-audit `review_status` contract bound to the input
+  snapshot digest, so agents can branch on `clear/review_required` and a stable
+  next action without parsing queue prose.
+- Added a release gate for the checked-in real-source candidate dataset and
+  blinded packet, covering gold-label policy, immutable locators, packet id,
+  digest, and case-count integrity.
+- Hardened bounded document reads against replacement symlinks and concurrent
+  file-size/metadata changes, and made empty in-scope documents valid schema-
+  compliant clear audits.
+- LaTeX document audits now surface missing in-root includes and bibliography
+  files instead of silently presenting a partial manuscript as complete.
+
+## 0.1.4 - 2026-09-21
+
+- Markdown manuscript audits now link GB/T-style `【1】` markers and fullwidth
+  author-year citations, expand numeric ranges such as `[1-3]`, and render
+  Chinese HTML reports (`lang=zh`, Chinese first-screen copy).
+- Shipped the v1 agent output schema and evidence-object helpers with the
+  public package, including optional `query_records` and evidence-span fields.
+- Query provenance now covers identifier lookup, title search, abstract fetch,
+  and full-text fetch. Title-search misses after an identifier hit stay out of
+  `sources_failed`. Batch audits keep the same core verdicts under one worker,
+  several workers, and cache replay.
+- Agent skill and README now describe manuscript first-screen categories,
+  uncalibrated `scores`, `query_records`, and `audit-document --html`.
+- Manuscript HTML reports now answer the first-screen questions: how many
+  citations were audited, which items to check first, and whether the problem
+  is metadata, insufficient evidence, contradiction, or a source outage.
+  Semicolon-separated claims are reviewed separately.
+- Full-text evidence is split into region-tagged units (methods, experiments,
+  limitations, references, and so on) with character locators. Support results
+  keep both supporting and conflicting spans, and never treat one located span
+  as a complete-paper review.
+- Added an uncalibrated threshold sweep over the real-source hard-case slice
+  (`python scripts/eval_hard_cases.py`). Groups below 20 cases stay
+  uncalibrated; production thresholds are unchanged.
+- Public citation and support results now include an additive `scores` block that
+  separates identity-match scores, support-judgment scores, and evidence
+  coverage. Legacy `confidence` is unchanged and is labeled an uncalibrated
+  score, not a probability.
+- Identifier hits now keep a `query_records` log so a successful authority
+  lookup and a failed supplementary title search can be reported as two facts
+  without putting the authority into `sources_failed`. Reason codes distinguish
+  `ok`, `no_match`, `timeout`, `rate_limited`, and `unconfigured`.
+- Markdown/LaTeX `audit-document` links in-text markers to bibliography entries,
+  keeps unlinked markers visible, and can write a local HTML report with
+  `--html` from the same JSON model.
+- Added a first maintainer-reviewed real-source hard-case slice
+  (`data/eval/support_hard_cases_v1.json`): 39 abstract-level cases plus 2
+  multi-citation set cases, paper-grouped splits, and separate natural vs
+  perturbation labels. This is not the 250-case dual-annotated campaign.
+- Pinned the current FastMCP integration to the compatible v1 SDK line
+  (`mcp>=1.28,<2`). MCP SDK v2 remains an explicit future migration.
+- Added `CITEGUARD_SUPPORT_ENGINE=auto|heuristic|production` so offline and MCP
+  runs can force the lexical backend without loading model weights.
+
 ## 0.1.3 - 2026-07-15
 
 - Documented the release-gated documentation contract

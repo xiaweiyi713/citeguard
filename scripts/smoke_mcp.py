@@ -22,6 +22,7 @@ from _bootstrap import ensure_project_root
 
 ensure_project_root()
 
+from citeguard.contracts import CONTRACT_VERSION
 from citeguard.errors import ERROR_CODE_CATEGORY, ERROR_CODE_RETRYABLE
 from citeguard.runtime import SOURCE_HEALTH_SCHEMA_VERSION
 from citeguard.verification import CACHE_SCHEMA_VERSION, REVIEW_ACTION_QUEUE_KEYS, STABLE_NEXT_ACTIONS
@@ -147,6 +148,12 @@ async def _run_smoke(command: str, server_args: List[str], require_sdk: bool = F
             "The lawful full-text excerpt shows sparse retrieval improves citation audit recall.",
             encoding="utf-8",
         )
+        document_path = Path(tmpdir) / "references.md"
+        document_path.write_text(
+            "## References\n\n"
+            "1. Vaswani, A. Attention Is All You Need. NeurIPS, 2017. arXiv:1706.03762.\n",
+            encoding="utf-8",
+        )
         missing_full_text_path = Path(tmpdir) / "missing-lawful-full-text-excerpt.txt"
         env = dict(os.environ)
         env.update(
@@ -154,6 +161,7 @@ async def _run_smoke(command: str, server_args: List[str], require_sdk: bool = F
                 "CITEGUARD_FIXTURE_CITATIONS": str(fixture_path),
                 "CITEGUARD_CACHE": ":memory:",
                 "CITEGUARD_ALLOWED_FILE_ROOTS": str(tmpdir),
+                "CITEGUARD_SUPPORT_ENGINE": "heuristic",
                 "TOKENIZERS_PARALLELISM": "false",
             }
         )
@@ -168,6 +176,7 @@ async def _run_smoke(command: str, server_args: List[str], require_sdk: bool = F
                 _require_tool(tool_names, "citeguard_status_tool")
                 _require_tool(tool_names, "verify_citation_tool")
                 _require_tool(tool_names, "audit_citations_tool")
+                _require_tool(tool_names, "audit_document_tool")
                 _require_tool(tool_names, "check_claim_support_tool")
                 _require_tool(tool_names, "check_claim_support_set_tool")
                 _require_tool(tool_names, "search_counterevidence_tool")
@@ -184,6 +193,16 @@ async def _run_smoke(command: str, server_args: List[str], require_sdk: bool = F
                         "suggested_fix.kind",
                         "suggested_fix.requires_user_confirmation",
                         "filtered.returned_indexes",
+                    ],
+                )
+                _require_tool_description(
+                    tools_by_name,
+                    "audit_document_tool",
+                    [
+                        "CITEGUARD_ALLOWED_FILE_ROOTS",
+                        "exact line/paragraph locators",
+                        "never edits the document",
+                        "not_found",
                     ],
                 )
                 _require_tool_description(
@@ -224,7 +243,7 @@ async def _run_smoke(command: str, server_args: List[str], require_sdk: bool = F
                 )
 
                 status = _coerce_tool_payload(await session.call_tool("citeguard_status_tool", {}))
-                _require_status_payload(status, fixture_path)
+                _require_status_payload(status, fixture_path, expected_support_engine="heuristic")
 
                 verify = _coerce_tool_payload(
                     await session.call_tool(
@@ -268,6 +287,11 @@ async def _run_smoke(command: str, server_args: List[str], require_sdk: bool = F
                     )
                 )
                 _require_audit_citations_payload(audit)
+
+                document_audit = _coerce_tool_payload(
+                    await session.call_tool("audit_document_tool", {"path": str(document_path)})
+                )
+                _require_document_audit_payload(document_audit, document_path)
 
                 audit_high_risk = _coerce_tool_payload(
                     await session.call_tool(
@@ -591,6 +615,7 @@ async def _run_smoke(command: str, server_args: List[str], require_sdk: bool = F
     print(
         "OK: MCP stdio smoke passed "
         "(initialize, list_tools, status, offline verify, offline audit, offline support, "
+        "offline bounded document audit, "
         "offline verify not-found safety, "
         "offline full-text support, offline full-text-file support, "
         "offline support-set full-text-file support, offline full-text support-audit, "
@@ -600,8 +625,9 @@ async def _run_smoke(command: str, server_args: List[str], require_sdk: bool = F
         "source-outage safety counter-evidence leads, Chinese source-outage safety leads, "
         "support-mode aggregation details, high-risk-only batch filtering, "
         "tool metadata descriptions, source-health next_action, source-health retry delay provenance, "
-        "status source-health item contract, structured errors, "
-        "support-model status next_action, batch shape error details, full-text-file error details)."
+        "status source-health item contract, contract_version v1, structured errors, "
+        "support-model status next_action, forced-heuristic support profile, batch shape error details, "
+        "full-text-file error details)."
     )
     return 0
 
@@ -625,14 +651,58 @@ def _require_tool_description(tools_by_name: dict[str, Any], name: str, phrases:
     description = getattr(tool, "description", "") if tool is not None else ""
     if not isinstance(description, str):
         description = str(description)
-    missing = [phrase for phrase in phrases if phrase not in description]
+    normalized_description = " ".join(description.split())
+    missing = [phrase for phrase in phrases if phrase not in normalized_description]
     if missing:
         raise RuntimeError(f"Expected MCP tool {name!r} description to include {missing}; got: {description!r}")
+
+
+def _require_document_audit_payload(payload: dict, document_path: Path) -> None:
+    if payload.get("contract_version") != "v1":
+        raise RuntimeError(f"Document audit did not return contract_version v1: {payload!r}")
+    if payload.get("tool") != "audit_document":
+        raise RuntimeError(f"Document audit tool marker is missing: {payload!r}")
+    document = payload.get("document")
+    extraction = payload.get("extraction")
+    edit_policy = payload.get("edit_policy")
+    if not isinstance(document, dict) or document.get("path") != str(document_path.resolve()):
+        raise RuntimeError(f"Document audit path provenance is missing: {payload!r}")
+    dependencies = document.get("dependencies")
+    if dependencies is not None and (
+        not isinstance(dependencies, dict)
+        or dependencies.get("complete") is not True
+        or dependencies.get("missing") != []
+    ):
+        raise RuntimeError(f"Document audit dependency completeness is missing: {payload!r}")
+    snapshot = document.get("snapshot")
+    if (
+        not isinstance(snapshot, dict)
+        or not str(snapshot.get("digest", "")).startswith("sha256:")
+        or snapshot.get("file_count") != 1
+    ):
+        raise RuntimeError(f"Document audit did not return a content-addressed snapshot: {payload!r}")
+    review_status = payload.get("review_status")
+    if review_status is not None and (
+        not isinstance(review_status, dict)
+        or review_status.get("state") != "clear"
+        or review_status.get("review_required") is not False
+        or review_status.get("queue_count") != 0
+        or review_status.get("snapshot_digest") != snapshot.get("digest")
+    ):
+        raise RuntimeError(f"Document audit review status is missing or stale: {payload!r}")
+    if not isinstance(extraction, dict) or extraction.get("candidate_count") != 1:
+        raise RuntimeError(f"Document audit did not extract its fixture citation: {payload!r}")
+    candidates = extraction.get("candidates")
+    if not isinstance(candidates, list) or not candidates or not str(candidates[0].get("document_locator", "")).endswith("#line-3"):
+        raise RuntimeError(f"Document audit did not preserve a precise line locator: {payload!r}")
+    if not isinstance(edit_policy, dict) or edit_policy.get("document_modified") or edit_policy.get("automatic_apply_allowed"):
+        raise RuntimeError(f"Document audit must remain suggestion-only: {payload!r}")
 
 
 def _coerce_tool_payload(result: Any) -> dict:
     structured = getattr(result, "structured_content", None)
     if isinstance(structured, dict):
+        _require_contract_version(structured)
         return structured
 
     content = getattr(result, "content", None)
@@ -645,11 +715,20 @@ def _coerce_tool_payload(result: Any) -> dict:
                 except json.JSONDecodeError:
                     continue
                 if isinstance(parsed, dict):
+                    _require_contract_version(parsed)
                     return parsed
 
     if isinstance(result, dict):
+        _require_contract_version(result)
         return result
     raise RuntimeError(f"Could not decode MCP tool result: {result!r}")
+
+
+def _require_contract_version(payload: dict) -> None:
+    if payload.get("contract_version") != CONTRACT_VERSION:
+        raise RuntimeError(
+            f"Expected MCP contract_version={CONTRACT_VERSION!r}, got: {payload!r}"
+        )
 
 
 def _require_error_payload(payload: dict, code: str, tool: str) -> None:
@@ -716,7 +795,11 @@ def _require_file_error_payload(
             raise RuntimeError(f"Expected file error details.{key}={value!r}, got: {payload!r}")
 
 
-def _require_status_payload(payload: dict, fixture_path: Path) -> None:
+def _require_status_payload(
+    payload: dict,
+    fixture_path: Path,
+    expected_support_engine: Optional[str] = None,
+) -> None:
     if payload.get("service") != "CiteGuard":
         raise RuntimeError(f"Unexpected status payload: {payload!r}")
     if payload.get("schema_version") != 1:
@@ -800,7 +883,28 @@ def _require_status_payload(payload: dict, fixture_path: Path) -> None:
     missing = support_models.get("missing_dependencies")
     if not isinstance(missing, list):
         raise RuntimeError(f"Expected support_models.missing_dependencies, got: {payload!r}")
-    if support_models.get("deep_models_available") is True:
+    requested_engine = support_models.get("requested_engine")
+    if requested_engine not in {"auto", "heuristic", "production"}:
+        raise RuntimeError(f"Expected stable support_models.requested_engine, got: {payload!r}")
+    if payload.get("support_engine") != requested_engine:
+        raise RuntimeError(f"Expected top-level support_engine to match support_models, got: {payload!r}")
+    if support_models.get("effective_engine") != requested_engine:
+        raise RuntimeError(f"Expected support_models.effective_engine to match requested engine, got: {payload!r}")
+    if not isinstance(support_models.get("model_loading_enabled"), bool):
+        raise RuntimeError(f"Expected boolean support_models.model_loading_enabled, got: {payload!r}")
+    if support_models.get("configuration_error") != "":
+        raise RuntimeError(f"Expected no support-engine configuration error in smoke, got: {payload!r}")
+    if expected_support_engine is not None and requested_engine != expected_support_engine:
+        raise RuntimeError(f"Expected support_models.requested_engine={expected_support_engine!r}, got: {payload!r}")
+    if requested_engine == "heuristic":
+        if (
+            engine != "heuristic_fallback"
+            or support_models.get("next_action") != "continue"
+            or support_models.get("model_loading_enabled") is not False
+            or support_models.get("install_hint") != ""
+        ):
+            raise RuntimeError(f"Expected forced heuristic support-model status, got: {payload!r}")
+    elif support_models.get("deep_models_available") is True:
         if engine != "production_ensemble" or support_models.get("next_action") != "continue" or missing != []:
             raise RuntimeError(f"Expected available deep support-model status, got: {payload!r}")
     else:
@@ -1303,6 +1407,8 @@ def _require_counterevidence_payload(payload: dict) -> None:
     candidate = candidates[0]
     if candidate.get("signal") != "explicit_contradiction_cue":
         raise RuntimeError(f"Expected explicit contradiction cue lead, got: {payload!r}")
+    if candidate.get("sources") != ["fixture"]:
+        raise RuntimeError(f"Expected merged candidate source provenance, got: {payload!r}")
     if "improvement_negation" not in set(candidate.get("matched_query_roles", [])):
         raise RuntimeError(f"Expected improvement_negation query role, got: {payload!r}")
     review_summary = payload.get("review_summary")
@@ -1317,6 +1423,13 @@ def _require_counterevidence_payload(payload: dict) -> None:
     query_plan = payload.get("query_plan")
     if not isinstance(query_plan, list) or "improvement_negation" not in {item.get("role") for item in query_plan}:
         raise RuntimeError(f"Expected improvement_negation in query_plan, got: {payload!r}")
+    query_results = payload.get("query_results")
+    if not isinstance(query_results, list) or not query_results:
+        raise RuntimeError(f"Expected counter-evidence query_results, got: {payload!r}")
+    if any(item.get("sources_responded") != ["fixture"] for item in query_results):
+        raise RuntimeError(f"Expected query-level source-response provenance, got: {payload!r}")
+    if payload.get("sources_responded") != ["fixture"]:
+        raise RuntimeError(f"Expected top-level source-response provenance, got: {payload!r}")
     if "review leads" not in str(payload.get("interpretation", "")):
         raise RuntimeError(f"Expected conservative review-leads interpretation, got: {payload!r}")
     if payload.get("source_failure_mode") != "none":

@@ -108,6 +108,49 @@ benchmark claims.
   false-reject cases can be triaged directly from the manifest, including
   whether a false support came from NLI entailment, paired reranking, or another
   ensemble path and what the average NLI neutral/entailment scores looked like.
+- `scripts/run_support_ablations.py` defines a reproducible six-row verifier
+  component matrix for heuristic-only, reranker-only, NLI-only,
+  heuristic+reranker, reranker+NLI, and the full ensemble. It records
+  `completed`, `unavailable`, `model_error`, and `planned` rows separately,
+  never assigns zero metrics to an unrun model, preserves strict false-support
+  gates, writes standard `support_verifier_ablation` artifacts, and carries
+  label maturity into manifest summaries. Retrieval-source ablations remain a
+  separate milestone because live-source variability and an appropriate real
+  citation/evidence fixture still need an explicit protocol.
+- `data/eval/human_support_benchmark_campaign.json` defines the first real
+  250--300-case campaign, including bilingual/domain/evidence-scope quotas and
+  a 50-case held-out test split. `scripts/audit_human_support_benchmark.py`
+  reports collection readiness without treating synthetic seeds as labels;
+  `scripts/freeze_human_support_benchmark_test_split.py` writes a
+  content-addressed manifest after independent review. The operating procedure
+  is in [`human_benchmark_protocol.md`](human_benchmark_protocol.md).
+- `data/eval/live_retrieval_benchmark_campaign.json` and
+  `scripts/observe_live_retrieval_benchmark.py` define a separate real known-
+  record observation path. It records observer-supplied region, timestamp,
+  source-version availability, latency, rate-limit/outage diagnostics, and
+  DOI/arXiv/title slices without turning the deterministic adapter fixture into
+  a source-quality claim. See
+  [`live_retrieval_benchmark_protocol.md`](live_retrieval_benchmark_protocol.md).
+- `scripts/collect_live_retrieval_cases.py` now turns an explicit public DOI,
+  arXiv, OpenAlex, or Crossref request manifest into strict, content-digested
+  real-record cases. `data/eval/live_retrieval_benchmark.json` contains the
+  first 12-case pilot and `experiments/live-retrieval-observation-20260807T0505Z`
+  contains its first timestamped observation; both remain below claim-ready
+  quotas.
+- `citeguard/benchmark/human_candidates.py` plus
+  `scripts/build_human_support_candidates.py` and
+  `scripts/merge_human_support_annotations.py` provide an unlabeled real-source
+  support staging path. The pilot packet is intentionally gold-free and keeps
+  packet identity/digest, evidence scope, source locator, and disagreement
+  provenance visible.
+  `scripts/prepare_human_support_adjudications.py` produces private, content-bound
+  third-review packets for exactly two-reviewer disagreements;
+  `scripts/promote_human_support_candidates.py` can stage agreed or independently
+  adjudicated rows while retaining both original labels in the provenance
+  sidecar. These mechanisms do not themselves establish that real people
+  performed the reviews.
+  `scripts/audit_human_support_candidates.py --strict` checks the packet before
+  assignment and fails on gold leakage or digest drift.
 
 ## Current Limitations
 
@@ -132,8 +175,10 @@ benchmark claims.
 3. Add reviewer disagreement examples instead of silently collapsing labels.
 4. Expand domain coverage beyond the current synthetic seed set, especially for
    review-writing claims, CS systems papers, and biomedical abstracts.
-5. Run production support evals with model dependencies installed and compare
-   fixture, heuristic, reranker-only, NLI-only, and ensemble configurations.
+5. Run the complete verifier matrix with production model dependencies installed
+   and archive the resulting `support_verifier_ablation` artifact; the runner
+   and no-model plan/status contract are implemented, but production rows still
+   need real model execution.
 6. Add retrieval-source ablations for in-memory fixtures, OpenAlex, Crossref,
    arXiv, Semantic Scholar, and multi-source merged evidence.
 7. Publish compact benchmark tables only after label provenance and domain
@@ -179,6 +224,8 @@ python scripts/prepare_support_label_sidecar.py --existing-sidecar data/eval/sup
 python scripts/prepare_support_label_sidecar.py --existing-sidecar data/eval/support_eval_label_sidecar.json --audit --fail-on-high-risk-unreviewed --fail-on-high-risk-unreviewed-language zh
 python scripts/prepare_support_label_sidecar.py --existing-sidecar data/eval/support_eval_label_sidecar.json --audit --fail-on-full-text-required-unreviewed --fail-on-policy-boundary-unreviewed
 python scripts/compare_support_baselines.py --split test --output-dir experiments --run-id support-baselines-release
+python scripts/run_support_ablations.py --split test --plan-only
+python scripts/run_support_ablations.py --split test --output-dir experiments --run-id support-verifier-ablation-release
 python scripts/eval_support.py --validate-only \
   --label-sidecar data/eval/support_eval_label_sidecar.json \
   --min-sidecar-coverage 1.0 \

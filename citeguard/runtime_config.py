@@ -9,6 +9,8 @@ from typing import List, Mapping, Optional
 
 DEFAULT_SOURCES = "openalex,crossref,arxiv"
 DEFAULT_MAILTO = "research@example.com"
+DEFAULT_SUPPORT_ENGINE = "auto"
+SUPPORT_ENGINE_VALUES = ("auto", "heuristic", "production")
 STATUS_SCHEMA_VERSION = 1
 SOURCE_HEALTH_SCHEMA_VERSION = 8
 POLITE_ACCESS_SCHEMA_VERSION = 1
@@ -143,6 +145,24 @@ def remote_evidence_enabled(env: Optional[Mapping[str, str]] = None) -> bool:
     active_env = env or os.environ
     raw = active_env.get("CITEGUARD_REMOTE_EVIDENCE", "0")
     return str(raw).strip().lower() in {"1", "true", "yes", "on"}
+
+
+def support_engine(env: Optional[Mapping[str, str]] = None) -> str:
+    """Return the requested claim-support execution profile.
+
+    ``auto`` uses the model-backed ensemble when its dependencies are present
+    and otherwise falls back conservatively to the lexical engine. ``heuristic``
+    explicitly disables model loading, which is useful for offline, CI, and
+    low-resource MCP clients. ``production`` requests the model-backed profile
+    while retaining the existing dependency fallback behavior.
+    """
+
+    active_env = env or os.environ
+    raw = str(active_env.get("CITEGUARD_SUPPORT_ENGINE", DEFAULT_SUPPORT_ENGINE)).strip().lower()
+    if raw in SUPPORT_ENGINE_VALUES:
+        return raw
+    allowed = ", ".join(SUPPORT_ENGINE_VALUES)
+    raise ValueError(f"CITEGUARD_SUPPORT_ENGINE must be one of: {allowed}.")
 
 
 def source_budget(env: Optional[Mapping[str, str]] = None) -> float:

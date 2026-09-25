@@ -13,6 +13,7 @@ The stable code registry is also exported from `citeguard.errors` as
 ```json
 {
   "ok": false,
+  "contract_version": "v1",
   "schema_version": 1,
   "error": {
     "code": "missing_citation_input",
@@ -29,7 +30,8 @@ The stable code registry is also exported from `citeguard.errors` as
 
 CLI commands write this shape to stderr and exit non-zero. MCP tools return the
 same shape as the tool result for expected input errors, not as a transport
-exception. `schema_version` versions the error payload contract. `error.code`
+exception. Root `contract_version` versions the shared CLI/MCP contract, while
+`schema_version` versions the error payload contract. `error.code`
 is the stable branch key, while `error.recovery` mirrors the public recovery
 registry and `error.next_action` mirrors the public error-to-action registry, so
 agents can choose the next step without parsing prose.
@@ -137,6 +139,10 @@ preserve `recovery_code` as the stable reason/error-code hint when present.
   `file_error` with `details.field=output`, `details.command`,
   `details.filename`, and `details.errno`; cache export also includes
   `details.cache_command=export`.
+- `audit-document --html` refuses an output path that is the audited document,
+  a file read or declared missing through LaTeX/BibTeX includes, or an alias to either. It returns
+  `invalid_input` with `details.command=audit-document` and
+  `details.field=html`; ordinary output I/O failures still return `file_error`.
 - Runtime configuration validation errors, such as invalid `CITEGUARD_SOURCES`,
   return `invalid_input` with `details.source=environment`,
   `details.field`, and any parsed `details.invalid_values` /

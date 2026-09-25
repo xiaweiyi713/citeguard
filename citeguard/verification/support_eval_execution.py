@@ -484,6 +484,9 @@ def _support_release_label_maturity_summary(
         if isinstance(label_sidecar, dict)
         else 0,
         "dual_annotated": int(metrics.get("dual_annotated", maturity.get("dual_annotated_count", 0)) or 0),
+        "dual_independent": int(
+            metrics.get("dual_independent", maturity.get("dual_independent_count", 0)) or 0
+        ),
         "published_benchmark": int(maturity.get("published_benchmark_count", 0) or 0)
         if isinstance(maturity, dict)
         else 0,

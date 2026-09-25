@@ -46,6 +46,52 @@ overclaims, supplemental-material full-text boundaries, Semantic Scholar rate-li
 a Chinese citation-set weak aggregation boundary, and a source-limited
 citation-set fabrication boundary.
 
+## First real-source hard-case slice
+
+[`../data/eval/support_hard_cases_v1.json`](../data/eval/support_hard_cases_v1.json)
+is a maintainer-reviewed slice over five public abstracts: 39 evidence-level
+cases plus 2 multi-citation set cases. Splits are paper-grouped. Natural
+excerpts (`origin=natural_excerpt`) and maintainer perturbations
+(`origin=maintainer_perturbation`) are labeled separately. Error families cover
+direct support, related-but-unsupported, causal overclaim, scope overclaim,
+condition omission, contradiction, full-text-required, and multi-citation
+aggregation. This is not dual-annotated and does not meet the 250-case campaign
+quota in `human_support_benchmark_campaign.json`.
+
+```bash
+python -m unittest tests.test_support_hard_cases
+```
+
+Sweep uncalibrated acceptance thresholds (false-support vs supported recall)
+without changing production policy:
+
+```bash
+python scripts/eval_hard_cases.py
+```
+
+## First production-backend run (2026-07-16)
+
+The deep support engine (reranker + NLI ensemble, the `[models]` extra) was
+run for the first time against the synthetic seed test split (19 cases, not a
+human-reviewed benchmark). Headline numbers, archived under
+`experiments/production-first-run/`:
+
+| metric | value |
+|---|---|
+| supported precision | 1.0000 |
+| false-support rate / overcalls | 0.0 / 0 |
+| contradiction recall | 1.0000 |
+| supported recall | 0.6667 |
+| abstention rate | 0.3158 |
+| accuracy / macro F1 | 0.7895 / 0.8375 |
+
+The safety-side metrics (no false support, all contradictions caught) match
+the falsification-first design intent; the cost is conservative recall and a
+high abstention rate. The single review-queue miss (`s24`, gold `supported`
+predicted `contradicted`) is a paraphrase-style technical claim — exactly the
+kind of case human annotation should prioritize. These are synthetic-seed
+numbers and must not be quoted as a human-reviewed benchmark.
+
 ## Quality gates
 
 `--quality-gate` turns the report into a conservative
@@ -82,6 +128,15 @@ False-support reports include `false_support_analysis.review_plan` with
 turn supported-overcall blockers or weak-support overcalls into blinded review
 packets without inventing commands. These packets are review assignments only;
 they do not change labels or permit accepting `supported` predictions.
+Baseline comparison rows preserve the same queue as
+`false_support_review_plan_packet_ids`,
+`false_support_review_plan_packet_count`, and
+`false_support_review_plan_packet_case_ids`. Experiment manifests mirror the
+highest-overcall backend under
+`false_support_top_overcall_review_plan_packet_ids`,
+`false_support_top_overcall_review_plan_packet_count`, and
+`false_support_top_overcall_review_plan_packet_case_ids`, including stable empty
+values when no backend overcalls support.
 Reports also include `support_set_policy`, a deterministic fixture that checks
 claim-level aggregation boundaries such as multiple weak citations remaining
 tentative and contradictions dominating the aggregate. Release gates also check
@@ -150,6 +205,22 @@ the most dangerous support overcalls. Support-review manifests also retain
 same `support_set_policy` fixture and manifest summary fields, so citation-set
 aggregation regressions are visible beside evidence-level baseline regressions.
 
+`scripts/run_support_ablations.py` runs the stable six-row verifier component
+matrix: `heuristic_only`, `reranker_only`, `nli_only`,
+`heuristic_reranker`, `reranker_nli`, and `full_ensemble`. Use `--plan-only`
+to inspect dependency availability without loading models, or select repeatable
+`--ablation` values for a smaller run. Rows are explicitly `completed`,
+`unavailable`, `model_error`, or `planned`; only `completed` rows carry metrics,
+so a missing model is never rendered as a zero-score experiment. Every completed
+row keeps the strict false-support quality gate and reports precision/recall/F1,
+false-support and support-overcall rates, abstention rate, and contradiction
+recall. With `--output-dir`, the `support_verifier_ablation` manifest exposes
+`support_ablation_status_by_name`, `support_ablation_metrics`,
+`support_ablation_matrix_complete`, and label-maturity fields such as
+`support_ablation_label_human_reviewed` and
+`support_ablation_benchmark_claim_safe`. Seed-set ablations remain synthetic
+regression evidence, not a human-reviewed benchmark.
+
 ## Annotation packets
 
 Generate or complete a provenance sidecar draft with:
@@ -163,7 +234,10 @@ python3 scripts/prepare_support_label_sidecar.py \
 ```
 
 For independent human labeling, use a blinded annotation packet so reviewers do
-not see dataset gold labels:
+not see dataset gold labels. For the first real 250--300-case campaign, follow
+[`human_benchmark_protocol.md`](human_benchmark_protocol.md): it adds source
+rights checks, distinct reviewer IDs, and a content-addressed held-out test
+split freeze. The synthetic seed set never satisfies that campaign.
 
 Automated release reviewers are intentionally separate from this workflow.
 Their outputs may authorize an ordinary software release, but they are not
@@ -258,6 +332,8 @@ python3 scripts/eval_support.py --validate-only --label-sidecar data/eval/suppor
 python3 scripts/eval_verification.py --output-dir experiments --run-id verification-smoke
 python3 scripts/eval_support.py --report --split test --quality-gate --output-dir experiments --run-id support-smoke
 python3 scripts/compare_support_baselines.py --split test --min-high-risk-reviewed-by-language zh=0 --output-dir experiments --run-id support-baselines-smoke
+python3 scripts/run_support_ablations.py --split test --plan-only
+python3 scripts/run_support_ablations.py --split test --output-dir experiments --run-id support-verifier-ablation
 ```
 
 ## Package and release smokes
