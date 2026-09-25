@@ -500,6 +500,7 @@ def audit_document(
         payload,
         _document_texts(reader, active_format),
         public_candidates,
+        audit_results=full_audit["results"],
         support_backend=support_backend,
     )
 

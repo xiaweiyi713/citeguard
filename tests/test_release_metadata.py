@@ -32,6 +32,8 @@ from scripts.release_package_gate import (
     _record_cli_error_contract_gate,
     _record_configuration_contract_gate,
     _record_counterevidence_safety_contract_gate,
+    _record_document_audit_contract_gate,
+    _record_evidence_object_contract_gate,
     _record_error_codes_contract_gate,
     _record_full_text_evidence_boundary_contract_gate,
     _record_live_source_health_contract_gate,
@@ -45,8 +47,10 @@ from scripts.release_package_gate import (
     _record_release_artifact_contract_gate,
     _record_security_compliance_contract_gate,
     _record_source_outage_safety_gate,
+    _record_supply_chain_contract_gate,
     _record_support_baseline_comparison_gate,
     _record_support_calibration_artifact_gate,
+    _record_support_verifier_ablation_gate,
     _record_support_label_sidecar_gate,
     _record_support_review_queue_gate,
     _record_support_review_queue_annotation_packet_gate,
@@ -81,6 +85,7 @@ def _support_label_gate_payload():
             "full_text_required_unreviewed": 7,
             "policy_boundary_unreviewed": 2,
             "dual_annotated": 0,
+            "dual_independent": 0,
             "unresolved_disagreements": 0,
             "supported_disagreements": 0,
             "raw_dual_agreement_rate": None,
@@ -127,6 +132,7 @@ def _support_label_manifest_summary():
         "support_label_full_text_required_unreviewed": 7,
         "support_label_policy_boundary_unreviewed": 2,
         "support_label_dual_annotated": 0,
+        "support_label_dual_independent": 0,
         "support_label_unresolved_disagreements": 0,
         "support_label_supported_disagreements": 0,
         "support_label_raw_dual_agreement_rate": None,
@@ -205,6 +211,7 @@ def _clear_support_release_summary():
         "label_maturity": {
             "human_reviewed": 0,
             "dual_annotated": 0,
+            "dual_independent": 0,
             "published_benchmark": 0,
             "high_risk_unreviewed": 35,
         },
@@ -243,6 +250,7 @@ def _clear_support_release_manifest_summary():
         "support_release_abstention_review_case_ids": [],
         "support_release_label_human_reviewed": 0,
         "support_release_label_dual_annotated": 0,
+        "support_release_label_dual_independent": 0,
         "support_release_label_published_benchmark": 0,
         "support_release_label_high_risk_unreviewed": 35,
     }
@@ -897,7 +905,9 @@ class ReleaseMetadataTests(unittest.TestCase):
     def test_pyproject_declares_public_entry_points_and_extras(self):
         pyproject = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
 
-        self.assertIn(f'version = "{__version__}"', pyproject)
+        self.assertIn('dynamic = ["version"]', pyproject)
+        self.assertIn('version = {attr = "citeguard.version.__version__"}', pyproject)
+        self.assertNotIn(f'version = "{__version__}"', pyproject)
         self.assertIn('description = "A skeptical citation auditor for agent writing workflows."', pyproject)
         self.assertIn('"skeptical-citation-auditor"', pyproject)
         self.assertIn('"agent-tools"', pyproject)
@@ -912,12 +922,16 @@ class ReleaseMetadataTests(unittest.TestCase):
         self.assertIn("mcp = [", pyproject)
         self.assertIn('"mcp>=1.28,<2; python_version >= \'3.10\'"', pyproject)
         self.assertIn("pdf = [", pyproject)
-        self.assertIn('"pypdf>=4,<6"', pyproject)
+        self.assertIn('"pypdf>=6.14.2,<7"', pyproject)
+        self.assertIn('"cryptography>=50; python_version >= \'3.10\'"', pyproject)
         self.assertIn("models = [", pyproject)
         self.assertIn('"Topic :: Text Processing :: Linguistic"', pyproject)
         self.assertIn('"Typing :: Typed"', pyproject)
         self.assertIn('Documentation = "https://github.com/xiaweiyi713/citeguard#readme"', pyproject)
-        self.assertIn('citeguard = ["py.typed", "verification/*.json"]', pyproject)
+        self.assertIn(
+            'citeguard = ["py.typed", "verification/*.json", "contracts/v1/*.json"]',
+            pyproject,
+        )
 
     def test_release_gate_records_public_only_package_discovery(self):
         summary = {"ok": True, "steps": []}
@@ -987,6 +1001,9 @@ class ReleaseMetadataTests(unittest.TestCase):
             "configs/model.yaml",
             "configs/retrieval.yaml",
             "configs/verifier.yaml",
+            "scripts/run_support_ablations.py",
+            "citeguard/verification/document_audit.py",
+            "citeguard/evidence.py",
         ]:
             with self.subTest(relative=relative):
                 self.assertIn(relative, expected_files)
@@ -1148,8 +1165,9 @@ Classifier: Typing :: Typed
 Provides-Extra: mcp
 Provides-Extra: models
 Provides-Extra: pdf
-Requires-Dist: mcp>=1.28,<2; python_version >= "3.10"
-Requires-Dist: pypdf<6,>=4; extra == "pdf"
+Requires-Dist: mcp<2,>=1.28; python_version >= "3.10"
+Requires-Dist: cryptography>=50; python_version >= "3.10"
+Requires-Dist: pypdf<7,>=6.14.2; extra == "pdf"
 Project-URL: Homepage, https://github.com/xiaweiyi713/citeguard
 Project-URL: Repository, https://github.com/xiaweiyi713/citeguard
 Project-URL: Issues, https://github.com/xiaweiyi713/citeguard/issues
@@ -1574,11 +1592,16 @@ License-File: LICENSE
 
     def test_ci_runs_release_and_mcp_smoke_gates(self):
         workflow = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+        publish_workflow = (ROOT / ".github" / "workflows" / "publish.yml").read_text(encoding="utf-8")
 
         self.assertIn("python scripts/eval_verification.py", workflow)
         self.assertIn("python scripts/eval_support.py --validate-only", workflow)
+        self.assertIn("python scripts/audit_human_support_benchmark.py", workflow)
+        self.assertIn("python scripts/audit_live_retrieval_benchmark.py", workflow)
+        self.assertIn("python scripts/summarize_live_retrieval_observations.py", workflow)
         self.assertIn("python scripts/eval_support.py --report --split test", workflow)
         self.assertIn("python scripts/compare_support_baselines.py --split test", workflow)
+        self.assertIn("python scripts/run_support_ablations.py --split test --plan-only", workflow)
         self.assertIn("--label-sidecar data/eval/support_eval_label_sidecar.json", workflow)
         self.assertIn("--min-sidecar-coverage 1.0", workflow)
         self.assertIn("--min-human-reviewed 0", workflow)
@@ -1599,6 +1622,10 @@ License-File: LICENSE
         self.assertIn('python-version: "3.10"', workflow)
         self.assertIn('python -m pip install -e ".[mcp]"', workflow)
         self.assertIn("python scripts/smoke_mcp.py --require-sdk", workflow)
+        self.assertIn("python -m pip_audit --strict", workflow)
+        self.assertIn('python -m pip install -e ".[models,pdf]"', publish_workflow)
+        self.assertIn("python -m pip_audit --strict", publish_workflow)
+        self.assertIn("python scripts/generate_sbom.py --output citationguard.cdx.json", publish_workflow)
 
     def test_release_gate_records_ci_mcp_smoke_contract(self):
         summary = {"ok": True, "steps": []}
@@ -1704,6 +1731,12 @@ License-File: LICENSE
             "_record_full_text_evidence_boundary_contract_gate",
             "local/user-provided opt-in evidence",
             "abstract-only results are not upgraded",
+            "evidence_object_contract",
+            "_record_evidence_object_contract_gate",
+            "evidence objects preserve returned-fragment integrity",
+            "document_audit_contract",
+            "_record_document_audit_contract_gate",
+            "bounded local document auditing preserves exact locators",
             "support_set_aggregation_contract",
             "_record_support_set_aggregation_contract_gate",
             "multiple weak citation-set evidence remains tentative",
@@ -1742,9 +1775,11 @@ License-File: LICENSE
             "support_set_summary",
             "support_review_queue",
             "support_baseline_comparison",
+            "support_verifier_ablation",
             "support_review_queue_annotation_packet",
             "_record_support_review_queue_gate",
             "_record_support_baseline_comparison_gate",
+            "_record_support_verifier_ablation_gate",
             "_record_support_review_queue_annotation_packet_gate",
             "false_support_triage_present",
             "rows_missing_active_risk_slices",
@@ -1962,6 +1997,7 @@ License-File: LICENSE
             "offline_fixture",
             "status_payload",
             "status_source_health_retry_delay",
+            "offline_heuristic_profile",
             "fixture_verify",
             "audit_high_risk_filter",
             "claim_support",
@@ -3117,9 +3153,13 @@ License-File: LICENSE
         self.assertIn("CITEGUARD_SOURCES", summary["steps"][0]["environment_variables"])
         self.assertIn("CITEGUARD_FIXTURE_CITATIONS", summary["steps"][0]["environment_variables"])
         self.assertIn("CITEGUARD_HTTP_MIN_INTERVAL", summary["steps"][0]["environment_variables"])
+        self.assertIn("CITEGUARD_METRICS_PATH", summary["steps"][0]["environment_variables"])
         self.assertIn("SEMANTIC_SCHOLAR_API_KEY", summary["steps"][0]["environment_variables"])
+        self.assertIn("CITEGUARD_SUPPORT_ENGINE", summary["steps"][0]["environment_variables"])
         self.assertIn("source_health", summary["steps"][0]["status_fields"])
         self.assertIn("remote_evidence_policy", summary["steps"][0]["status_fields"])
+        self.assertIn("support_engine", summary["steps"][0]["status_fields"])
+        self.assertIn("runtime_metrics", summary["steps"][0]["status_fields"])
         self.assertEqual(summary["steps"][0]["fixture_mode"], "fixture")
         self.assertEqual(summary["steps"][0]["cache_path"], ":memory:")
         self.assertEqual(summary["steps"][0]["http"]["timeout_seconds"], 7)
@@ -3127,6 +3167,9 @@ License-File: LICENSE
         self.assertEqual(summary["steps"][0]["http"]["retry_backoff_seconds"], 0.5)
         self.assertEqual(summary["steps"][0]["http"]["min_interval_seconds"], 0.25)
         self.assertTrue(summary["steps"][0]["remote_evidence_enabled"])
+        self.assertTrue(summary["steps"][0]["runtime_metrics"]["enabled"])
+        self.assertFalse(summary["steps"][0]["runtime_metrics"]["network_transmission"])
+        self.assertFalse(summary["steps"][0]["runtime_metrics"]["path_exposed"])
         self.assertEqual(
             summary["steps"][0]["doc_discoverability"],
             {"readme_setup_reference": True, "release_checklist_documentation": True},
@@ -3134,6 +3177,8 @@ License-File: LICENSE
         self.assertEqual(summary["steps"][0]["support_models"]["reranker_model"], "release-reranker")
         self.assertEqual(summary["steps"][0]["support_models"]["nli_model"], "release-nli")
         self.assertEqual(summary["steps"][0]["support_models"]["engine"], "heuristic_fallback")
+        self.assertEqual(summary["steps"][0]["support_models"]["requested_engine"], "auto")
+        self.assertTrue(summary["steps"][0]["support_models"]["model_loading_enabled"])
         self.assertFalse(summary["steps"][0]["support_models"]["deep_models_available"])
         self.assertEqual(summary["steps"][0]["support_models"]["next_action"], "install_or_configure_dependency")
         self.assertIn("sentence_transformers", summary["steps"][0]["support_models"]["missing_dependencies"])
@@ -3243,6 +3288,23 @@ License-File: LICENSE
         self.assertEqual(summary["steps"][0]["candidate_count"], 1)
         self.assertEqual(summary["steps"][0]["candidate_signal"], "explicit_contradiction_cue")
         self.assertIn("improvement_negation", summary["steps"][0]["candidate_query_roles"])
+        self.assertEqual(summary["steps"][0]["candidate_sources"], ["release_fixture"])
+        self.assertEqual(summary["steps"][0]["sources_responded"], ["release_fixture"])
+        self.assertTrue(
+            all(item == ["release_fixture"] for item in summary["steps"][0]["query_sources_responded"])
+        )
+        self.assertEqual(
+            summary["steps"][0]["top_k_zero_provenance"],
+            {
+                "candidate_count": 0,
+                "sources_responded": ["release_fixture"],
+                "source_failure_mode": "none",
+            },
+        )
+        self.assertIn(
+            "skills/citeguard-verify/references/tool-payloads.md",
+            summary["steps"][0]["docs_checked"],
+        )
         self.assertEqual(
             summary["steps"][0]["review_summary"]["recommended_next_steps"]["first_queue"],
             "explicit_contradiction_candidate_indexes",
@@ -3270,6 +3332,23 @@ License-File: LICENSE
         )
         self.assertNotEqual(summary["steps"][0]["abstract_probe"]["evidence_scope"], "full_text")
         self.assertIn("local/user-provided", summary["steps"][0]["policy"])
+
+    def test_release_gate_records_evidence_object_contract(self):
+        summary = {"ok": True, "steps": []}
+
+        _record_evidence_object_contract_gate(summary, project_root=ROOT)
+
+        self.assertTrue(summary["ok"])
+        step = summary["steps"][0]
+        self.assertEqual(step["name"], "evidence_object_contract")
+        self.assertEqual(step["status"], "passed")
+        self.assertEqual(step["schema_version"], 1)
+        self.assertTrue(step["local_fragment_sha256"].startswith("sha256:"))
+        self.assertEqual(step["local_locator"], "/workspace/release-evidence.txt#lines-2-3")
+        self.assertIsNone(step["local_retrieved_at"])
+        self.assertEqual(step["oa_retrieval"]["method"], "oa_fulltext_fetch")
+        self.assertEqual(step["oa_license"]["status"], "open_access_license_known")
+        self.assertIn("docs/agent_output_contract.md", step["docs_checked"])
 
     def test_release_gate_records_support_set_aggregation_contract(self):
         summary = {"ok": True, "steps": []}
@@ -3497,9 +3576,77 @@ License-File: LICENSE
             ],
         )
         self.assertEqual(step["maintainer_skill_file"], "skills/citeguard-maintain/SKILL.md")
+        self.assertEqual(
+            step["trigger_prediction_schema_file"],
+            "citeguard/contracts/v1/skill-trigger-prediction.schema.json",
+        )
         self.assertLess(step["skill_lines"], 500)
-        self.assertEqual(step["trigger_eval"]["case_count"], 9)
-        self.assertTrue(all(item["expected"] == item["predicted"] for item in step["trigger_eval"]["results"]))
+        self.assertGreaterEqual(step["trigger_eval"]["case_count"], 100)
+        self.assertEqual(step["trigger_eval"]["target_clients"], ["codex", "claude", "cursor"])
+        self.assertEqual(set(step["trigger_eval"]["coverage"]["by_language"]), {"en", "zh"})
+        self.assertEqual(
+            step["trigger_eval"]["provenance_contract"],
+            {
+                "request_digest_bound": True,
+                "suite_id_bound": True,
+                "dataset_digest_bound": True,
+                "skill_digest_bound": True,
+                "client_version_required": True,
+                "recorded_at_required": True,
+            },
+        )
+        self.assertFalse(step["trigger_eval"]["real_client_results_collected"])
+        self.assertEqual(step["trigger_eval"]["next_action"], "collect_real_client_predictions")
+
+    def test_release_gate_records_supply_chain_contract(self):
+        summary = {"ok": True, "steps": []}
+
+        _record_supply_chain_contract_gate(summary, ROOT)
+
+        self.assertTrue(summary["ok"])
+        step = summary["steps"][0]
+        self.assertEqual(step["name"], "supply_chain_contract")
+        self.assertEqual(step["status"], "passed")
+        self.assertEqual(step["sbom"]["format"], "CycloneDX")
+        self.assertEqual(step["sbom"]["root_component"]["version"], __version__)
+        self.assertGreater(step["pinned_action_count"], 0)
+        self.assertEqual(step["unpinned_action_references"], [])
+        self.assertEqual(
+            step["audit_workflows"],
+            {
+                "ci_strict_audit": True,
+                "publish_full_extras": True,
+                "publish_strict_audit": True,
+                "publish_sbom": True,
+            },
+        )
+        self.assertEqual(step["mcp_sdk_requirement"], "mcp>=1.28,<2; python_version >= '3.10'")
+        self.assertEqual(
+            step["dependency_security_floors"],
+            {
+                "cryptography": ">=50; python_version >= '3.10'",
+                "pypdf": ">=6.14.2,<7; extra == 'pdf'",
+            },
+        )
+        self.assertEqual(step["dependabot_file"], ".github/dependabot.yml")
+
+    def test_release_gate_records_bounded_document_audit_contract(self):
+        summary = {"ok": True, "steps": []}
+
+        _record_document_audit_contract_gate(summary, project_root=ROOT)
+
+        self.assertTrue(summary["ok"])
+        step = summary["steps"][0]
+        self.assertEqual(step["name"], "document_audit_contract")
+        self.assertEqual(step["status"], "passed")
+        self.assertEqual(step["tool"], "audit_document")
+        self.assertEqual(step["schema_version"], 1)
+        self.assertEqual(step["candidate_count"], 1)
+        self.assertTrue(step["document_locator"].endswith("#line-5"))
+        self.assertFalse(step["edit_policy"]["document_modified"])
+        self.assertFalse(step["edit_policy"]["automatic_apply_allowed"])
+        self.assertEqual(step["boundary_error_code"], "file_error")
+        self.assertIn("docs/mcp_setup.md", step["docs_checked"])
 
     def test_release_gate_records_batch_workflow_examples_contract(self):
         summary = {"ok": True, "steps": []}
@@ -4095,6 +4242,7 @@ License-File: LICENSE
         self.assertTrue(summary["steps"][0]["label_maturity_present"])
         self.assertEqual(summary["steps"][0]["label_maturity"]["human_reviewed"], 0)
         self.assertEqual(summary["steps"][0]["label_maturity"]["dual_annotated"], 0)
+        self.assertEqual(summary["steps"][0]["label_maturity"]["dual_independent"], 0)
         self.assertEqual(summary["steps"][0]["false_support_analysis"]["risk_slices"], [])
         self.assertEqual(summary["steps"][0]["false_support_analysis"]["review_plan"]["status"], "clear")
         self.assertEqual(
@@ -4143,6 +4291,7 @@ License-File: LICENSE
         self.assertEqual(summary["steps"][0]["manifest_result_summary"]["release_next_action"], "continue")
         self.assertEqual(summary["steps"][0]["manifest_result_summary"]["support_set_policy_case_count"], 3)
         self.assertEqual(summary["steps"][0]["manifest_result_summary"]["support_label_dual_annotated"], 0)
+        self.assertEqual(summary["steps"][0]["manifest_result_summary"]["support_label_dual_independent"], 0)
         self.assertEqual(summary["steps"][0]["manifest_result_summary"]["support_label_unresolved_disagreements"], 0)
         self.assertEqual(summary["steps"][0]["manifest_result_summary"]["support_label_supported_disagreements"], 0)
         self.assertEqual(summary["steps"][0]["manifest_result_summary"]["support_release_status"], "clear")
@@ -4590,6 +4739,66 @@ License-File: LICENSE
                 "highest_risk_slice_review",
             ],
         )
+        self.assertEqual(
+            summary["steps"][0]["manifest_result_summary"][
+                "false_support_top_overcall_review_plan_packet_ids"
+            ],
+            ["support-label-packet-supported-overcall-blockers-test"],
+        )
+        self.assertEqual(
+            summary["steps"][0]["manifest_result_summary"][
+                "false_support_top_overcall_review_plan_packet_count"
+            ],
+            1,
+        )
+        self.assertEqual(
+            summary["steps"][0]["manifest_result_summary"][
+                "false_support_top_overcall_review_plan_packet_case_ids"
+            ],
+            ["s10", "s11"],
+        )
+
+    def test_release_gate_records_support_verifier_ablation_contract(self):
+        summary = {"ok": True, "steps": []}
+
+        _record_support_verifier_ablation_gate(
+            summary,
+            python=sys.executable,
+            project_root=ROOT,
+            dataset="data/eval/support_eval.json",
+            label_sidecar="data/eval/support_eval_label_sidecar.json",
+        )
+
+        self.assertTrue(summary["ok"])
+        step = summary["steps"][0]
+        self.assertEqual(step["name"], "support_verifier_ablation")
+        self.assertEqual(step["status"], "passed")
+        self.assertEqual(
+            step["requested_ablations"],
+            [
+                "heuristic_only",
+                "reranker_only",
+                "nli_only",
+                "heuristic_reranker",
+                "reranker_nli",
+                "full_ensemble",
+            ],
+        )
+        self.assertEqual(step["completed_ablations"], ["heuristic_only"])
+        self.assertEqual(step["invalid_plan_metric_rows"], [])
+        self.assertIn(step["plan_status_by_name"]["heuristic_only"], {"planned", "unavailable"})
+        self.assertIn("false_support_rate", step["heuristic_metrics"])
+        self.assertIn("contradiction_recall", step["heuristic_metrics"])
+        self.assertEqual(step["label_provenance"]["human_reviewed"], 0)
+        self.assertFalse(step["label_provenance"]["benchmark_claim_safe"])
+        manifest_summary = step["manifest_result_summary"]
+        self.assertEqual(manifest_summary["support_ablation_requested"], ["heuristic_only"])
+        self.assertEqual(
+            manifest_summary["support_ablation_status_by_name"],
+            {"heuristic_only": "completed"},
+        )
+        self.assertFalse(manifest_summary["support_ablation_benchmark_claim_safe"])
+        self.assertIn("unavailable models are not scored", step["policy"])
 
     def test_release_gate_records_support_calibration_artifact_contract(self):
         summary = {"ok": True, "steps": []}
@@ -5536,11 +5745,17 @@ License-File: LICENSE
             "false_support_top_risk_slice_case_ids",
             "false_support_review_plan_status",
             "false_support_review_plan_phase_ids",
+            "false_support_review_plan_packet_ids",
+            "false_support_review_plan_packet_count",
+            "false_support_review_plan_packet_case_ids",
             "false_support_overcall_backends",
             "false_support_top_overcall_backend",
             "false_support_top_overcall_review_plan_status",
             "false_support_top_overcall_review_plan_next_action",
             "false_support_top_overcall_review_plan_phase_ids",
+            "false_support_top_overcall_review_plan_packet_ids",
+            "false_support_top_overcall_review_plan_packet_count",
+            "false_support_top_overcall_review_plan_packet_case_ids",
             "support_release_status",
             "support_release_next_action",
             "support_release_quality_gate_ok",

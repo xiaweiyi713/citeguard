@@ -1,0 +1,120 @@
+{
+  "schema_version": 1,
+  "description": "Small operator-curated pilot requests for the live retrieval collector. Public metadata only.",
+  "requests": [
+    {
+      "id": "pilot-doi-cvpr-resnet",
+      "query_kind": "doi",
+      "query": "10.1109/CVPR.2016.90",
+      "expected_identity": {"doi": "10.1109/cvpr.2016.90", "arxiv_id": "1512.03385"},
+      "lang": "en",
+      "domain": "computer_science",
+      "rights_basis": "public_metadata",
+      "source": "crossref"
+    },
+    {
+      "id": "pilot-doi-bart-acl",
+      "query_kind": "doi",
+      "query": "10.18653/v1/2020.acl-main.703",
+      "lang": "en",
+      "domain": "computer_science",
+      "rights_basis": "public_metadata",
+      "source": "crossref"
+    },
+    {
+      "id": "pilot-doi-alphafold-nature",
+      "query_kind": "doi",
+      "query": "10.1038/s41586-021-03819-2",
+      "lang": "en",
+      "domain": "biomedicine",
+      "rights_basis": "public_metadata",
+      "source": "crossref"
+    },
+    {
+      "id": "pilot-doi-transformer-arxiv-doi",
+      "query_kind": "doi",
+      "query": "10.1145/3528223.3530127",
+      "lang": "en",
+      "domain": "computer_science",
+      "rights_basis": "public_metadata",
+      "source": "crossref"
+    },
+    {
+      "id": "pilot-arxiv-transformer",
+      "query_kind": "arxiv_id",
+      "query": "1706.03762",
+      "lang": "en",
+      "domain": "computer_science",
+      "rights_basis": "public_metadata",
+      "source": "arxiv"
+    },
+    {
+      "id": "pilot-arxiv-bert",
+      "query_kind": "arxiv_id",
+      "query": "1810.04805",
+      "lang": "en",
+      "domain": "computer_science",
+      "rights_basis": "public_metadata",
+      "source": "arxiv"
+    },
+    {
+      "id": "pilot-arxiv-resnet",
+      "query_kind": "arxiv_id",
+      "query": "1512.03385",
+      "expected_identity": {"doi": "10.1109/cvpr.2016.90", "arxiv_id": "1512.03385"},
+      "lang": "en",
+      "domain": "computer_science",
+      "rights_basis": "public_metadata",
+      "source": "arxiv"
+    },
+    {
+      "id": "pilot-arxiv-gpt3",
+      "query_kind": "arxiv_id",
+      "query": "2005.14165",
+      "lang": "en",
+      "domain": "computer_science",
+      "rights_basis": "public_metadata",
+      "source": "arxiv"
+    },
+    {
+      "id": "pilot-title-transformer",
+      "query_kind": "title",
+      "query": "Attention Is All You Need",
+      "expected_identity": {"arxiv_id": "1706.03762"},
+      "lang": "en",
+      "domain": "computer_science",
+      "rights_basis": "public_metadata",
+      "source": "arxiv"
+    },
+    {
+      "id": "pilot-title-resnet",
+      "query_kind": "title",
+      "query": "Deep Residual Learning for Image Recognition",
+      "expected_identity": {"doi": "10.1109/cvpr.2016.90", "arxiv_id": "1512.03385"},
+      "lang": "en",
+      "domain": "computer_science",
+      "rights_basis": "public_metadata",
+      "source": "openalex"
+    },
+    {
+      "id": "pilot-title-bert",
+      "query_kind": "title",
+      "query": "BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding",
+      "expected_identity": {"arxiv_id": "1810.04805"},
+      "lang": "en",
+      "domain": "computer_science",
+      "rights_basis": "public_metadata",
+      "source": "arxiv"
+    },
+    {
+      "id": "pilot-title-alphafold",
+      "query_kind": "title",
+      "query": "Highly accurate protein structure prediction with AlphaFold",
+      "expected_identity": {"doi": "10.1038/s41586-021-03819-2"},
+      "lang": "en",
+      "domain": "biomedicine",
+      "rights_basis": "public_metadata",
+      "source": "openalex"
+    }
+  ]
+}

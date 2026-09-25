@@ -1,0 +1,168 @@
+{
+  "created_at": "2026-07-16T14:56:42.922333Z",
+  "experiment_name": "support_eval",
+  "files": {
+    "config": "config.json",
+    "manifest": "manifest.json",
+    "result": "result.json"
+  },
+  "result_summary": {
+    "abstention_correct_count": 6,
+    "abstention_incorrect_count": 0,
+    "abstention_rate": 0.3158,
+    "abstention_review_case_ids": [],
+    "abstention_total_count": 6,
+    "accuracy": 0.7895,
+    "benchmark_claim_safe": false,
+    "contradiction_recall": 1.0,
+    "false_support_block_acceptance_case_ids": [],
+    "false_support_block_acceptance_count": 0,
+    "false_support_ok_to_accept_supported": true,
+    "false_support_rate": 0.0,
+    "false_support_review_before_accepting_case_ids": [],
+    "false_support_review_plan_block_case_ids": [],
+    "false_support_review_plan_next_action": "continue",
+    "false_support_review_plan_packet_case_ids": [],
+    "false_support_review_plan_packet_count": 0,
+    "false_support_review_plan_packet_ids": [],
+    "false_support_review_plan_phase_ids": [
+      "supported_overcall_blockers",
+      "weak_support_overcall_review",
+      "highest_risk_slice_review"
+    ],
+    "false_support_review_plan_review_case_ids": [],
+    "false_support_review_plan_status": "clear",
+    "false_support_review_plan_top_risk_slice_id": null,
+    "false_support_risk_slice_count": 0,
+    "false_support_top_risk_slice_case_ids": [],
+    "false_support_top_risk_slice_id": null,
+    "false_support_total_overcall_count": 0,
+    "macro_f1": 0.8375,
+    "macro_precision": 0.9,
+    "macro_recall": 0.8334,
+    "misjudged_support_rate": 0.3333,
+    "n": 19,
+    "per_label": {
+      "contradicted": {
+        "f1": 0.75,
+        "gold": 6,
+        "precision": 0.6,
+        "predicted": 10,
+        "recall": 1.0,
+        "tp": 6
+      },
+      "insufficient_evidence": {
+        "f1": 0.8,
+        "gold": 9,
+        "precision": 1.0,
+        "predicted": 6,
+        "recall": 0.6667,
+        "tp": 6
+      },
+      "supported": {
+        "f1": 0.8,
+        "gold": 3,
+        "precision": 1.0,
+        "predicted": 2,
+        "recall": 0.6667,
+        "tp": 2
+      },
+      "weakly_supported": {
+        "f1": 1.0,
+        "gold": 1,
+        "precision": 1.0,
+        "predicted": 1,
+        "recall": 1.0,
+        "tp": 1
+      }
+    },
+    "release_blocked": false,
+    "release_blocking_case_ids": [],
+    "release_blocking_count": 0,
+    "release_next_action": "review_medium_risk_before_benchmark_claims",
+    "release_review_required_case_ids": [
+      "s24"
+    ],
+    "release_review_required_count": 1,
+    "support_acceptance_blocked_slice_ids": [],
+    "support_acceptance_review_required_slice_ids": [],
+    "support_acceptance_slice_case_counts": {
+      "contradiction": 6,
+      "full_text_boundary": 4,
+      "hard_negative": 6,
+      "non_english": 6,
+      "test_split": 19
+    },
+    "support_acceptance_slice_ids": [
+      "contradiction",
+      "hard_negative",
+      "full_text_boundary",
+      "test_split",
+      "non_english"
+    ],
+    "support_overcall_count": 0,
+    "support_overcall_rate": 0.0,
+    "support_release_abstention_rate": 0.3158,
+    "support_release_abstention_review_case_ids": [],
+    "support_release_benchmark_claim_safe": false,
+    "support_release_block_acceptance_case_ids": [],
+    "support_release_blocking_case_ids": [],
+    "support_release_case_count": 19,
+    "support_release_contradiction_recall": 1.0,
+    "support_release_false_support_count": 0,
+    "support_release_false_support_rate": 0.0,
+    "support_release_incorrect_abstention_count": 0,
+    "support_release_label_dual_annotated": 0,
+    "support_release_label_high_risk_unreviewed": 0,
+    "support_release_label_human_reviewed": 0,
+    "support_release_label_published_benchmark": 0,
+    "support_release_label_sidecar_gate_ok": null,
+    "support_release_macro_f1": 0.8375,
+    "support_release_missed_contradiction_count": 0,
+    "support_release_next_action": "complete_human_label_review",
+    "support_release_ok_to_accept_supported": false,
+    "support_release_quality_gate_ok": null,
+    "support_release_review_before_accepting_case_ids": [],
+    "support_release_review_queue_count": 1,
+    "support_release_review_required_case_ids": [
+      "s24"
+    ],
+    "support_release_review_top_case_ids": [
+      "s24"
+    ],
+    "support_release_status": "evaluation_passed_but_labels_immature",
+    "support_release_supported_f1": 0.8,
+    "support_release_supported_precision": 1.0,
+    "support_release_supported_recall": 0.6667,
+    "support_release_top_risk_slice_case_ids": [],
+    "support_release_top_risk_slice_id": null,
+    "support_release_weak_false_support_count": 0,
+    "support_release_weighted_f1": 0.7947,
+    "support_set_policy_accuracy": 1.0,
+    "support_set_policy_case_count": 3,
+    "support_set_policy_case_ids": [
+      "ss02",
+      "ss03",
+      "ss05"
+    ],
+    "support_set_policy_case_types": {
+      "contradiction_set": 1,
+      "weak_set_boundary": 2
+    },
+    "support_set_policy_languages": {
+      "en": 2,
+      "zh": 1
+    },
+    "support_set_policy_splits": {
+      "test": 3
+    },
+    "supported_f1": 0.8,
+    "supported_precision": 1.0,
+    "supported_recall": 0.6667,
+    "weighted_f1": 0.7947,
+    "weighted_precision": 0.8737,
+    "weighted_recall": 0.7895
+  },
+  "run_id": "production-first-run",
+  "schema_version": 1
+}

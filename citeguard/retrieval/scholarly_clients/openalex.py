@@ -76,6 +76,28 @@ class OpenAlexMetadataSource(MetadataSource):
         best = max(candidates, key=lambda record: record_match_score(candidate, record), default=None)
         return best if best and record_match_score(candidate, best) >= 0.70 else None
 
+    def lookup_identifier(self, candidate: CitationRecord) -> Optional[CitationRecord]:
+        """Resolve a DOI through OpenAlex's identifier filter.
+
+        Keep this path separate from title search so callers can distinguish a
+        missing/failed identifier lookup from a merely similar search result.
+        OpenAlex exposes DOI filters reliably; arXiv-only identifiers are left
+        to the arXiv adapter or a source with an explicit DOI.
+        """
+
+        if not candidate.doi:
+            return None
+        params = {"filter": f"doi:{normalize_doi(candidate.doi)}", "per-page": 1}
+        if self.mailto:
+            params["mailto"] = self.mailto
+        payload = self.http_client.get_json(self.BASE_URL, params=params)
+        results = payload.get("results", [])
+        if not results:
+            return None
+        record = self._to_record(results[0])
+        self._remember([record])
+        return record
+
     def _remember(self, records: List[CitationRecord]) -> None:
         self._records.extend(record for record in records if record.citation_id not in {item.citation_id for item in self._records})
 

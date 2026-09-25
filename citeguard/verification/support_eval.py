@@ -126,6 +126,7 @@ class SupportCase:
     label_notes: str = ""
     case_type: str = "standard"
     split: str = "test"
+    source_locator: str = ""
 
 
 @dataclass(frozen=True)
@@ -147,6 +148,7 @@ class SupportLabelProvenance:
     adjudication_status: str
     annotator_count: int
     annotator_labels: List[str]
+    annotator_ids: List[str]
     adjudicated_label: str
     disagreement: str = "none"
     adjudicator: str = ""
@@ -170,6 +172,7 @@ def load_support_eval(path: str) -> List[SupportCase]:
             c.get("label_notes", ""),
             c.get("case_type", "standard"),
             c.get("split", "test"),
+            c.get("source_locator", ""),
         )
         for c in data["cases"]
     ]

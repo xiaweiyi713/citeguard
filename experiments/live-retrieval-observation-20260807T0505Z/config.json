@@ -1,0 +1,21 @@
+{
+  "campaign": "data/eval/live_retrieval_benchmark_campaign.json",
+  "dataset": "data/eval/live_retrieval_benchmark.json",
+  "http": {
+    "mailto_configured": true,
+    "min_interval": 0.2,
+    "retries": 0,
+    "retry_backoff": 0.2,
+    "semantic_scholar_api_key_configured": false,
+    "source_budget": 5.0,
+    "timeout": 8
+  },
+  "observer_region": "CN-Shanghai",
+  "script": "scripts/observe_live_retrieval_benchmark.py",
+  "source_api_versions": {},
+  "sources": [
+    "openalex",
+    "crossref",
+    "arxiv"
+  ]
+}

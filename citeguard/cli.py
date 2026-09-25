@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import sys
+import tempfile
 import time
 from pathlib import Path
 from typing import Any, Dict, Iterable, NoReturn, Optional, TextIO
@@ -359,7 +361,7 @@ def build_parser() -> argparse.ArgumentParser:
     document_audit_parser.add_argument(
         "--html",
         default="",
-        help="Write a human-readable HTML report to this path. JSON still prints to stdout.",
+        help="Write a human-readable HTML report without overwriting audited files. JSON still prints to stdout.",
     )
     return parser
 
@@ -711,10 +713,9 @@ def run(
                 from citeguard.verification.document_report import render_document_audit_html
 
                 try:
-                    Path(html_path).expanduser().write_text(
-                        render_document_audit_html(payload),
-                        encoding="utf-8",
-                    )
+                    output = Path(html_path).expanduser()
+                    _guard_document_html_output(output, payload)
+                    _write_text_atomically(output, render_document_audit_html(payload))
                 except OSError as exc:
                     raise _output_file_error(exc, command=args.command, path=html_path) from exc
             _print_json(payload, out, compact=args.compact)
@@ -827,6 +828,47 @@ def _print_json(payload: Any, out: TextIO, compact: bool = False) -> None:
     else:
         out.write(json.dumps(payload, indent=2, sort_keys=True))
     out.write("\n")
+
+
+def _guard_document_html_output(output: Path, payload: Dict[str, Any]) -> None:
+    document = payload.get("document")
+    snapshot = document.get("snapshot") if isinstance(document, dict) else None
+    files = snapshot.get("files", []) if isinstance(snapshot, dict) else []
+    dependencies = document.get("dependencies") if isinstance(document, dict) else None
+    missing = dependencies.get("missing", []) if isinstance(dependencies, dict) else []
+    resolved_output = output.resolve()
+    for item in [*files, *missing]:
+        if not isinstance(item, dict) or not item.get("path"):
+            continue
+        input_path = Path(str(item["path"]))
+        if resolved_output == input_path.resolve() or (output.exists() and output.samefile(input_path)):
+            raise CLIUsageError(
+                "invalid_input",
+                "HTML output must not replace the audited document or one of its dependencies.",
+                details={"command": "audit-document", "field": "html", "path": str(output)},
+            )
+    if output.is_symlink():
+        raise CLIUsageError(
+            "invalid_input",
+            "HTML output must not be a symlink.",
+            details={"command": "audit-document", "field": "html", "path": str(output)},
+        )
+
+
+def _write_text_atomically(output: Path, content: str) -> None:
+    temporary_path: Optional[Path] = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w", encoding="utf-8", dir=output.parent, prefix=f".{output.name}.", suffix=".tmp", delete=False
+        ) as handle:
+            temporary_path = Path(handle.name)
+            handle.write(content)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary_path, output)
+    finally:
+        if temporary_path is not None:
+            temporary_path.unlink(missing_ok=True)
 
 
 def main(argv: Optional[Iterable[str]] = None) -> None:

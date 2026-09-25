@@ -94,7 +94,7 @@ CiteGuard 对照 **OpenAlex、Crossref、arXiv、Semantic Scholar** 回答两个
 
 ### 3. 一篇文稿里的引用该先看哪里?
 
-`audit-document` / `audit_document_tool` 受限读取 Markdown、LaTeX、BibTeX、BBL 或 DOCX 文稿，提取并核验引用后返回精确行号/段落号和风险排序的 review queue。Markdown/LaTeX 还会把正文引用标记连到文献条目，并给出论点级建议（原句、证据、修改对照）；连不上的标记单独列出，不会从报告里消失。`--html report.html` 用同一份 JSON 结果写一份给人看的本地报告，stdout 仍是 JSON。它只给建议，绝不自动修改文稿；`not_found` 仍表示“需要核对身份”，不代表伪造。返回的 `document.snapshot.digest` 标识本次实际读取的文稿版本；文稿或其 include/BibTeX 依赖变化后，应重新审计。CI 可显式使用 `--fail-on-review`，让非空 review queue 返回退出码 1。
+`audit-document` / `audit_document_tool` 受限读取 Markdown、LaTeX、BibTeX、BBL 或 DOCX 文稿，提取并核验引用后返回精确行号/段落号和风险排序的 review queue。Markdown/LaTeX 还会把正文引用标记连到文献条目，并给出论点级建议（原句、证据、修改对照）；连不上的标记单独列出，不会从报告里消失。`--html report.html` 用同一份 JSON 结果写一份给人看的本地报告，包含正文论点及未在正文出现的待复核文献条目，stdout 仍是 JSON；输出路径不能是文稿或其依赖文件。它只给建议，绝不自动修改文稿；`not_found` 仍表示“需要核对身份”，不代表伪造。返回的 `document.snapshot.digest` 标识本次实际读取的文稿版本；文稿或其 include/BibTeX 依赖变化后，应重新审计。CI 可显式使用 `--fail-on-review`，让非空 review queue 返回退出码 1。
 
 ---
 

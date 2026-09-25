@@ -1,0 +1,3260 @@
+{
+  "benchmark_claim_safe": false,
+  "collection": {
+    "benchmark_claim_safe": false,
+    "campaign_id": "citeguard-live-retrieval-v1",
+    "cataloged_case_ids": [
+      "pilot-arxiv-bert",
+      "pilot-arxiv-gpt3",
+      "pilot-arxiv-resnet",
+      "pilot-arxiv-transformer",
+      "pilot-doi-alphafold-nature",
+      "pilot-doi-bart-acl",
+      "pilot-doi-cvpr-resnet",
+      "pilot-doi-transformer-arxiv-doi",
+      "pilot-title-alphafold",
+      "pilot-title-bert",
+      "pilot-title-resnet",
+      "pilot-title-transformer"
+    ],
+    "counts": {
+      "cataloged_real_cases": 12,
+      "invalid_real_cases": 0,
+      "qualified_by_domain": {
+        "biomedicine": 2,
+        "computer_science": 10
+      },
+      "qualified_by_language": {
+        "en": 12
+      },
+      "qualified_by_query_kind": {
+        "arxiv_id": 4,
+        "doi": 4,
+        "title": 4
+      },
+      "qualified_real_cases": 12
+    },
+    "deficits": [
+      {
+        "actual": 12,
+        "direction": "at_least",
+        "metric": "minimum_case_count",
+        "threshold": 200
+      },
+      {
+        "actual": 4,
+        "direction": "at_least",
+        "metric": "minimum_by_query_kind",
+        "threshold": 50,
+        "value": "doi"
+      },
+      {
+        "actual": 4,
+        "direction": "at_least",
+        "metric": "minimum_by_query_kind",
+        "threshold": 50,
+        "value": "arxiv_id"
+      },
+      {
+        "actual": 4,
+        "direction": "at_least",
+        "metric": "minimum_by_query_kind",
+        "threshold": 100,
+        "value": "title"
+      }
+    ],
+    "invalid_cases": [],
+    "next_action": "continue_balanced_case_collection",
+    "ok": true,
+    "policy": {
+      "known_real_records_only": true,
+      "not_found_is_not_fabrication_evidence": true,
+      "permanent_source_ranking_forbidden": true,
+      "source_outages_are_inconclusive": true
+    },
+    "qualified_case_ids": [
+      "pilot-arxiv-bert",
+      "pilot-arxiv-gpt3",
+      "pilot-arxiv-resnet",
+      "pilot-arxiv-transformer",
+      "pilot-doi-alphafold-nature",
+      "pilot-doi-bart-acl",
+      "pilot-doi-cvpr-resnet",
+      "pilot-doi-transformer-arxiv-doi",
+      "pilot-title-alphafold",
+      "pilot-title-bert",
+      "pilot-title-resnet",
+      "pilot-title-transformer"
+    ],
+    "schema_version": 1,
+    "status": "collection_incomplete",
+    "targets": {
+      "minimum_by_query_kind": {
+        "arxiv_id": 50,
+        "doi": 50,
+        "title": 100
+      },
+      "minimum_case_count": 200,
+      "minimum_observations_per_case": 3
+    }
+  },
+  "observation": {
+    "by_query_kind": {
+      "arxiv_id": {
+        "attempt_count": 12,
+        "failure_kind_counts": {},
+        "identity_accuracy": 0.3333,
+        "identity_accuracy_eligible_count": 12,
+        "identity_correct_count": 4,
+        "latency_ms": {
+          "count": 12,
+          "max": 3698.056,
+          "mean": 3227.646,
+          "p50": 3189.183,
+          "p95": 3698.056
+        },
+        "not_found_count": 3,
+        "outage_limited_count": 0,
+        "rate_limited_count": 0,
+        "source_limited_count": 0
+      },
+      "doi": {
+        "attempt_count": 12,
+        "failure_kind_counts": {},
+        "identity_accuracy": 0.6667,
+        "identity_accuracy_eligible_count": 12,
+        "identity_correct_count": 8,
+        "latency_ms": {
+          "count": 12,
+          "max": 6845.624,
+          "mean": 2752.691,
+          "p50": 2373.767,
+          "p95": 6845.624
+        },
+        "not_found_count": 3,
+        "outage_limited_count": 0,
+        "rate_limited_count": 0,
+        "source_limited_count": 0
+      },
+      "title": {
+        "attempt_count": 12,
+        "failure_kind_counts": {},
+        "identity_accuracy": 0.3333,
+        "identity_accuracy_eligible_count": 12,
+        "identity_correct_count": 4,
+        "latency_ms": {
+          "count": 12,
+          "max": 4.765,
+          "mean": 1.686,
+          "p50": 1.384,
+          "p95": 4.765
+        },
+        "not_found_count": 7,
+        "outage_limited_count": 0,
+        "rate_limited_count": 0,
+        "source_limited_count": 0
+      }
+    },
+    "by_source": {
+      "arxiv": {
+        "attempt_count": 12,
+        "failure_kind_counts": {},
+        "identity_accuracy": 0.4167,
+        "identity_accuracy_eligible_count": 12,
+        "identity_correct_count": 5,
+        "latency_ms": {
+          "count": 12,
+          "max": 6845.624,
+          "mean": 2623.523,
+          "p50": 3485.935,
+          "p95": 6845.624
+        },
+        "not_found_count": 6,
+        "outage_limited_count": 0,
+        "rate_limited_count": 0,
+        "source_limited_count": 0
+      },
+      "crossref": {
+        "attempt_count": 12,
+        "failure_kind_counts": {},
+        "identity_accuracy": 0.4167,
+        "identity_accuracy_eligible_count": 12,
+        "identity_correct_count": 5,
+        "latency_ms": {
+          "count": 12,
+          "max": 3172.952,
+          "mean": 1647.769,
+          "p50": 2262.476,
+          "p95": 3172.952
+        },
+        "not_found_count": 5,
+        "outage_limited_count": 0,
+        "rate_limited_count": 0,
+        "source_limited_count": 0
+      },
+      "openalex": {
+        "attempt_count": 12,
+        "failure_kind_counts": {},
+        "identity_accuracy": 0.5,
+        "identity_accuracy_eligible_count": 12,
+        "identity_correct_count": 6,
+        "latency_ms": {
+          "count": 12,
+          "max": 3662.816,
+          "mean": 1710.731,
+          "p50": 1966.99,
+          "p95": 3662.816
+        },
+        "not_found_count": 2,
+        "outage_limited_count": 0,
+        "rate_limited_count": 0,
+        "source_limited_count": 0
+      }
+    },
+    "interpretation": "Identity accuracy excludes source-limited attempts. A known record returning not_found is a retrieval failure to investigate, not evidence that a citation is fabricated.",
+    "observation": {
+      "case_count": 12,
+      "observed_at": "2026-08-07T04:20:01.574756Z",
+      "observer_region": "CN-Shanghai",
+      "observer_region_source": "operator_supplied",
+      "source_count": 3,
+      "source_versions": {
+        "arxiv": {
+          "adapter_version": "0.1.3",
+          "source": "arxiv",
+          "source_api_version": "not_disclosed"
+        },
+        "crossref": {
+          "adapter_version": "0.1.3",
+          "source": "crossref",
+          "source_api_version": "not_disclosed"
+        },
+        "openalex": {
+          "adapter_version": "0.1.3",
+          "source": "openalex",
+          "source_api_version": "not_disclosed"
+        }
+      }
+    },
+    "permanent_source_ranking_allowed": false,
+    "policy": "timestamped_observations_are_environment_specific; source_outages_and_rate_limits_are_inconclusive; do_not_convert_not_found_into_fabrication_claims",
+    "rows": [
+      {
+        "canonical_record": null,
+        "case_id": "pilot-arxiv-bert",
+        "case_sha256": "sha256:46be903285aa51c0c7c62783bfedc49d5412a4743faca98ad441f55a1348f660",
+        "domain": "computer_science",
+        "elapsed_ms": 3189.183,
+        "expected_identity": {
+          "arxiv_id": "1810.04805"
+        },
+        "ground_truth_locator": "https://arxiv.org/abs/1810.04805",
+        "identity_match": false,
+        "lang": "en",
+        "outage_limited": false,
+        "query_fields": {
+          "arxiv_id": "1810.04805",
+          "authors": [
+            "Jacob Devlin",
+            "Ming-Wei Chang",
+            "Kenton Lee",
+            "Kristina Toutanova"
+          ],
+          "title": "BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding",
+          "venue": "arXiv",
+          "year": 2018
+        },
+        "query_kind": "arxiv_id",
+        "rate_limited": false,
+        "rights_basis": "public_metadata",
+        "source": "openalex",
+        "source_failure_details": [],
+        "source_failure_mode": "none",
+        "source_limited": false,
+        "sources_checked": [
+          "openalex"
+        ],
+        "sources_failed": [],
+        "sources_responded": [
+          "openalex"
+        ],
+        "status": "not_found",
+        "verdict": "not_found"
+      },
+      {
+        "canonical_record": {
+          "abstract": "Recent work has demonstrated substantial gains on many NLP tasks and benchmarks by pre-training on a large corpus of text followed by fine-tuning on a specific task. While typically task-agnostic in architecture, this method still requires task-specific fine-tuning datasets of thousands or tens of thousands of examples. By contrast, humans can generally perform a new language task from only a few examples or from simple instructions - something which current NLP systems still largely struggle to do. Here we show that scaling up language models greatly improves task-agnostic, few-shot performance, sometimes even reaching competitiveness with prior state-of-the-art fine-tuning approaches. Specifically, we train GPT-3, an autoregressive language model with 175 billion parameters, 10x more than any previous non-sparse language model, and test its performance in the few-shot setting. For all tasks, GPT-3 is applied without any gradient updates or fine-tuning, with tasks and few-shot demonstrations specified purely via text interaction with the model. GPT-3 achieves strong performance on many NLP datasets, including translation, question-answering, and cloze tasks, as well as several tasks that require on-the-fly reasoning or domain adaptation, such as unscrambling words, using a novel word in a sentence, or performing 3-digit arithmetic. At the same time, we also identify some datasets where GPT-3's few-shot learning still struggles, as well as some datasets where GPT-3 faces methodological issues related to training on large web corpora. Finally, we find that GPT-3 can generate samples of news articles which human evaluators have difficulty distinguishing from articles written by humans. We discuss broader societal impacts of this finding and of GPT-3 in general.",
+          "arxiv_id": "",
+          "authors": [
+            "T. B. Brown",
+            "Benjamin Mann",
+            "Nick Ryder",
+            "Melanie Subbiah",
+            "Jared Kaplan",
+            "Prafulla Dhariwal",
+            "Arvind Neelakantan",
+            "Pranav Shyam",
+            "Girish Sastry",
+            "Amanda Askell",
+            "Sandhini Agarwal",
+            "Ariel Herbert-Voss",
+            "Gretchen Krueger",
+            "Tom Henighan",
+            "Rewon Child",
+            "Aditya Ramesh",
+            "Daniel M. Ziegler",
+            "Jeffrey Wu",
+            "Clemens Winter",
+            "Christopher Hesse",
+            "Mark Chen",
+            "Eric J. Sigler",
+            "Mateusz Litwin",
+            "Scott Gray",
+            "Benjamin Chess",
+            "Jack Clark",
+            "Christopher Berner",
+            "Sam McCandlish",
+            "Alec Radford",
+            "Ilya Sutskever",
+            "Dario Amodei"
+          ],
+          "citation_id": "openalex:W3030163527",
+          "doi": "10.48550/arxiv.2005.14165",
+          "metadata": {
+            "cited_by_count": 3029,
+            "metadata_quality": {
+              "completeness": 1.0,
+              "confidence_effect": "none",
+              "identifiers": {
+                "arxiv_id": false,
+                "doi": true
+              },
+              "missing_fields": [],
+              "present_fields": [
+                "title",
+                "authors",
+                "year",
+                "venue",
+                "abstract",
+                "identifier",
+                "url"
+              ],
+              "schema_version": 1
+            },
+            "open_access": {
+              "is_oa": true,
+              "landing_page_url": "http://arxiv.org/abs/2005.14165",
+              "license": "",
+              "pdf_url": "https://arxiv.org/pdf/2005.14165",
+              "version": "submittedVersion"
+            },
+            "openalex_id": "https://openalex.org/W3030163527",
+            "source_score": 12342.145
+          },
+          "source": "openalex",
+          "title": "Language Models are Few-Shot Learners",
+          "url": "http://arxiv.org/abs/2005.14165",
+          "venue": "arXiv (Cornell University)",
+          "year": 2020
+        },
+        "case_id": "pilot-arxiv-gpt3",
+        "case_sha256": "sha256:3997b816a0c54377cb18864f29cc2000208b77f6b96ae07b9f4a8a01c45d4adf",
+        "domain": "computer_science",
+        "elapsed_ms": 2972.999,
+        "expected_identity": {
+          "arxiv_id": "2005.14165"
+        },
+        "ground_truth_locator": "https://arxiv.org/abs/2005.14165",
+        "identity_match": false,
+        "lang": "en",
+        "outage_limited": false,
+        "query_fields": {
+          "arxiv_id": "2005.14165",
+          "authors": [
+            "Tom B. Brown",
+            "Benjamin Mann",
+            "Nick Ryder",
+            "Melanie Subbiah",
+            "Jared Kaplan",
+            "Prafulla Dhariwal",
+            "Arvind Neelakantan",
+            "Pranav Shyam",
+            "Girish Sastry",
+            "Amanda Askell",
+            "Sandhini Agarwal",
+            "Ariel Herbert-Voss",
+            "Gretchen Krueger",
+            "Tom Henighan",
+            "Rewon Child",
+            "Aditya Ramesh",
+            "Daniel M. Ziegler",
+            "Jeffrey Wu",
+            "Clemens Winter",
+            "Christopher Hesse",
+            "Mark Chen",
+            "Eric Sigler",
+            "Mateusz Litwin",
+            "Scott Gray",
+            "Benjamin Chess",
+            "Jack Clark",
+            "Christopher Berner",
+            "Sam McCandlish",
+            "Alec Radford",
+            "Ilya Sutskever",
+            "Dario Amodei"
+          ],
+          "title": "Language Models are Few-Shot Learners",
+          "venue": "arXiv",
+          "year": 2020
+        },
+        "query_kind": "arxiv_id",
+        "rate_limited": false,
+        "rights_basis": "public_metadata",
+        "source": "openalex",
+        "source_failure_details": [],
+        "source_failure_mode": "none",
+        "source_limited": false,
+        "sources_checked": [
+          "openalex"
+        ],
+        "sources_failed": [],
+        "sources_responded": [
+          "openalex"
+        ],
+        "status": "resolved_incorrect",
+        "verdict": "metadata_mismatch"
+      },
+      {
+        "canonical_record": {
+          "abstract": "Deeper neural networks are more difficult to train. We present a residual learning framework to ease the training of networks that are substantially deeper than those used previously. We explicitly reformulate the layers as learning residual functions with reference to the layer inputs, instead of learning unreferenced functions. We provide comprehensive empirical evidence showing that these residual networks are easier to optimize, and can gain accuracy from considerably increased depth. On the ImageNet dataset we evaluate residual nets with a depth of up to 152 layers - 8× deeper than VGG nets [40] but still having lower complexity. An ensemble of these residual nets achieves 3.57% error on the ImageNet test set. This result won the 1st place on the ILSVRC 2015 classification task. We also present analysis on CIFAR-10 with 100 and 1000 layers. The depth of representations is of central importance for many visual recognition tasks. Solely due to our extremely deep representations, we obtain a 28% relative improvement on the COCO object detection dataset. Deep residual nets are foundations of our submissions to ILSVRC & COCO 2015 competitions1, where we also won the 1st places on the tasks of ImageNet detection, ImageNet localization, COCO detection, and COCO segmentation.",
+          "arxiv_id": "",
+          "authors": [
+            "Kaiming He",
+            "Xiangyu Zhang",
+            "Shaoqing Ren",
+            "Jian Sun"
+          ],
+          "citation_id": "openalex:W2194775991",
+          "doi": "10.1109/cvpr.2016.90",
+          "metadata": {
+            "cited_by_count": 224735,
+            "metadata_quality": {
+              "completeness": 0.8571,
+              "confidence_effect": "missing_metadata_lowers_confidence_not_fabrication_evidence",
+              "identifiers": {
+                "arxiv_id": false,
+                "doi": true
+              },
+              "missing_fields": [
+                "venue"
+              ],
+              "present_fields": [
+                "title",
+                "authors",
+                "year",
+                "abstract",
+                "identifier",
+                "url"
+              ],
+              "schema_version": 1
+            },
+            "open_access": {
+              "is_oa": true,
+              "landing_page_url": "https://repositorio.unal.edu.co/handle/unal/81443",
+              "license": "cc-by",
+              "pdf_url": "",
+              "version": "submittedVersion"
+            },
+            "openalex_id": "https://openalex.org/W2194775991",
+            "source_score": 93196.78
+          },
+          "source": "openalex",
+          "title": "Deep Residual Learning for Image Recognition",
+          "url": "https://doi.org/10.1109/cvpr.2016.90",
+          "venue": "",
+          "year": 2016
+        },
+        "case_id": "pilot-arxiv-resnet",
+        "case_sha256": "sha256:2ad1c02702740399b66fb1737065fe79b64bd92e8165cb27090ac763ae08d8a0",
+        "domain": "computer_science",
+        "elapsed_ms": 3202.518,
+        "expected_identity": {
+          "arxiv_id": "1512.03385"
+        },
+        "ground_truth_locator": "https://arxiv.org/abs/1512.03385",
+        "identity_match": false,
+        "lang": "en",
+        "outage_limited": false,
+        "query_fields": {
+          "arxiv_id": "1512.03385",
+          "authors": [
+            "Kaiming He",
+            "Xiangyu Zhang",
+            "Shaoqing Ren",
+            "Jian Sun"
+          ],
+          "title": "Deep Residual Learning for Image Recognition",
+          "venue": "arXiv",
+          "year": 2015
+        },
+        "query_kind": "arxiv_id",
+        "rate_limited": false,
+        "rights_basis": "public_metadata",
+        "source": "openalex",
+        "source_failure_details": [],
+        "source_failure_mode": "none",
+        "source_limited": false,
+        "sources_checked": [
+          "openalex"
+        ],
+        "sources_failed": [],
+        "sources_responded": [
+          "openalex"
+        ],
+        "status": "resolved_incorrect",
+        "verdict": "metadata_mismatch"
+      },
+      {
+        "canonical_record": {
+          "abstract": "The dominant sequence transduction models are based on complex recurrent or convolutional neural networks in an encoder-decoder configuration. The best performing models also connect the encoder and decoder through an attention mechanism. We propose a new simple network architecture, the Transformer, based solely on attention mechanisms, dispensing with recurrence and convolutions entirely. Experiments on two machine translation tasks show these models to be superior in quality while being more parallelizable and requiring significantly less time to train. Our model achieves 28.4 BLEU on the WMT 2014 English-to-German translation task, improving over the existing best results, including ensembles by over 2 BLEU. On the WMT 2014 English-to-French translation task, our model establishes a new single-model state-of-the-art BLEU score of 41.8 after training for 3.5 days on eight GPUs, a small fraction of the training costs of the best models from the literature. We show that the Transformer generalizes well to other tasks by applying it successfully to English constituency parsing both with large and limited training data.",
+          "arxiv_id": "",
+          "authors": [
+            "Ashish Vaswani",
+            "Noam Shazeer",
+            "Niki Parmar",
+            "Jakob Uszkoreit",
+            "Llion Jones",
+            "Aidan N. Gomez",
+            "Łukasz Kaiser",
+            "Illia Polosukhin"
+          ],
+          "citation_id": "openalex:W2626778328",
+          "doi": "10.65215/2q58a426",
+          "metadata": {
+            "cited_by_count": 6600,
+            "metadata_quality": {
+              "completeness": 0.8571,
+              "confidence_effect": "missing_metadata_lowers_confidence_not_fabrication_evidence",
+              "identifiers": {
+                "arxiv_id": false,
+                "doi": true
+              },
+              "missing_fields": [
+                "venue"
+              ],
+              "present_fields": [
+                "title",
+                "authors",
+                "year",
+                "abstract",
+                "identifier",
+                "url"
+              ],
+              "schema_version": 1
+            },
+            "open_access": {
+              "is_oa": true,
+              "landing_page_url": "https://doi.org/10.65215/r5bs2d54",
+              "license": "",
+              "pdf_url": "https://langtaosha.org.cn/index.php/lts/preprint/download/10/108",
+              "version": "acceptedVersion"
+            },
+            "openalex_id": "https://openalex.org/W2626778328",
+            "source_score": 15057.465
+          },
+          "source": "openalex",
+          "title": "Attention Is All You Need",
+          "url": "https://doi.org/10.65215/2q58a426",
+          "venue": "",
+          "year": 2025
+        },
+        "case_id": "pilot-arxiv-transformer",
+        "case_sha256": "sha256:ddccb14c39e9641992c972a8a7c6c9c7d0cced95c656d598e14d8d9909ff5001",
+        "domain": "computer_science",
+        "elapsed_ms": 3662.816,
+        "expected_identity": {
+          "arxiv_id": "1706.03762"
+        },
+        "ground_truth_locator": "https://arxiv.org/abs/1706.03762",
+        "identity_match": false,
+        "lang": "en",
+        "outage_limited": false,
+        "query_fields": {
+          "arxiv_id": "1706.03762",
+          "authors": [
+            "Ashish Vaswani",
+            "Noam Shazeer",
+            "Niki Parmar",
+            "Jakob Uszkoreit",
+            "Llion Jones",
+            "Aidan N. Gomez",
+            "Lukasz Kaiser",
+            "Illia Polosukhin"
+          ],
+          "title": "Attention Is All You Need",
+          "venue": "arXiv",
+          "year": 2017
+        },
+        "query_kind": "arxiv_id",
+        "rate_limited": false,
+        "rights_basis": "public_metadata",
+        "source": "openalex",
+        "source_failure_details": [],
+        "source_failure_mode": "none",
+        "source_limited": false,
+        "sources_checked": [
+          "openalex"
+        ],
+        "sources_failed": [],
+        "sources_responded": [
+          "openalex"
+        ],
+        "status": "resolved_incorrect",
+        "verdict": "ambiguous"
+      },
+      {
+        "canonical_record": {
+          "abstract": "Abstract Proteins are essential to life, and understanding their structure can facilitate a mechanistic understanding of their function. Through an enormous experimental effort 1–4 , the structures of around 100,000 unique proteins have been determined 5 , but this represents a small fraction of the billions of known protein sequences 6,7 . Structural coverage is bottlenecked by the months to years of painstaking effort required to determine a single protein structure. Accurate computational approaches are needed to address this gap and to enable large-scale structural bioinformatics. Predicting the three-dimensional structure that a protein will adopt based solely on its amino acid sequence—the structure prediction component of the ‘protein folding problem’ 8 —has been an important open research problem for more than 50 years 9 . Despite recent progress 10–14 , existing methods fall far short of atomic accuracy, especially when no homologous structure is available. Here we provide the first computational method that can regularly predict protein structures with atomic accuracy even in cases in which no similar structure is known. We validated an entirely redesigned version of our neural network-based model, AlphaFold, in the challenging 14th Critical Assessment of protein Structure Prediction (CASP14) 15 , demonstrating accuracy competitive with experimental structures in a majority of cases and greatly outperforming other methods. Underpinning the latest version of AlphaFold is a novel machine learning approach that incorporates physical and biological knowledge about protein structure, leveraging multi-sequence alignments, into the design of the deep learning algorithm.",
+          "arxiv_id": "",
+          "authors": [
+            "John Jumper",
+            "Richard Evans",
+            "Alexander Pritzel",
+            "Tim Green",
+            "Michael Figurnov",
+            "Olaf Ronneberger",
+            "Kathryn Tunyasuvunakool",
+            "Russ Bates",
+            "Augustin Žídek",
+            "Anna Potapenko",
+            "Alex Bridgland",
+            "Clemens Meyer",
+            "Simon Köhl",
+            "Andrew J. Ballard",
+            "Andrew Cowie",
+            "Bernardino Romera‐Paredes",
+            "Stanislav Nikolov",
+            "Rishub Jain",
+            "Jonas Adler",
+            "Trevor Back",
+            "Stig Petersen",
+            "David Reiman",
+            "Ellen Clancy",
+            "Michał Zieliński",
+            "Martin Steinegger",
+            "Michalina Pacholska",
+            "Tamas Berghammer",
+            "Sebastian W. Bodenstein",
+            "David Silver",
+            "Oriol Vinyals",
+            "Andrew Senior",
+            "Koray Kavukcuoglu",
+            "Pushmeet Kohli",
+            "Demis Hassabis"
+          ],
+          "citation_id": "openalex:W3177828909",
+          "doi": "10.1038/s41586-021-03819-2",
+          "metadata": {
+            "cited_by_count": 46231,
+            "metadata_quality": {
+              "completeness": 1.0,
+              "confidence_effect": "none",
+              "identifiers": {
+                "arxiv_id": false,
+                "doi": true
+              },
+              "missing_fields": [],
+              "present_fields": [
+                "title",
+                "authors",
+                "year",
+                "venue",
+                "abstract",
+                "identifier",
+                "url"
+              ],
+              "schema_version": 1
+            },
+            "open_access": {
+              "is_oa": true,
+              "landing_page_url": "https://doi.org/10.1038/s41586-021-03819-2",
+              "license": "cc-by",
+              "pdf_url": "https://www.nature.com/articles/s41586-021-03819-2.pdf",
+              "version": "publishedVersion"
+            },
+            "openalex_id": "https://openalex.org/W3177828909",
+            "source_score": 1473.87
+          },
+          "source": "openalex",
+          "title": "Highly accurate protein structure prediction with AlphaFold",
+          "url": "https://doi.org/10.1038/s41586-021-03819-2",
+          "venue": "Nature",
+          "year": 2021
+        },
+        "case_id": "pilot-doi-alphafold-nature",
+        "case_sha256": "sha256:cc115846ea59f782688c02412d54d0e744f4a01d63cf4206e2e00a224abe9da1",
+        "domain": "biomedicine",
+        "elapsed_ms": 1966.99,
+        "expected_identity": {
+          "doi": "10.1038/s41586-021-03819-2"
+        },
+        "ground_truth_locator": "https://doi.org/10.1038/s41586-021-03819-2",
+        "identity_match": true,
+        "lang": "en",
+        "outage_limited": false,
+        "query_fields": {
+          "authors": [
+            "John Jumper",
+            "Richard Evans",
+            "Alexander Pritzel",
+            "Tim Green",
+            "Michael Figurnov",
+            "Olaf Ronneberger",
+            "Kathryn Tunyasuvunakool",
+            "Russ Bates",
+            "Augustin Žídek",
+            "Anna Potapenko",
+            "Alex Bridgland",
+            "Clemens Meyer",
+            "Simon A. A. Kohl",
+            "Andrew J. Ballard",
+            "Andrew Cowie",
+            "Bernardino Romera-Paredes",
+            "Stanislav Nikolov",
+            "Rishub Jain",
+            "Jonas Adler",
+            "Trevor Back",
+            "Stig Petersen",
+            "David Reiman",
+            "Ellen Clancy",
+            "Michal Zielinski",
+            "Martin Steinegger",
+            "Michalina Pacholska",
+            "Tamas Berghammer",
+            "Sebastian Bodenstein",
+            "David Silver",
+            "Oriol Vinyals",
+            "Andrew W. Senior",
+            "Koray Kavukcuoglu",
+            "Pushmeet Kohli",
+            "Demis Hassabis"
+          ],
+          "doi": "10.1038/s41586-021-03819-2",
+          "title": "Highly accurate protein structure prediction with AlphaFold",
+          "venue": "Nature",
+          "year": 2021
+        },
+        "query_kind": "doi",
+        "rate_limited": false,
+        "rights_basis": "public_metadata",
+        "source": "openalex",
+        "source_failure_details": [],
+        "source_failure_mode": "none",
+        "source_limited": false,
+        "sources_checked": [
+          "openalex"
+        ],
+        "sources_failed": [],
+        "sources_responded": [
+          "openalex"
+        ],
+        "status": "resolved_correct",
+        "verdict": "verified"
+      },
+      {
+        "canonical_record": {
+          "abstract": "Mike Lewis, Yinhan Liu, Naman Goyal, Marjan Ghazvininejad, Abdelrahman Mohamed, Omer Levy, Veselin Stoyanov, Luke Zettlemoyer. Proceedings of the 58th Annual Meeting of the Association for Computational Linguistics. 2020.",
+          "arxiv_id": "",
+          "authors": [
+            "Mike Lewis",
+            "Yinhan Liu",
+            "Naman Goyal",
+            "Marjan Ghazvininejad",
+            "Abdelrahman Mohamed",
+            "Omer Levy",
+            "Ves Stoyanov",
+            "Luke Zettlemoyer"
+          ],
+          "citation_id": "openalex:W2982399380",
+          "doi": "10.18653/v1/2020.acl-main.703",
+          "metadata": {
+            "cited_by_count": 1224,
+            "metadata_quality": {
+              "completeness": 0.8571,
+              "confidence_effect": "missing_metadata_lowers_confidence_not_fabrication_evidence",
+              "identifiers": {
+                "arxiv_id": false,
+                "doi": true
+              },
+              "missing_fields": [
+                "venue"
+              ],
+              "present_fields": [
+                "title",
+                "authors",
+                "year",
+                "abstract",
+                "identifier",
+                "url"
+              ],
+              "schema_version": 1
+            },
+            "open_access": {
+              "is_oa": true,
+              "landing_page_url": "https://doi.org/10.18653/v1/2020.acl-main.703",
+              "license": "cc-by",
+              "pdf_url": "https://www.aclweb.org/anthology/2020.acl-main.703.pdf",
+              "version": "publishedVersion"
+            },
+            "openalex_id": "https://openalex.org/W2982399380",
+            "source_score": 0.0
+          },
+          "source": "openalex",
+          "title": "BART: Denoising Sequence-to-Sequence Pre-training for Natural Language Generation, Translation, and Comprehension",
+          "url": "https://doi.org/10.18653/v1/2020.acl-main.703",
+          "venue": "",
+          "year": 2020
+        },
+        "case_id": "pilot-doi-bart-acl",
+        "case_sha256": "sha256:cbf655cd766ac72a009ca638ef95fd002c079db247fbcfabb6094921d33a2c10",
+        "domain": "computer_science",
+        "elapsed_ms": 2764.37,
+        "expected_identity": {
+          "doi": "10.18653/v1/2020.acl-main.703"
+        },
+        "ground_truth_locator": "https://doi.org/10.18653/v1/2020.acl-main.703",
+        "identity_match": true,
+        "lang": "en",
+        "outage_limited": false,
+        "query_fields": {
+          "authors": [
+            "Mike Lewis",
+            "Yinhan Liu",
+            "Naman Goyal",
+            "Marjan Ghazvininejad",
+            "Abdelrahman Mohamed",
+            "Omer Levy",
+            "Veselin Stoyanov",
+            "Luke Zettlemoyer"
+          ],
+          "doi": "10.18653/v1/2020.acl-main.703",
+          "title": "BART: Denoising Sequence-to-Sequence Pre-training for Natural Language Generation, Translation, and Comprehension",
+          "venue": "Proceedings of the 58th Annual Meeting of the Association for Computational Linguistics",
+          "year": 2020
+        },
+        "query_kind": "doi",
+        "rate_limited": false,
+        "rights_basis": "public_metadata",
+        "source": "openalex",
+        "source_failure_details": [],
+        "source_failure_mode": "none",
+        "source_limited": false,
+        "sources_checked": [
+          "openalex"
+        ],
+        "sources_failed": [],
+        "sources_responded": [
+          "openalex"
+        ],
+        "status": "resolved_correct",
+        "verdict": "metadata_mismatch"
+      },
+      {
+        "canonical_record": {
+          "abstract": "Deeper neural networks are more difficult to train. We present a residual learning framework to ease the training of networks that are substantially deeper than those used previously. We explicitly reformulate the layers as learning residual functions with reference to the layer inputs, instead of learning unreferenced functions. We provide comprehensive empirical evidence showing that these residual networks are easier to optimize, and can gain accuracy from considerably increased depth. On the ImageNet dataset we evaluate residual nets with a depth of up to 152 layers - 8× deeper than VGG nets [40] but still having lower complexity. An ensemble of these residual nets achieves 3.57% error on the ImageNet test set. This result won the 1st place on the ILSVRC 2015 classification task. We also present analysis on CIFAR-10 with 100 and 1000 layers. The depth of representations is of central importance for many visual recognition tasks. Solely due to our extremely deep representations, we obtain a 28% relative improvement on the COCO object detection dataset. Deep residual nets are foundations of our submissions to ILSVRC & COCO 2015 competitions1, where we also won the 1st places on the tasks of ImageNet detection, ImageNet localization, COCO detection, and COCO segmentation.",
+          "arxiv_id": "",
+          "authors": [
+            "Kaiming He",
+            "Xiangyu Zhang",
+            "Shaoqing Ren",
+            "Jian Sun"
+          ],
+          "citation_id": "openalex:W2194775991",
+          "doi": "10.1109/cvpr.2016.90",
+          "metadata": {
+            "cited_by_count": 224735,
+            "metadata_quality": {
+              "completeness": 0.8571,
+              "confidence_effect": "missing_metadata_lowers_confidence_not_fabrication_evidence",
+              "identifiers": {
+                "arxiv_id": false,
+                "doi": true
+              },
+              "missing_fields": [
+                "venue"
+              ],
+              "present_fields": [
+                "title",
+                "authors",
+                "year",
+                "abstract",
+                "identifier",
+                "url"
+              ],
+              "schema_version": 1
+            },
+            "open_access": {
+              "is_oa": true,
+              "landing_page_url": "https://repositorio.unal.edu.co/handle/unal/81443",
+              "license": "cc-by",
+              "pdf_url": "",
+              "version": "submittedVersion"
+            },
+            "openalex_id": "https://openalex.org/W2194775991",
+            "source_score": 93196.78
+          },
+          "source": "openalex",
+          "title": "Deep Residual Learning for Image Recognition",
+          "url": "https://doi.org/10.1109/cvpr.2016.90",
+          "venue": "",
+          "year": 2016
+        },
+        "case_id": "pilot-doi-cvpr-resnet",
+        "case_sha256": "sha256:5a1a7fbe3112e5dd88f36b73406e8274444b1833cf330cfa6ad4c0ff0b678d5f",
+        "domain": "computer_science",
+        "elapsed_ms": 7.687,
+        "expected_identity": {
+          "doi": "10.1109/cvpr.2016.90"
+        },
+        "ground_truth_locator": "https://doi.org/10.1109/cvpr.2016.90",
+        "identity_match": true,
+        "lang": "en",
+        "outage_limited": false,
+        "query_fields": {
+          "authors": [
+            "Kaiming He",
+            "Xiangyu Zhang",
+            "Shaoqing Ren",
+            "Jian Sun"
+          ],
+          "doi": "10.1109/cvpr.2016.90",
+          "title": "Deep Residual Learning for Image Recognition",
+          "venue": "2016 IEEE Conference on Computer Vision and Pattern Recognition (CVPR)",
+          "year": 2016
+        },
+        "query_kind": "doi",
+        "rate_limited": false,
+        "rights_basis": "public_metadata",
+        "source": "openalex",
+        "source_failure_details": [],
+        "source_failure_mode": "none",
+        "source_limited": false,
+        "sources_checked": [
+          "openalex"
+        ],
+        "sources_failed": [],
+        "sources_responded": [
+          "openalex"
+        ],
+        "status": "resolved_correct",
+        "verdict": "metadata_mismatch"
+      },
+      {
+        "canonical_record": {
+          "abstract": "Neural graphics primitives, parameterized by fully connected neural networks, can be costly to train and evaluate. We reduce this cost with a versatile new input encoding that permits the use of a smaller network without sacrificing quality, thus significantly reducing the number of floating point and memory access operations: a small neural network is augmented by a multiresolution hash table of trainable feature vectors whose values are optimized through stochastic gradient descent. The multiresolution structure allows the network to disambiguate hash collisions, making for a simple architecture that is trivial to parallelize on modern GPUs. We leverage this parallelism by implementing the whole system using fully-fused CUDA kernels with a focus on minimizing wasted bandwidth and compute operations. We achieve a combined speedup of several orders of magnitude, enabling training of high-quality neural graphics primitives in a matter of seconds, and rendering in tens of milliseconds at a resolution of 1920×1080.",
+          "arxiv_id": "",
+          "authors": [
+            "Thomas Müller",
+            "Alex Evans",
+            "Christoph Schied",
+            "Alexander Keller"
+          ],
+          "citation_id": "openalex:W4221151978",
+          "doi": "10.1145/3528223.3530127",
+          "metadata": {
+            "cited_by_count": 3797,
+            "metadata_quality": {
+              "completeness": 1.0,
+              "confidence_effect": "none",
+              "identifiers": {
+                "arxiv_id": false,
+                "doi": true
+              },
+              "missing_fields": [],
+              "present_fields": [
+                "title",
+                "authors",
+                "year",
+                "venue",
+                "abstract",
+                "identifier",
+                "url"
+              ],
+              "schema_version": 1
+            },
+            "open_access": {
+              "is_oa": true,
+              "landing_page_url": "https://doi.org/10.1145/3528223.3530127",
+              "license": "cc-by-nc-nd",
+              "pdf_url": "https://dl.acm.org/doi/pdf/10.1145/3528223.3530127",
+              "version": "publishedVersion"
+            },
+            "openalex_id": "https://openalex.org/W4221151978",
+            "source_score": 0.0
+          },
+          "source": "openalex",
+          "title": "Instant neural graphics primitives with a multiresolution hash encoding",
+          "url": "https://doi.org/10.1145/3528223.3530127",
+          "venue": "ACM Transactions on Graphics",
+          "year": 2022
+        },
+        "case_id": "pilot-doi-transformer-arxiv-doi",
+        "case_sha256": "sha256:1e04417d6cf4dd6cceb30ffc9a0f3477e88f2acf121cf294297ff3589b4001a4",
+        "domain": "computer_science",
+        "elapsed_ms": 2750.455,
+        "expected_identity": {
+          "doi": "10.1145/3528223.3530127"
+        },
+        "ground_truth_locator": "https://doi.org/10.1145/3528223.3530127",
+        "identity_match": true,
+        "lang": "en",
+        "outage_limited": false,
+        "query_fields": {
+          "authors": [
+            "Thomas Müller",
+            "Alex Evans",
+            "Christoph Schied",
+            "Alexander Keller"
+          ],
+          "doi": "10.1145/3528223.3530127",
+          "title": "Instant neural graphics primitives with a multiresolution hash encoding",
+          "venue": "ACM Transactions on Graphics",
+          "year": 2022
+        },
+        "query_kind": "doi",
+        "rate_limited": false,
+        "rights_basis": "public_metadata",
+        "source": "openalex",
+        "source_failure_details": [],
+        "source_failure_mode": "none",
+        "source_limited": false,
+        "sources_checked": [
+          "openalex"
+        ],
+        "sources_failed": [],
+        "sources_responded": [
+          "openalex"
+        ],
+        "status": "resolved_correct",
+        "verdict": "verified"
+      },
+      {
+        "canonical_record": {
+          "abstract": "Abstract Proteins are essential to life, and understanding their structure can facilitate a mechanistic understanding of their function. Through an enormous experimental effort 1–4 , the structures of around 100,000 unique proteins have been determined 5 , but this represents a small fraction of the billions of known protein sequences 6,7 . Structural coverage is bottlenecked by the months to years of painstaking effort required to determine a single protein structure. Accurate computational approaches are needed to address this gap and to enable large-scale structural bioinformatics. Predicting the three-dimensional structure that a protein will adopt based solely on its amino acid sequence—the structure prediction component of the ‘protein folding problem’ 8 —has been an important open research problem for more than 50 years 9 . Despite recent progress 10–14 , existing methods fall far short of atomic accuracy, especially when no homologous structure is available. Here we provide the first computational method that can regularly predict protein structures with atomic accuracy even in cases in which no similar structure is known. We validated an entirely redesigned version of our neural network-based model, AlphaFold, in the challenging 14th Critical Assessment of protein Structure Prediction (CASP14) 15 , demonstrating accuracy competitive with experimental structures in a majority of cases and greatly outperforming other methods. Underpinning the latest version of AlphaFold is a novel machine learning approach that incorporates physical and biological knowledge about protein structure, leveraging multi-sequence alignments, into the design of the deep learning algorithm.",
+          "arxiv_id": "",
+          "authors": [
+            "John Jumper",
+            "Richard Evans",
+            "Alexander Pritzel",
+            "Tim Green",
+            "Michael Figurnov",
+            "Olaf Ronneberger",
+            "Kathryn Tunyasuvunakool",
+            "Russ Bates",
+            "Augustin Žídek",
+            "Anna Potapenko",
+            "Alex Bridgland",
+            "Clemens Meyer",
+            "Simon Köhl",
+            "Andrew J. Ballard",
+            "Andrew Cowie",
+            "Bernardino Romera‐Paredes",
+            "Stanislav Nikolov",
+            "Rishub Jain",
+            "Jonas Adler",
+            "Trevor Back",
+            "Stig Petersen",
+            "David Reiman",
+            "Ellen Clancy",
+            "Michał Zieliński",
+            "Martin Steinegger",
+            "Michalina Pacholska",
+            "Tamas Berghammer",
+            "Sebastian W. Bodenstein",
+            "David Silver",
+            "Oriol Vinyals",
+            "Andrew Senior",
+            "Koray Kavukcuoglu",
+            "Pushmeet Kohli",
+            "Demis Hassabis"
+          ],
+          "citation_id": "openalex:W3177828909",
+          "doi": "10.1038/s41586-021-03819-2",
+          "metadata": {
+            "cited_by_count": 46231,
+            "metadata_quality": {
+              "completeness": 1.0,
+              "confidence_effect": "none",
+              "identifiers": {
+                "arxiv_id": false,
+                "doi": true
+              },
+              "missing_fields": [],
+              "present_fields": [
+                "title",
+                "authors",
+                "year",
+                "venue",
+                "abstract",
+                "identifier",
+                "url"
+              ],
+              "schema_version": 1
+            },
+            "open_access": {
+              "is_oa": true,
+              "landing_page_url": "https://doi.org/10.1038/s41586-021-03819-2",
+              "license": "cc-by",
+              "pdf_url": "https://www.nature.com/articles/s41586-021-03819-2.pdf",
+              "version": "publishedVersion"
+            },
+            "openalex_id": "https://openalex.org/W3177828909",
+            "source_score": 57722.16
+          },
+          "source": "openalex",
+          "title": "Highly accurate protein structure prediction with AlphaFold",
+          "url": "https://doi.org/10.1038/s41586-021-03819-2",
+          "venue": "Nature",
+          "year": 2021
+        },
+        "case_id": "pilot-title-alphafold",
+        "case_sha256": "sha256:df7fbdf65d3c59c381c94db14a16e825bfed956315f4cd9d825e12d7f6b150dc",
+        "domain": "biomedicine",
+        "elapsed_ms": 4.765,
+        "expected_identity": {
+          "doi": "10.1038/s41586-021-03819-2"
+        },
+        "ground_truth_locator": "https://doi.org/10.1038/s41586-021-03819-2",
+        "identity_match": true,
+        "lang": "en",
+        "outage_limited": false,
+        "query_fields": {
+          "authors": [
+            "John Jumper",
+            "Richard Evans",
+            "Alexander Pritzel",
+            "Tim Green",
+            "Michael Figurnov",
+            "Olaf Ronneberger",
+            "Kathryn Tunyasuvunakool",
+            "Russ Bates",
+            "Augustin Žídek",
+            "Anna Potapenko",
+            "Alex Bridgland",
+            "Clemens Meyer",
+            "Simon Köhl",
+            "Andrew J. Ballard",
+            "Andrew Cowie",
+            "Bernardino Romera‐Paredes",
+            "Stanislav Nikolov",
+            "Rishub Jain",
+            "Jonas Adler",
+            "Trevor Back",
+            "Stig Petersen",
+            "David Reiman",
+            "Ellen Clancy",
+            "Michał Zieliński",
+            "Martin Steinegger",
+            "Michalina Pacholska",
+            "Tamas Berghammer",
+            "Sebastian W. Bodenstein",
+            "David Silver",
+            "Oriol Vinyals",
+            "Andrew Senior",
+            "Koray Kavukcuoglu",
+            "Pushmeet Kohli",
+            "Demis Hassabis"
+          ],
+          "title": "Highly accurate protein structure prediction with AlphaFold",
+          "venue": "Nature",
+          "year": 2021
+        },
+        "query_kind": "title",
+        "rate_limited": false,
+        "rights_basis": "public_metadata",
+        "source": "openalex",
+        "source_failure_details": [],
+        "source_failure_mode": "none",
+        "source_limited": false,
+        "sources_checked": [
+          "openalex"
+        ],
+        "sources_failed": [],
+        "sources_responded": [
+          "openalex"
+        ],
+        "status": "resolved_correct",
+        "verdict": "verified"
+      },
+      {
+        "canonical_record": null,
+        "case_id": "pilot-title-bert",
+        "case_sha256": "sha256:e1ba17fde9a741e8bc7fbd884456ffe8a6081758873e131921f70b30cf42ba49",
+        "domain": "computer_science",
+        "elapsed_ms": 2.731,
+        "expected_identity": {
+          "arxiv_id": "1810.04805"
+        },
+        "ground_truth_locator": "https://arxiv.org/abs/1810.04805",
+        "identity_match": false,
+        "lang": "en",
+        "outage_limited": false,
+        "query_fields": {
+          "authors": [
+            "Jacob Devlin",
+            "Ming-Wei Chang",
+            "Kenton Lee",
+            "Kristina Toutanova"
+          ],
+          "title": "BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding",
+          "venue": "arXiv",
+          "year": 2018
+        },
+        "query_kind": "title",
+        "rate_limited": false,
+        "rights_basis": "public_metadata",
+        "source": "openalex",
+        "source_failure_details": [],
+        "source_failure_mode": "none",
+        "source_limited": false,
+        "sources_checked": [
+          "openalex"
+        ],
+        "sources_failed": [],
+        "sources_responded": [
+          "openalex"
+        ],
+        "status": "not_found",
+        "verdict": "not_found"
+      },
+      {
+        "canonical_record": {
+          "abstract": "Deeper neural networks are more difficult to train. We present a residual learning framework to ease the training of networks that are substantially deeper than those used previously. We explicitly reformulate the layers as learning residual functions with reference to the layer inputs, instead of learning unreferenced functions. We provide comprehensive empirical evidence showing that these residual networks are easier to optimize, and can gain accuracy from considerably increased depth. On the ImageNet dataset we evaluate residual nets with a depth of up to 152 layers - 8× deeper than VGG nets [40] but still having lower complexity. An ensemble of these residual nets achieves 3.57% error on the ImageNet test set. This result won the 1st place on the ILSVRC 2015 classification task. We also present analysis on CIFAR-10 with 100 and 1000 layers. The depth of representations is of central importance for many visual recognition tasks. Solely due to our extremely deep representations, we obtain a 28% relative improvement on the COCO object detection dataset. Deep residual nets are foundations of our submissions to ILSVRC & COCO 2015 competitions1, where we also won the 1st places on the tasks of ImageNet detection, ImageNet localization, COCO detection, and COCO segmentation.",
+          "arxiv_id": "",
+          "authors": [
+            "Kaiming He",
+            "Xiangyu Zhang",
+            "Shaoqing Ren",
+            "Jian Sun"
+          ],
+          "citation_id": "openalex:W2194775991",
+          "doi": "10.1109/cvpr.2016.90",
+          "metadata": {
+            "cited_by_count": 224735,
+            "metadata_quality": {
+              "completeness": 0.8571,
+              "confidence_effect": "missing_metadata_lowers_confidence_not_fabrication_evidence",
+              "identifiers": {
+                "arxiv_id": false,
+                "doi": true
+              },
+              "missing_fields": [
+                "venue"
+              ],
+              "present_fields": [
+                "title",
+                "authors",
+                "year",
+                "abstract",
+                "identifier",
+                "url"
+              ],
+              "schema_version": 1
+            },
+            "open_access": {
+              "is_oa": true,
+              "landing_page_url": "https://repositorio.unal.edu.co/handle/unal/81443",
+              "license": "cc-by",
+              "pdf_url": "",
+              "version": "submittedVersion"
+            },
+            "openalex_id": "https://openalex.org/W2194775991",
+            "source_score": 93196.78
+          },
+          "source": "openalex",
+          "title": "Deep Residual Learning for Image Recognition",
+          "url": "https://doi.org/10.1109/cvpr.2016.90",
+          "venue": "",
+          "year": 2016
+        },
+        "case_id": "pilot-title-resnet",
+        "case_sha256": "sha256:04cd38a42f79be6bd608e2dbd515f771e92da31574bc8e0ae254fd1a83cb7420",
+        "domain": "computer_science",
+        "elapsed_ms": 2.418,
+        "expected_identity": {
+          "doi": "10.1109/cvpr.2016.90"
+        },
+        "ground_truth_locator": "https://doi.org/10.1109/cvpr.2016.90",
+        "identity_match": true,
+        "lang": "en",
+        "outage_limited": false,
+        "query_fields": {
+          "authors": [
+            "Kaiming He",
+            "Xiangyu Zhang",
+            "Shaoqing Ren",
+            "Jian Sun"
+          ],
+          "title": "Deep Residual Learning for Image Recognition",
+          "year": 2016
+        },
+        "query_kind": "title",
+        "rate_limited": false,
+        "rights_basis": "public_metadata",
+        "source": "openalex",
+        "source_failure_details": [],
+        "source_failure_mode": "none",
+        "source_limited": false,
+        "sources_checked": [
+          "openalex"
+        ],
+        "sources_failed": [],
+        "sources_responded": [
+          "openalex"
+        ],
+        "status": "resolved_correct",
+        "verdict": "ambiguous"
+      },
+      {
+        "canonical_record": {
+          "abstract": "The dominant sequence transduction models are based on complex recurrent or convolutional neural networks in an encoder-decoder configuration. The best performing models also connect the encoder and decoder through an attention mechanism. We propose a new simple network architecture, the Transformer, based solely on attention mechanisms, dispensing with recurrence and convolutions entirely. Experiments on two machine translation tasks show these models to be superior in quality while being more parallelizable and requiring significantly less time to train. Our model achieves 28.4 BLEU on the WMT 2014 English-to-German translation task, improving over the existing best results, including ensembles by over 2 BLEU. On the WMT 2014 English-to-French translation task, our model establishes a new single-model state-of-the-art BLEU score of 41.8 after training for 3.5 days on eight GPUs, a small fraction of the training costs of the best models from the literature. We show that the Transformer generalizes well to other tasks by applying it successfully to English constituency parsing both with large and limited training data.",
+          "arxiv_id": "",
+          "authors": [
+            "Ashish Vaswani",
+            "Noam Shazeer",
+            "Niki Parmar",
+            "Jakob Uszkoreit",
+            "Llion Jones",
+            "Aidan N. Gomez",
+            "Łukasz Kaiser",
+            "Illia Polosukhin"
+          ],
+          "citation_id": "openalex:W2626778328",
+          "doi": "10.65215/2q58a426",
+          "metadata": {
+            "cited_by_count": 6600,
+            "metadata_quality": {
+              "completeness": 0.8571,
+              "confidence_effect": "missing_metadata_lowers_confidence_not_fabrication_evidence",
+              "identifiers": {
+                "arxiv_id": false,
+                "doi": true
+              },
+              "missing_fields": [
+                "venue"
+              ],
+              "present_fields": [
+                "title",
+                "authors",
+                "year",
+                "abstract",
+                "identifier",
+                "url"
+              ],
+              "schema_version": 1
+            },
+            "open_access": {
+              "is_oa": true,
+              "landing_page_url": "https://doi.org/10.65215/r5bs2d54",
+              "license": "",
+              "pdf_url": "https://langtaosha.org.cn/index.php/lts/preprint/download/10/108",
+              "version": "acceptedVersion"
+            },
+            "openalex_id": "https://openalex.org/W2626778328",
+            "source_score": 15057.465
+          },
+          "source": "openalex",
+          "title": "Attention Is All You Need",
+          "url": "https://doi.org/10.65215/2q58a426",
+          "venue": "",
+          "year": 2025
+        },
+        "case_id": "pilot-title-transformer",
+        "case_sha256": "sha256:45f4a5c4fd39937258c53c9c74e0bda94e7cc2503e905117070ec735f41f11c5",
+        "domain": "computer_science",
+        "elapsed_ms": 1.846,
+        "expected_identity": {
+          "arxiv_id": "1706.03762"
+        },
+        "ground_truth_locator": "https://arxiv.org/abs/1706.03762",
+        "identity_match": false,
+        "lang": "en",
+        "outage_limited": false,
+        "query_fields": {
+          "authors": [
+            "Ashish Vaswani",
+            "Noam Shazeer",
+            "Niki Parmar",
+            "Jakob Uszkoreit",
+            "Llion Jones",
+            "Aidan N. Gomez",
+            "Lukasz Kaiser",
+            "Illia Polosukhin"
+          ],
+          "title": "Attention Is All You Need",
+          "venue": "arXiv",
+          "year": 2017
+        },
+        "query_kind": "title",
+        "rate_limited": false,
+        "rights_basis": "public_metadata",
+        "source": "openalex",
+        "source_failure_details": [],
+        "source_failure_mode": "none",
+        "source_limited": false,
+        "sources_checked": [
+          "openalex"
+        ],
+        "sources_failed": [],
+        "sources_responded": [
+          "openalex"
+        ],
+        "status": "resolved_incorrect",
+        "verdict": "ambiguous"
+      },
+      {
+        "canonical_record": null,
+        "case_id": "pilot-arxiv-bert",
+        "case_sha256": "sha256:46be903285aa51c0c7c62783bfedc49d5412a4743faca98ad441f55a1348f660",
+        "domain": "computer_science",
+        "elapsed_ms": 3060.075,
+        "expected_identity": {
+          "arxiv_id": "1810.04805"
+        },
+        "ground_truth_locator": "https://arxiv.org/abs/1810.04805",
+        "identity_match": false,
+        "lang": "en",
+        "outage_limited": false,
+        "query_fields": {
+          "arxiv_id": "1810.04805",
+          "authors": [
+            "Jacob Devlin",
+            "Ming-Wei Chang",
+            "Kenton Lee",
+            "Kristina Toutanova"
+          ],
+          "title": "BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding",
+          "venue": "arXiv",
+          "year": 2018
+        },
+        "query_kind": "arxiv_id",
+        "rate_limited": false,
+        "rights_basis": "public_metadata",
+        "source": "crossref",
+        "source_failure_details": [],
+        "source_failure_mode": "none",
+        "source_limited": false,
+        "sources_checked": [
+          "crossref"
+        ],
+        "sources_failed": [],
+        "sources_responded": [
+          "crossref"
+        ],
+        "status": "not_found",
+        "verdict": "not_found"
+      },
+      {
+        "canonical_record": {
+          "abstract": "",
+          "arxiv_id": "",
+          "authors": [
+            "Genta Indra Winata",
+            "Andrea Madotto",
+            "Zhaojiang Lin",
+            "Rosanne Liu",
+            "Jason Yosinski",
+            "Pascale Fung"
+          ],
+          "citation_id": "crossref:b960219a08a6",
+          "doi": "10.18653/v1/2021.mrl-1.1",
+          "metadata": {
+            "is_referenced_by_count": 60,
+            "metadata_quality": {
+              "completeness": 0.8571,
+              "confidence_effect": "missing_metadata_lowers_confidence_not_fabrication_evidence",
+              "identifiers": {
+                "arxiv_id": false,
+                "doi": true
+              },
+              "missing_fields": [
+                "abstract"
+              ],
+              "present_fields": [
+                "title",
+                "authors",
+                "year",
+                "venue",
+                "identifier",
+                "url"
+              ],
+              "schema_version": 1
+            },
+            "source_score": 0.0,
+            "type": "proceedings-article"
+          },
+          "source": "crossref",
+          "title": "Language Models are Few-shot Multilingual Learners",
+          "url": "https://doi.org/10.18653/v1/2021.mrl-1.1",
+          "venue": "Proceedings of the 1st Workshop on Multilingual Representation Learning",
+          "year": 2021
+        },
+        "case_id": "pilot-arxiv-gpt3",
+        "case_sha256": "sha256:3997b816a0c54377cb18864f29cc2000208b77f6b96ae07b9f4a8a01c45d4adf",
+        "domain": "computer_science",
+        "elapsed_ms": 2442.894,
+        "expected_identity": {
+          "arxiv_id": "2005.14165"
+        },
+        "ground_truth_locator": "https://arxiv.org/abs/2005.14165",
+        "identity_match": false,
+        "lang": "en",
+        "outage_limited": false,
+        "query_fields": {
+          "arxiv_id": "2005.14165",
+          "authors": [
+            "Tom B. Brown",
+            "Benjamin Mann",
+            "Nick Ryder",
+            "Melanie Subbiah",
+            "Jared Kaplan",
+            "Prafulla Dhariwal",
+            "Arvind Neelakantan",
+            "Pranav Shyam",
+            "Girish Sastry",
+            "Amanda Askell",
+            "Sandhini Agarwal",
+            "Ariel Herbert-Voss",
+            "Gretchen Krueger",
+            "Tom Henighan",
+            "Rewon Child",
+            "Aditya Ramesh",
+            "Daniel M. Ziegler",
+            "Jeffrey Wu",
+            "Clemens Winter",
+            "Christopher Hesse",
+            "Mark Chen",
+            "Eric Sigler",
+            "Mateusz Litwin",
+            "Scott Gray",
+            "Benjamin Chess",
+            "Jack Clark",
+            "Christopher Berner",
+            "Sam McCandlish",
+            "Alec Radford",
+            "Ilya Sutskever",
+            "Dario Amodei"
+          ],
+          "title": "Language Models are Few-Shot Learners",
+          "venue": "arXiv",
+          "year": 2020
+        },
+        "query_kind": "arxiv_id",
+        "rate_limited": false,
+        "rights_basis": "public_metadata",
+        "source": "crossref",
+        "source_failure_details": [],
+        "source_failure_mode": "none",
+        "source_limited": false,
+        "sources_checked": [
+          "crossref"
+        ],
+        "sources_failed": [],
+        "sources_responded": [
+          "crossref"
+        ],
+        "status": "resolved_incorrect",
+        "verdict": "ambiguous"
+      },
+      {
+        "canonical_record": {
+          "abstract": "",
+          "arxiv_id": "",
+          "authors": [
+            "Kaiming He",
+            "Xiangyu Zhang",
+            "Shaoqing Ren",
+            "Jian Sun"
+          ],
+          "citation_id": "crossref:94a532a2d7af",
+          "doi": "10.1109/cvpr.2016.90",
+          "metadata": {
+            "is_referenced_by_count": 170720,
+            "metadata_quality": {
+              "completeness": 0.8571,
+              "confidence_effect": "missing_metadata_lowers_confidence_not_fabrication_evidence",
+              "identifiers": {
+                "arxiv_id": false,
+                "doi": true
+              },
+              "missing_fields": [
+                "abstract"
+              ],
+              "present_fields": [
+                "title",
+                "authors",
+                "year",
+                "venue",
+                "identifier",
+                "url"
+              ],
+              "schema_version": 1
+            },
+            "source_score": 0.0,
+            "type": "proceedings-article"
+          },
+          "source": "crossref",
+          "title": "Deep Residual Learning for Image Recognition",
+          "url": "https://doi.org/10.1109/cvpr.2016.90",
+          "venue": "2016 IEEE Conference on Computer Vision and Pattern Recognition (CVPR)",
+          "year": 2016
+        },
+        "case_id": "pilot-arxiv-resnet",
+        "case_sha256": "sha256:2ad1c02702740399b66fb1737065fe79b64bd92e8165cb27090ac763ae08d8a0",
+        "domain": "computer_science",
+        "elapsed_ms": 3172.952,
+        "expected_identity": {
+          "arxiv_id": "1512.03385"
+        },
+        "ground_truth_locator": "https://arxiv.org/abs/1512.03385",
+        "identity_match": false,
+        "lang": "en",
+        "outage_limited": false,
+        "query_fields": {
+          "arxiv_id": "1512.03385",
+          "authors": [
+            "Kaiming He",
+            "Xiangyu Zhang",
+            "Shaoqing Ren",
+            "Jian Sun"
+          ],
+          "title": "Deep Residual Learning for Image Recognition",
+          "venue": "arXiv",
+          "year": 2015
+        },
+        "query_kind": "arxiv_id",
+        "rate_limited": false,
+        "rights_basis": "public_metadata",
+        "source": "crossref",
+        "source_failure_details": [],
+        "source_failure_mode": "none",
+        "source_limited": false,
+        "sources_checked": [
+          "crossref"
+        ],
+        "sources_failed": [],
+        "sources_responded": [
+          "crossref"
+        ],
+        "status": "resolved_incorrect",
+        "verdict": "metadata_mismatch"
+      },
+      {
+        "canonical_record": null,
+        "case_id": "pilot-arxiv-transformer",
+        "case_sha256": "sha256:ddccb14c39e9641992c972a8a7c6c9c7d0cced95c656d598e14d8d9909ff5001",
+        "domain": "computer_science",
+        "elapsed_ms": 2686.168,
+        "expected_identity": {
+          "arxiv_id": "1706.03762"
+        },
+        "ground_truth_locator": "https://arxiv.org/abs/1706.03762",
+        "identity_match": false,
+        "lang": "en",
+        "outage_limited": false,
+        "query_fields": {
+          "arxiv_id": "1706.03762",
+          "authors": [
+            "Ashish Vaswani",
+            "Noam Shazeer",
+            "Niki Parmar",
+            "Jakob Uszkoreit",
+            "Llion Jones",
+            "Aidan N. Gomez",
+            "Lukasz Kaiser",
+            "Illia Polosukhin"
+          ],
+          "title": "Attention Is All You Need",
+          "venue": "arXiv",
+          "year": 2017
+        },
+        "query_kind": "arxiv_id",
+        "rate_limited": false,
+        "rights_basis": "public_metadata",
+        "source": "crossref",
+        "source_failure_details": [],
+        "source_failure_mode": "none",
+        "source_limited": false,
+        "sources_checked": [
+          "crossref"
+        ],
+        "sources_failed": [],
+        "sources_responded": [
+          "crossref"
+        ],
+        "status": "not_found",
+        "verdict": "not_found"
+      },
+      {
+        "canonical_record": {
+          "abstract": "Abstract Proteins are essential to life, and understanding their structure can facilitate a mechanistic understanding of their function. Through an enormous experimental effort 1–4 , the structures of around 100,000 unique proteins have been determined 5 , but this represents a small fraction of the billions of known protein sequences 6,7 . Structural coverage is bottlenecked by the months to years of painstaking effort required to determine a single protein structure. Accurate computational approaches are needed to address this gap and to enable large-scale structural bioinformatics. Predicting the three-dimensional structure that a protein will adopt based solely on its amino acid sequence—the structure prediction component of the ‘protein folding problem’ 8 —has been an important open research problem for more than 50 years 9 . Despite recent progress 10–14 , existing methods fall far short of atomic accuracy, especially when no homologous structure is available. Here we provide the first computational method that can regularly predict protein structures with atomic accuracy even in cases in which no similar structure is known. We validated an entirely redesigned version of our neural network-based model, AlphaFold, in the challenging 14th Critical Assessment of protein Structure Prediction (CASP14) 15 , demonstrating accuracy competitive with experimental structures in a majority of cases and greatly outperforming other methods. Underpinning the latest version of AlphaFold is a novel machine learning approach that incorporates physical and biological knowledge about protein structure, leveraging multi-sequence alignments, into the design of the deep learning algorithm.",
+          "arxiv_id": "",
+          "authors": [
+            "John Jumper",
+            "Richard Evans",
+            "Alexander Pritzel",
+            "Tim Green",
+            "Michael Figurnov",
+            "Olaf Ronneberger",
+            "Kathryn Tunyasuvunakool",
+            "Russ Bates",
+            "Augustin Žídek",
+            "Anna Potapenko",
+            "Alex Bridgland",
+            "Clemens Meyer",
+            "Simon A. A. Kohl",
+            "Andrew J. Ballard",
+            "Andrew Cowie",
+            "Bernardino Romera-Paredes",
+            "Stanislav Nikolov",
+            "Rishub Jain",
+            "Jonas Adler",
+            "Trevor Back",
+            "Stig Petersen",
+            "David Reiman",
+            "Ellen Clancy",
+            "Michal Zielinski",
+            "Martin Steinegger",
+            "Michalina Pacholska",
+            "Tamas Berghammer",
+            "Sebastian Bodenstein",
+            "David Silver",
+            "Oriol Vinyals",
+            "Andrew W. Senior",
+            "Koray Kavukcuoglu",
+            "Pushmeet Kohli",
+            "Demis Hassabis"
+          ],
+          "citation_id": "crossref:79deebd6096b",
+          "doi": "10.1038/s41586-021-03819-2",
+          "metadata": {
+            "is_referenced_by_count": 43600,
+            "metadata_quality": {
+              "completeness": 1.0,
+              "confidence_effect": "none",
+              "identifiers": {
+                "arxiv_id": false,
+                "doi": true
+              },
+              "missing_fields": [],
+              "present_fields": [
+                "title",
+                "authors",
+                "year",
+                "venue",
+                "abstract",
+                "identifier",
+                "url"
+              ],
+              "schema_version": 1
+            },
+            "source_score": 0.0,
+            "type": "journal-article"
+          },
+          "source": "crossref",
+          "title": "Highly accurate protein structure prediction with AlphaFold",
+          "url": "https://doi.org/10.1038/s41586-021-03819-2",
+          "venue": "Nature",
+          "year": 2021
+        },
+        "case_id": "pilot-doi-alphafold-nature",
+        "case_sha256": "sha256:cc115846ea59f782688c02412d54d0e744f4a01d63cf4206e2e00a224abe9da1",
+        "domain": "biomedicine",
+        "elapsed_ms": 2262.476,
+        "expected_identity": {
+          "doi": "10.1038/s41586-021-03819-2"
+        },
+        "ground_truth_locator": "https://doi.org/10.1038/s41586-021-03819-2",
+        "identity_match": true,
+        "lang": "en",
+        "outage_limited": false,
+        "query_fields": {
+          "authors": [
+            "John Jumper",
+            "Richard Evans",
+            "Alexander Pritzel",
+            "Tim Green",
+            "Michael Figurnov",
+            "Olaf Ronneberger",
+            "Kathryn Tunyasuvunakool",
+            "Russ Bates",
+            "Augustin Žídek",
+            "Anna Potapenko",
+            "Alex Bridgland",
+            "Clemens Meyer",
+            "Simon A. A. Kohl",
+            "Andrew J. Ballard",
+            "Andrew Cowie",
+            "Bernardino Romera-Paredes",
+            "Stanislav Nikolov",
+            "Rishub Jain",
+            "Jonas Adler",
+            "Trevor Back",
+            "Stig Petersen",
+            "David Reiman",
+            "Ellen Clancy",
+            "Michal Zielinski",
+            "Martin Steinegger",
+            "Michalina Pacholska",
+            "Tamas Berghammer",
+            "Sebastian Bodenstein",
+            "David Silver",
+            "Oriol Vinyals",
+            "Andrew W. Senior",
+            "Koray Kavukcuoglu",
+            "Pushmeet Kohli",
+            "Demis Hassabis"
+          ],
+          "doi": "10.1038/s41586-021-03819-2",
+          "title": "Highly accurate protein structure prediction with AlphaFold",
+          "venue": "Nature",
+          "year": 2021
+        },
+        "query_kind": "doi",
+        "rate_limited": false,
+        "rights_basis": "public_metadata",
+        "source": "crossref",
+        "source_failure_details": [],
+        "source_failure_mode": "none",
+        "source_limited": false,
+        "sources_checked": [
+          "crossref"
+        ],
+        "sources_failed": [],
+        "sources_responded": [
+          "crossref"
+        ],
+        "status": "resolved_correct",
+        "verdict": "verified"
+      },
+      {
+        "canonical_record": {
+          "abstract": "",
+          "arxiv_id": "",
+          "authors": [
+            "Mike Lewis",
+            "Yinhan Liu",
+            "Naman Goyal",
+            "Marjan Ghazvininejad",
+            "Abdelrahman Mohamed",
+            "Omer Levy",
+            "Veselin Stoyanov",
+            "Luke Zettlemoyer"
+          ],
+          "citation_id": "crossref:0179f107b9de",
+          "doi": "10.18653/v1/2020.acl-main.703",
+          "metadata": {
+            "is_referenced_by_count": 4106,
+            "metadata_quality": {
+              "completeness": 0.8571,
+              "confidence_effect": "missing_metadata_lowers_confidence_not_fabrication_evidence",
+              "identifiers": {
+                "arxiv_id": false,
+                "doi": true
+              },
+              "missing_fields": [
+                "abstract"
+              ],
+              "present_fields": [
+                "title",
+                "authors",
+                "year",
+                "venue",
+                "identifier",
+                "url"
+              ],
+              "schema_version": 1
+            },
+            "source_score": 0.0,
+            "type": "proceedings-article"
+          },
+          "source": "crossref",
+          "title": "BART: Denoising Sequence-to-Sequence Pre-training for Natural Language Generation, Translation, and Comprehension",
+          "url": "https://doi.org/10.18653/v1/2020.acl-main.703",
+          "venue": "Proceedings of the 58th Annual Meeting of the Association for Computational Linguistics",
+          "year": 2020
+        },
+        "case_id": "pilot-doi-bart-acl",
+        "case_sha256": "sha256:cbf655cd766ac72a009ca638ef95fd002c079db247fbcfabb6094921d33a2c10",
+        "domain": "computer_science",
+        "elapsed_ms": 2373.767,
+        "expected_identity": {
+          "doi": "10.18653/v1/2020.acl-main.703"
+        },
+        "ground_truth_locator": "https://doi.org/10.18653/v1/2020.acl-main.703",
+        "identity_match": true,
+        "lang": "en",
+        "outage_limited": false,
+        "query_fields": {
+          "authors": [
+            "Mike Lewis",
+            "Yinhan Liu",
+            "Naman Goyal",
+            "Marjan Ghazvininejad",
+            "Abdelrahman Mohamed",
+            "Omer Levy",
+            "Veselin Stoyanov",
+            "Luke Zettlemoyer"
+          ],
+          "doi": "10.18653/v1/2020.acl-main.703",
+          "title": "BART: Denoising Sequence-to-Sequence Pre-training for Natural Language Generation, Translation, and Comprehension",
+          "venue": "Proceedings of the 58th Annual Meeting of the Association for Computational Linguistics",
+          "year": 2020
+        },
+        "query_kind": "doi",
+        "rate_limited": false,
+        "rights_basis": "public_metadata",
+        "source": "crossref",
+        "source_failure_details": [],
+        "source_failure_mode": "none",
+        "source_limited": false,
+        "sources_checked": [
+          "crossref"
+        ],
+        "sources_failed": [],
+        "sources_responded": [
+          "crossref"
+        ],
+        "status": "resolved_correct",
+        "verdict": "verified"
+      },
+      {
+        "canonical_record": {
+          "abstract": "",
+          "arxiv_id": "",
+          "authors": [
+            "Kaiming He",
+            "Xiangyu Zhang",
+            "Shaoqing Ren",
+            "Jian Sun"
+          ],
+          "citation_id": "crossref:94a532a2d7af",
+          "doi": "10.1109/cvpr.2016.90",
+          "metadata": {
+            "is_referenced_by_count": 170720,
+            "metadata_quality": {
+              "completeness": 0.8571,
+              "confidence_effect": "missing_metadata_lowers_confidence_not_fabrication_evidence",
+              "identifiers": {
+                "arxiv_id": false,
+                "doi": true
+              },
+              "missing_fields": [
+                "abstract"
+              ],
+              "present_fields": [
+                "title",
+                "authors",
+                "year",
+                "venue",
+                "identifier",
+                "url"
+              ],
+              "schema_version": 1
+            },
+            "source_score": 0.0,
+            "type": "proceedings-article"
+          },
+          "source": "crossref",
+          "title": "Deep Residual Learning for Image Recognition",
+          "url": "https://doi.org/10.1109/cvpr.2016.90",
+          "venue": "2016 IEEE Conference on Computer Vision and Pattern Recognition (CVPR)",
+          "year": 2016
+        },
+        "case_id": "pilot-doi-cvpr-resnet",
+        "case_sha256": "sha256:5a1a7fbe3112e5dd88f36b73406e8274444b1833cf330cfa6ad4c0ff0b678d5f",
+        "domain": "computer_science",
+        "elapsed_ms": 1140.228,
+        "expected_identity": {
+          "doi": "10.1109/cvpr.2016.90"
+        },
+        "ground_truth_locator": "https://doi.org/10.1109/cvpr.2016.90",
+        "identity_match": true,
+        "lang": "en",
+        "outage_limited": false,
+        "query_fields": {
+          "authors": [
+            "Kaiming He",
+            "Xiangyu Zhang",
+            "Shaoqing Ren",
+            "Jian Sun"
+          ],
+          "doi": "10.1109/cvpr.2016.90",
+          "title": "Deep Residual Learning for Image Recognition",
+          "venue": "2016 IEEE Conference on Computer Vision and Pattern Recognition (CVPR)",
+          "year": 2016
+        },
+        "query_kind": "doi",
+        "rate_limited": false,
+        "rights_basis": "public_metadata",
+        "source": "crossref",
+        "source_failure_details": [],
+        "source_failure_mode": "none",
+        "source_limited": false,
+        "sources_checked": [
+          "crossref"
+        ],
+        "sources_failed": [],
+        "sources_responded": [
+          "crossref"
+        ],
+        "status": "resolved_correct",
+        "verdict": "verified"
+      },
+      {
+        "canonical_record": {
+          "abstract": "Neural graphics primitives, parameterized by fully connected neural networks, can be costly to train and evaluate. We reduce this cost with a versatile new input encoding that permits the use of a smaller network without sacrificing quality, thus significantly reducing the number of floating point and memory access operations: a small neural network is augmented by a multiresolution hash table of trainable feature vectors whose values are optimized through stochastic gradient descent. The multiresolution structure allows the network to disambiguate hash collisions, making for a simple architecture that is trivial to parallelize on modern GPUs. We leverage this parallelism by implementing the whole system using fully-fused CUDA kernels with a focus on minimizing wasted bandwidth and compute operations. We achieve a combined speedup of several orders of magnitude, enabling training of high-quality neural graphics primitives in a matter of seconds, and rendering in tens of milliseconds at a resolution of 1920×1080.",
+          "arxiv_id": "",
+          "authors": [
+            "Thomas Müller",
+            "Alex Evans",
+            "Christoph Schied",
+            "Alexander Keller"
+          ],
+          "citation_id": "crossref:b6c8aa7beeee",
+          "doi": "10.1145/3528223.3530127",
+          "metadata": {
+            "is_referenced_by_count": 3873,
+            "metadata_quality": {
+              "completeness": 1.0,
+              "confidence_effect": "none",
+              "identifiers": {
+                "arxiv_id": false,
+                "doi": true
+              },
+              "missing_fields": [],
+              "present_fields": [
+                "title",
+                "authors",
+                "year",
+                "venue",
+                "abstract",
+                "identifier",
+                "url"
+              ],
+              "schema_version": 1
+            },
+            "source_score": 0.0,
+            "type": "journal-article"
+          },
+          "source": "crossref",
+          "title": "Instant neural graphics primitives with a multiresolution hash encoding",
+          "url": "https://doi.org/10.1145/3528223.3530127",
+          "venue": "ACM Transactions on Graphics",
+          "year": 2022
+        },
+        "case_id": "pilot-doi-transformer-arxiv-doi",
+        "case_sha256": "sha256:1e04417d6cf4dd6cceb30ffc9a0f3477e88f2acf121cf294297ff3589b4001a4",
+        "domain": "computer_science",
+        "elapsed_ms": 2628.925,
+        "expected_identity": {
+          "doi": "10.1145/3528223.3530127"
+        },
+        "ground_truth_locator": "https://doi.org/10.1145/3528223.3530127",
+        "identity_match": true,
+        "lang": "en",
+        "outage_limited": false,
+        "query_fields": {
+          "authors": [
+            "Thomas Müller",
+            "Alex Evans",
+            "Christoph Schied",
+            "Alexander Keller"
+          ],
+          "doi": "10.1145/3528223.3530127",
+          "title": "Instant neural graphics primitives with a multiresolution hash encoding",
+          "venue": "ACM Transactions on Graphics",
+          "year": 2022
+        },
+        "query_kind": "doi",
+        "rate_limited": false,
+        "rights_basis": "public_metadata",
+        "source": "crossref",
+        "source_failure_details": [],
+        "source_failure_mode": "none",
+        "source_limited": false,
+        "sources_checked": [
+          "crossref"
+        ],
+        "sources_failed": [],
+        "sources_responded": [
+          "crossref"
+        ],
+        "status": "resolved_correct",
+        "verdict": "verified"
+      },
+      {
+        "canonical_record": null,
+        "case_id": "pilot-title-alphafold",
+        "case_sha256": "sha256:df7fbdf65d3c59c381c94db14a16e825bfed956315f4cd9d825e12d7f6b150dc",
+        "domain": "biomedicine",
+        "elapsed_ms": 1.624,
+        "expected_identity": {
+          "doi": "10.1038/s41586-021-03819-2"
+        },
+        "ground_truth_locator": "https://doi.org/10.1038/s41586-021-03819-2",
+        "identity_match": false,
+        "lang": "en",
+        "outage_limited": false,
+        "query_fields": {
+          "authors": [
+            "John Jumper",
+            "Richard Evans",
+            "Alexander Pritzel",
+            "Tim Green",
+            "Michael Figurnov",
+            "Olaf Ronneberger",
+            "Kathryn Tunyasuvunakool",
+            "Russ Bates",
+            "Augustin Žídek",
+            "Anna Potapenko",
+            "Alex Bridgland",
+            "Clemens Meyer",
+            "Simon Köhl",
+            "Andrew J. Ballard",
+            "Andrew Cowie",
+            "Bernardino Romera‐Paredes",
+            "Stanislav Nikolov",
+            "Rishub Jain",
+            "Jonas Adler",
+            "Trevor Back",
+            "Stig Petersen",
+            "David Reiman",
+            "Ellen Clancy",
+            "Michał Zieliński",
+            "Martin Steinegger",
+            "Michalina Pacholska",
+            "Tamas Berghammer",
+            "Sebastian W. Bodenstein",
+            "David Silver",
+            "Oriol Vinyals",
+            "Andrew Senior",
+            "Koray Kavukcuoglu",
+            "Pushmeet Kohli",
+            "Demis Hassabis"
+          ],
+          "title": "Highly accurate protein structure prediction with AlphaFold",
+          "venue": "Nature",
+          "year": 2021
+        },
+        "query_kind": "title",
+        "rate_limited": false,
+        "rights_basis": "public_metadata",
+        "source": "crossref",
+        "source_failure_details": [],
+        "source_failure_mode": "none",
+        "source_limited": false,
+        "sources_checked": [
+          "crossref"
+        ],
+        "sources_failed": [],
+        "sources_responded": [
+          "crossref"
+        ],
+        "status": "not_found",
+        "verdict": "not_found"
+      },
+      {
+        "canonical_record": null,
+        "case_id": "pilot-title-bert",
+        "case_sha256": "sha256:e1ba17fde9a741e8bc7fbd884456ffe8a6081758873e131921f70b30cf42ba49",
+        "domain": "computer_science",
+        "elapsed_ms": 1.74,
+        "expected_identity": {
+          "arxiv_id": "1810.04805"
+        },
+        "ground_truth_locator": "https://arxiv.org/abs/1810.04805",
+        "identity_match": false,
+        "lang": "en",
+        "outage_limited": false,
+        "query_fields": {
+          "authors": [
+            "Jacob Devlin",
+            "Ming-Wei Chang",
+            "Kenton Lee",
+            "Kristina Toutanova"
+          ],
+          "title": "BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding",
+          "venue": "arXiv",
+          "year": 2018
+        },
+        "query_kind": "title",
+        "rate_limited": false,
+        "rights_basis": "public_metadata",
+        "source": "crossref",
+        "source_failure_details": [],
+        "source_failure_mode": "none",
+        "source_limited": false,
+        "sources_checked": [
+          "crossref"
+        ],
+        "sources_failed": [],
+        "sources_responded": [
+          "crossref"
+        ],
+        "status": "not_found",
+        "verdict": "not_found"
+      },
+      {
+        "canonical_record": {
+          "abstract": "",
+          "arxiv_id": "",
+          "authors": [
+            "Kaiming He",
+            "Xiangyu Zhang",
+            "Shaoqing Ren",
+            "Jian Sun"
+          ],
+          "citation_id": "crossref:94a532a2d7af",
+          "doi": "10.1109/cvpr.2016.90",
+          "metadata": {
+            "is_referenced_by_count": 170720,
+            "metadata_quality": {
+              "completeness": 0.8571,
+              "confidence_effect": "missing_metadata_lowers_confidence_not_fabrication_evidence",
+              "identifiers": {
+                "arxiv_id": false,
+                "doi": true
+              },
+              "missing_fields": [
+                "abstract"
+              ],
+              "present_fields": [
+                "title",
+                "authors",
+                "year",
+                "venue",
+                "identifier",
+                "url"
+              ],
+              "schema_version": 1
+            },
+            "source_score": 0.0,
+            "type": "proceedings-article"
+          },
+          "source": "crossref",
+          "title": "Deep Residual Learning for Image Recognition",
+          "url": "https://doi.org/10.1109/cvpr.2016.90",
+          "venue": "2016 IEEE Conference on Computer Vision and Pattern Recognition (CVPR)",
+          "year": 2016
+        },
+        "case_id": "pilot-title-resnet",
+        "case_sha256": "sha256:04cd38a42f79be6bd608e2dbd515f771e92da31574bc8e0ae254fd1a83cb7420",
+        "domain": "computer_science",
+        "elapsed_ms": 1.384,
+        "expected_identity": {
+          "doi": "10.1109/cvpr.2016.90"
+        },
+        "ground_truth_locator": "https://doi.org/10.1109/cvpr.2016.90",
+        "identity_match": true,
+        "lang": "en",
+        "outage_limited": false,
+        "query_fields": {
+          "authors": [
+            "Kaiming He",
+            "Xiangyu Zhang",
+            "Shaoqing Ren",
+            "Jian Sun"
+          ],
+          "title": "Deep Residual Learning for Image Recognition",
+          "year": 2016
+        },
+        "query_kind": "title",
+        "rate_limited": false,
+        "rights_basis": "public_metadata",
+        "source": "crossref",
+        "source_failure_details": [],
+        "source_failure_mode": "none",
+        "source_limited": false,
+        "sources_checked": [
+          "crossref"
+        ],
+        "sources_failed": [],
+        "sources_responded": [
+          "crossref"
+        ],
+        "status": "resolved_correct",
+        "verdict": "verified"
+      },
+      {
+        "canonical_record": null,
+        "case_id": "pilot-title-transformer",
+        "case_sha256": "sha256:45f4a5c4fd39937258c53c9c74e0bda94e7cc2503e905117070ec735f41f11c5",
+        "domain": "computer_science",
+        "elapsed_ms": 1.0,
+        "expected_identity": {
+          "arxiv_id": "1706.03762"
+        },
+        "ground_truth_locator": "https://arxiv.org/abs/1706.03762",
+        "identity_match": false,
+        "lang": "en",
+        "outage_limited": false,
+        "query_fields": {
+          "authors": [
+            "Ashish Vaswani",
+            "Noam Shazeer",
+            "Niki Parmar",
+            "Jakob Uszkoreit",
+            "Llion Jones",
+            "Aidan N. Gomez",
+            "Lukasz Kaiser",
+            "Illia Polosukhin"
+          ],
+          "title": "Attention Is All You Need",
+          "venue": "arXiv",
+          "year": 2017
+        },
+        "query_kind": "title",
+        "rate_limited": false,
+        "rights_basis": "public_metadata",
+        "source": "crossref",
+        "source_failure_details": [],
+        "source_failure_mode": "none",
+        "source_limited": false,
+        "sources_checked": [
+          "crossref"
+        ],
+        "sources_failed": [],
+        "sources_responded": [
+          "crossref"
+        ],
+        "status": "not_found",
+        "verdict": "not_found"
+      },
+      {
+        "canonical_record": {
+          "abstract": "We introduce a new language representation model called BERT, which stands for Bidirectional Encoder Representations from Transformers. Unlike recent language representation models, BERT is designed to pre-train deep bidirectional representations from unlabeled text by jointly conditioning on both left and right context in all layers. As a result, the pre-trained BERT model can be fine-tuned with just one additional output layer to create state-of-the-art models for a wide range of tasks, such as question answering and language inference, without substantial task-specific architecture modifications. BERT is conceptually simple and empirically powerful. It obtains new state-of-the-art results on eleven natural language processing tasks, including pushing the GLUE score to 80.5% (7.7% point absolute improvement), MultiNLI accuracy to 86.7% (4.6% absolute improvement), SQuAD v1.1 question answering Test F1 to 93.2 (1.5 point absolute improvement) and SQuAD v2.0 Test F1 to 83.1 (5.1 point absolute improvement).",
+          "arxiv_id": "1810.04805v2",
+          "authors": [
+            "Jacob Devlin",
+            "Ming-Wei Chang",
+            "Kenton Lee",
+            "Kristina Toutanova"
+          ],
+          "citation_id": "arxiv:1842c8f292de",
+          "doi": "",
+          "metadata": {
+            "metadata_quality": {
+              "completeness": 1.0,
+              "confidence_effect": "none",
+              "identifiers": {
+                "arxiv_id": true,
+                "doi": false
+              },
+              "missing_fields": [],
+              "present_fields": [
+                "title",
+                "authors",
+                "year",
+                "venue",
+                "abstract",
+                "identifier",
+                "url"
+              ],
+              "schema_version": 1
+            },
+            "open_access": {
+              "is_oa": true,
+              "landing_page_url": "https://arxiv.org/abs/1810.04805v2",
+              "license": "arxiv",
+              "pdf_url": "https://arxiv.org/pdf/1810.04805v2",
+              "version": "submittedVersion"
+            },
+            "source_score": 0.0
+          },
+          "source": "arxiv",
+          "title": "BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding",
+          "url": "http://arxiv.org/abs/1810.04805v2",
+          "venue": "arXiv",
+          "year": 2018
+        },
+        "case_id": "pilot-arxiv-bert",
+        "case_sha256": "sha256:46be903285aa51c0c7c62783bfedc49d5412a4743faca98ad441f55a1348f660",
+        "domain": "computer_science",
+        "elapsed_ms": 3584.1,
+        "expected_identity": {
+          "arxiv_id": "1810.04805"
+        },
+        "ground_truth_locator": "https://arxiv.org/abs/1810.04805",
+        "identity_match": true,
+        "lang": "en",
+        "outage_limited": false,
+        "query_fields": {
+          "arxiv_id": "1810.04805",
+          "authors": [
+            "Jacob Devlin",
+            "Ming-Wei Chang",
+            "Kenton Lee",
+            "Kristina Toutanova"
+          ],
+          "title": "BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding",
+          "venue": "arXiv",
+          "year": 2018
+        },
+        "query_kind": "arxiv_id",
+        "rate_limited": false,
+        "rights_basis": "public_metadata",
+        "source": "arxiv",
+        "source_failure_details": [],
+        "source_failure_mode": "none",
+        "source_limited": false,
+        "sources_checked": [
+          "arxiv"
+        ],
+        "sources_failed": [],
+        "sources_responded": [
+          "arxiv"
+        ],
+        "status": "resolved_correct",
+        "verdict": "verified"
+      },
+      {
+        "canonical_record": {
+          "abstract": "Recent work has demonstrated substantial gains on many NLP tasks and benchmarks by pre-training on a large corpus of text followed by fine-tuning on a specific task. While typically task-agnostic in architecture, this method still requires task-specific fine-tuning datasets of thousands or tens of thousands of examples. By contrast, humans can generally perform a new language task from only a few examples or from simple instructions - something which current NLP systems still largely struggle to do. Here we show that scaling up language models greatly improves task-agnostic, few-shot performance, sometimes even reaching competitiveness with prior state-of-the-art fine-tuning approaches. Specifically, we train GPT-3, an autoregressive language model with 175 billion parameters, 10x more than any previous non-sparse language model, and test its performance in the few-shot setting. For all tasks, GPT-3 is applied without any gradient updates or fine-tuning, with tasks and few-shot demonstrations specified purely via text interaction with the model. GPT-3 achieves strong performance on many NLP datasets, including translation, question-answering, and cloze tasks, as well as several tasks that require on-the-fly reasoning or domain adaptation, such as unscrambling words, using a novel word in a sentence, or performing 3-digit arithmetic. At the same time, we also identify some datasets where GPT-3's few-shot learning still struggles, as well as some datasets where GPT-3 faces methodological issues related to training on large web corpora. Finally, we find that GPT-3 can generate samples of news articles which human evaluators have difficulty distinguishing from articles written by humans. We discuss broader societal impacts of this finding and of GPT-3 in general.",
+          "arxiv_id": "2005.14165v4",
+          "authors": [
+            "Tom B. Brown",
+            "Benjamin Mann",
+            "Nick Ryder",
+            "Melanie Subbiah",
+            "Jared Kaplan",
+            "Prafulla Dhariwal",
+            "Arvind Neelakantan",
+            "Pranav Shyam",
+            "Girish Sastry",
+            "Amanda Askell",
+            "Sandhini Agarwal",
+            "Ariel Herbert-Voss",
+            "Gretchen Krueger",
+            "Tom Henighan",
+            "Rewon Child",
+            "Aditya Ramesh",
+            "Daniel M. Ziegler",
+            "Jeffrey Wu",
+            "Clemens Winter",
+            "Christopher Hesse",
+            "Mark Chen",
+            "Eric Sigler",
+            "Mateusz Litwin",
+            "Scott Gray",
+            "Benjamin Chess",
+            "Jack Clark",
+            "Christopher Berner",
+            "Sam McCandlish",
+            "Alec Radford",
+            "Ilya Sutskever",
+            "Dario Amodei"
+          ],
+          "citation_id": "arxiv:2f3a0eed145e",
+          "doi": "",
+          "metadata": {
+            "metadata_quality": {
+              "completeness": 1.0,
+              "confidence_effect": "none",
+              "identifiers": {
+                "arxiv_id": true,
+                "doi": false
+              },
+              "missing_fields": [],
+              "present_fields": [
+                "title",
+                "authors",
+                "year",
+                "venue",
+                "abstract",
+                "identifier",
+                "url"
+              ],
+              "schema_version": 1
+            },
+            "open_access": {
+              "is_oa": true,
+              "landing_page_url": "https://arxiv.org/abs/2005.14165v4",
+              "license": "arxiv",
+              "pdf_url": "https://arxiv.org/pdf/2005.14165v4",
+              "version": "submittedVersion"
+            },
+            "source_score": 0.0
+          },
+          "source": "arxiv",
+          "title": "Language Models are Few-Shot Learners",
+          "url": "http://arxiv.org/abs/2005.14165v4",
+          "venue": "arXiv",
+          "year": 2020
+        },
+        "case_id": "pilot-arxiv-gpt3",
+        "case_sha256": "sha256:3997b816a0c54377cb18864f29cc2000208b77f6b96ae07b9f4a8a01c45d4adf",
+        "domain": "computer_science",
+        "elapsed_ms": 3574.062,
+        "expected_identity": {
+          "arxiv_id": "2005.14165"
+        },
+        "ground_truth_locator": "https://arxiv.org/abs/2005.14165",
+        "identity_match": true,
+        "lang": "en",
+        "outage_limited": false,
+        "query_fields": {
+          "arxiv_id": "2005.14165",
+          "authors": [
+            "Tom B. Brown",
+            "Benjamin Mann",
+            "Nick Ryder",
+            "Melanie Subbiah",
+            "Jared Kaplan",
+            "Prafulla Dhariwal",
+            "Arvind Neelakantan",
+            "Pranav Shyam",
+            "Girish Sastry",
+            "Amanda Askell",
+            "Sandhini Agarwal",
+            "Ariel Herbert-Voss",
+            "Gretchen Krueger",
+            "Tom Henighan",
+            "Rewon Child",
+            "Aditya Ramesh",
+            "Daniel M. Ziegler",
+            "Jeffrey Wu",
+            "Clemens Winter",
+            "Christopher Hesse",
+            "Mark Chen",
+            "Eric Sigler",
+            "Mateusz Litwin",
+            "Scott Gray",
+            "Benjamin Chess",
+            "Jack Clark",
+            "Christopher Berner",
+            "Sam McCandlish",
+            "Alec Radford",
+            "Ilya Sutskever",
+            "Dario Amodei"
+          ],
+          "title": "Language Models are Few-Shot Learners",
+          "venue": "arXiv",
+          "year": 2020
+        },
+        "query_kind": "arxiv_id",
+        "rate_limited": false,
+        "rights_basis": "public_metadata",
+        "source": "arxiv",
+        "source_failure_details": [],
+        "source_failure_mode": "none",
+        "source_limited": false,
+        "sources_checked": [
+          "arxiv"
+        ],
+        "sources_failed": [],
+        "sources_responded": [
+          "arxiv"
+        ],
+        "status": "resolved_correct",
+        "verdict": "verified"
+      },
+      {
+        "canonical_record": {
+          "abstract": "Deeper neural networks are more difficult to train. We present a residual learning framework to ease the training of networks that are substantially deeper than those used previously. We explicitly reformulate the layers as learning residual functions with reference to the layer inputs, instead of learning unreferenced functions. We provide comprehensive empirical evidence showing that these residual networks are easier to optimize, and can gain accuracy from considerably increased depth. On the ImageNet dataset we evaluate residual nets with a depth of up to 152 layers---8x deeper than VGG nets but still having lower complexity. An ensemble of these residual nets achieves 3.57% error on the ImageNet test set. This result won the 1st place on the ILSVRC 2015 classification task. We also present analysis on CIFAR-10 with 100 and 1000 layers. The depth of representations is of central importance for many visual recognition tasks. Solely due to our extremely deep representations, we obtain a 28% relative improvement on the COCO object detection dataset. Deep residual nets are foundations of our submissions to ILSVRC & COCO 2015 competitions, where we also won the 1st places on the tasks of ImageNet detection, ImageNet localization, COCO detection, and COCO segmentation.",
+          "arxiv_id": "1512.03385v1",
+          "authors": [
+            "Kaiming He",
+            "Xiangyu Zhang",
+            "Shaoqing Ren",
+            "Jian Sun"
+          ],
+          "citation_id": "arxiv:c1ea64ba9c1f",
+          "doi": "",
+          "metadata": {
+            "metadata_quality": {
+              "completeness": 1.0,
+              "confidence_effect": "none",
+              "identifiers": {
+                "arxiv_id": true,
+                "doi": false
+              },
+              "missing_fields": [],
+              "present_fields": [
+                "title",
+                "authors",
+                "year",
+                "venue",
+                "abstract",
+                "identifier",
+                "url"
+              ],
+              "schema_version": 1
+            },
+            "open_access": {
+              "is_oa": true,
+              "landing_page_url": "https://arxiv.org/abs/1512.03385v1",
+              "license": "arxiv",
+              "pdf_url": "https://arxiv.org/pdf/1512.03385v1",
+              "version": "submittedVersion"
+            },
+            "source_score": 0.0
+          },
+          "source": "arxiv",
+          "title": "Deep Residual Learning for Image Recognition",
+          "url": "http://arxiv.org/abs/1512.03385v1",
+          "venue": "arXiv",
+          "year": 2015
+        },
+        "case_id": "pilot-arxiv-resnet",
+        "case_sha256": "sha256:2ad1c02702740399b66fb1737065fe79b64bd92e8165cb27090ac763ae08d8a0",
+        "domain": "computer_science",
+        "elapsed_ms": 3698.056,
+        "expected_identity": {
+          "arxiv_id": "1512.03385"
+        },
+        "ground_truth_locator": "https://arxiv.org/abs/1512.03385",
+        "identity_match": true,
+        "lang": "en",
+        "outage_limited": false,
+        "query_fields": {
+          "arxiv_id": "1512.03385",
+          "authors": [
+            "Kaiming He",
+            "Xiangyu Zhang",
+            "Shaoqing Ren",
+            "Jian Sun"
+          ],
+          "title": "Deep Residual Learning for Image Recognition",
+          "venue": "arXiv",
+          "year": 2015
+        },
+        "query_kind": "arxiv_id",
+        "rate_limited": false,
+        "rights_basis": "public_metadata",
+        "source": "arxiv",
+        "source_failure_details": [],
+        "source_failure_mode": "none",
+        "source_limited": false,
+        "sources_checked": [
+          "arxiv"
+        ],
+        "sources_failed": [],
+        "sources_responded": [
+          "arxiv"
+        ],
+        "status": "resolved_correct",
+        "verdict": "verified"
+      },
+      {
+        "canonical_record": {
+          "abstract": "The dominant sequence transduction models are based on complex recurrent or convolutional neural networks in an encoder-decoder configuration. The best performing models also connect the encoder and decoder through an attention mechanism. We propose a new simple network architecture, the Transformer, based solely on attention mechanisms, dispensing with recurrence and convolutions entirely. Experiments on two machine translation tasks show these models to be superior in quality while being more parallelizable and requiring significantly less time to train. Our model achieves 28.4 BLEU on the WMT 2014 English-to-German translation task, improving over the existing best results, including ensembles by over 2 BLEU. On the WMT 2014 English-to-French translation task, our model establishes a new single-model state-of-the-art BLEU score of 41.8 after training for 3.5 days on eight GPUs, a small fraction of the training costs of the best models from the literature. We show that the Transformer generalizes well to other tasks by applying it successfully to English constituency parsing both with large and limited training data.",
+          "arxiv_id": "1706.03762v7",
+          "authors": [
+            "Ashish Vaswani",
+            "Noam Shazeer",
+            "Niki Parmar",
+            "Jakob Uszkoreit",
+            "Llion Jones",
+            "Aidan N. Gomez",
+            "Lukasz Kaiser",
+            "Illia Polosukhin"
+          ],
+          "citation_id": "arxiv:af879ac9f39c",
+          "doi": "",
+          "metadata": {
+            "metadata_quality": {
+              "completeness": 1.0,
+              "confidence_effect": "none",
+              "identifiers": {
+                "arxiv_id": true,
+                "doi": false
+              },
+              "missing_fields": [],
+              "present_fields": [
+                "title",
+                "authors",
+                "year",
+                "venue",
+                "abstract",
+                "identifier",
+                "url"
+              ],
+              "schema_version": 1
+            },
+            "open_access": {
+              "is_oa": true,
+              "landing_page_url": "https://arxiv.org/abs/1706.03762v7",
+              "license": "arxiv",
+              "pdf_url": "https://arxiv.org/pdf/1706.03762v7",
+              "version": "submittedVersion"
+            },
+            "source_score": 0.0
+          },
+          "source": "arxiv",
+          "title": "Attention Is All You Need",
+          "url": "http://arxiv.org/abs/1706.03762v7",
+          "venue": "arXiv",
+          "year": 2017
+        },
+        "case_id": "pilot-arxiv-transformer",
+        "case_sha256": "sha256:ddccb14c39e9641992c972a8a7c6c9c7d0cced95c656d598e14d8d9909ff5001",
+        "domain": "computer_science",
+        "elapsed_ms": 3485.935,
+        "expected_identity": {
+          "arxiv_id": "1706.03762"
+        },
+        "ground_truth_locator": "https://arxiv.org/abs/1706.03762",
+        "identity_match": true,
+        "lang": "en",
+        "outage_limited": false,
+        "query_fields": {
+          "arxiv_id": "1706.03762",
+          "authors": [
+            "Ashish Vaswani",
+            "Noam Shazeer",
+            "Niki Parmar",
+            "Jakob Uszkoreit",
+            "Llion Jones",
+            "Aidan N. Gomez",
+            "Lukasz Kaiser",
+            "Illia Polosukhin"
+          ],
+          "title": "Attention Is All You Need",
+          "venue": "arXiv",
+          "year": 2017
+        },
+        "query_kind": "arxiv_id",
+        "rate_limited": false,
+        "rights_basis": "public_metadata",
+        "source": "arxiv",
+        "source_failure_details": [],
+        "source_failure_mode": "none",
+        "source_limited": false,
+        "sources_checked": [
+          "arxiv"
+        ],
+        "sources_failed": [],
+        "sources_responded": [
+          "arxiv"
+        ],
+        "status": "resolved_correct",
+        "verdict": "verified"
+      },
+      {
+        "canonical_record": null,
+        "case_id": "pilot-doi-alphafold-nature",
+        "case_sha256": "sha256:cc115846ea59f782688c02412d54d0e744f4a01d63cf4206e2e00a224abe9da1",
+        "domain": "biomedicine",
+        "elapsed_ms": 4092.782,
+        "expected_identity": {
+          "doi": "10.1038/s41586-021-03819-2"
+        },
+        "ground_truth_locator": "https://doi.org/10.1038/s41586-021-03819-2",
+        "identity_match": false,
+        "lang": "en",
+        "outage_limited": false,
+        "query_fields": {
+          "authors": [
+            "John Jumper",
+            "Richard Evans",
+            "Alexander Pritzel",
+            "Tim Green",
+            "Michael Figurnov",
+            "Olaf Ronneberger",
+            "Kathryn Tunyasuvunakool",
+            "Russ Bates",
+            "Augustin Žídek",
+            "Anna Potapenko",
+            "Alex Bridgland",
+            "Clemens Meyer",
+            "Simon A. A. Kohl",
+            "Andrew J. Ballard",
+            "Andrew Cowie",
+            "Bernardino Romera-Paredes",
+            "Stanislav Nikolov",
+            "Rishub Jain",
+            "Jonas Adler",
+            "Trevor Back",
+            "Stig Petersen",
+            "David Reiman",
+            "Ellen Clancy",
+            "Michal Zielinski",
+            "Martin Steinegger",
+            "Michalina Pacholska",
+            "Tamas Berghammer",
+            "Sebastian Bodenstein",
+            "David Silver",
+            "Oriol Vinyals",
+            "Andrew W. Senior",
+            "Koray Kavukcuoglu",
+            "Pushmeet Kohli",
+            "Demis Hassabis"
+          ],
+          "doi": "10.1038/s41586-021-03819-2",
+          "title": "Highly accurate protein structure prediction with AlphaFold",
+          "venue": "Nature",
+          "year": 2021
+        },
+        "query_kind": "doi",
+        "rate_limited": false,
+        "rights_basis": "public_metadata",
+        "source": "arxiv",
+        "source_failure_details": [],
+        "source_failure_mode": "none",
+        "source_limited": false,
+        "sources_checked": [
+          "arxiv"
+        ],
+        "sources_failed": [],
+        "sources_responded": [
+          "arxiv"
+        ],
+        "status": "not_found",
+        "verdict": "not_found"
+      },
+      {
+        "canonical_record": {
+          "abstract": "We present BART, a denoising autoencoder for pretraining sequence-to-sequence models. BART is trained by (1) corrupting text with an arbitrary noising function, and (2) learning a model to reconstruct the original text. It uses a standard Tranformer-based neural machine translation architecture which, despite its simplicity, can be seen as generalizing BERT (due to the bidirectional encoder), GPT (with the left-to-right decoder), and many other more recent pretraining schemes. We evaluate a number of noising approaches, finding the best performance by both randomly shuffling the order of the original sentences and using a novel in-filling scheme, where spans of text are replaced with a single mask token. BART is particularly effective when fine tuned for text generation but also works well for comprehension tasks. It matches the performance of RoBERTa with comparable training resources on GLUE and SQuAD, achieves new state-of-the-art results on a range of abstractive dialogue, question answering, and summarization tasks, with gains of up to 6 ROUGE. BART also provides a 1.1 BLEU increase over a back-translation system for machine translation, with only target language pretraining. We also report ablation experiments that replicate other pretraining schemes within the BART framework, to better measure which factors most influence end-task performance.",
+          "arxiv_id": "1910.13461v1",
+          "authors": [
+            "Mike Lewis",
+            "Yinhan Liu",
+            "Naman Goyal",
+            "Marjan Ghazvininejad",
+            "Abdelrahman Mohamed",
+            "Omer Levy",
+            "Ves Stoyanov",
+            "Luke Zettlemoyer"
+          ],
+          "citation_id": "arxiv:e94f0c6828bf",
+          "doi": "",
+          "metadata": {
+            "metadata_quality": {
+              "completeness": 1.0,
+              "confidence_effect": "none",
+              "identifiers": {
+                "arxiv_id": true,
+                "doi": false
+              },
+              "missing_fields": [],
+              "present_fields": [
+                "title",
+                "authors",
+                "year",
+                "venue",
+                "abstract",
+                "identifier",
+                "url"
+              ],
+              "schema_version": 1
+            },
+            "open_access": {
+              "is_oa": true,
+              "landing_page_url": "https://arxiv.org/abs/1910.13461v1",
+              "license": "arxiv",
+              "pdf_url": "https://arxiv.org/pdf/1910.13461v1",
+              "version": "submittedVersion"
+            },
+            "source_score": 0.0
+          },
+          "source": "arxiv",
+          "title": "BART: Denoising Sequence-to-Sequence Pre-training for Natural Language Generation, Translation, and Comprehension",
+          "url": "http://arxiv.org/abs/1910.13461v1",
+          "venue": "arXiv",
+          "year": 2019
+        },
+        "case_id": "pilot-doi-bart-acl",
+        "case_sha256": "sha256:cbf655cd766ac72a009ca638ef95fd002c079db247fbcfabb6094921d33a2c10",
+        "domain": "computer_science",
+        "elapsed_ms": 4741.37,
+        "expected_identity": {
+          "doi": "10.18653/v1/2020.acl-main.703"
+        },
+        "ground_truth_locator": "https://doi.org/10.18653/v1/2020.acl-main.703",
+        "identity_match": false,
+        "lang": "en",
+        "outage_limited": false,
+        "query_fields": {
+          "authors": [
+            "Mike Lewis",
+            "Yinhan Liu",
+            "Naman Goyal",
+            "Marjan Ghazvininejad",
+            "Abdelrahman Mohamed",
+            "Omer Levy",
+            "Veselin Stoyanov",
+            "Luke Zettlemoyer"
+          ],
+          "doi": "10.18653/v1/2020.acl-main.703",
+          "title": "BART: Denoising Sequence-to-Sequence Pre-training for Natural Language Generation, Translation, and Comprehension",
+          "venue": "Proceedings of the 58th Annual Meeting of the Association for Computational Linguistics",
+          "year": 2020
+        },
+        "query_kind": "doi",
+        "rate_limited": false,
+        "rights_basis": "public_metadata",
+        "source": "arxiv",
+        "source_failure_details": [],
+        "source_failure_mode": "none",
+        "source_limited": false,
+        "sources_checked": [
+          "arxiv"
+        ],
+        "sources_failed": [],
+        "sources_responded": [
+          "arxiv"
+        ],
+        "status": "resolved_incorrect",
+        "verdict": "metadata_mismatch"
+      },
+      {
+        "canonical_record": null,
+        "case_id": "pilot-doi-cvpr-resnet",
+        "case_sha256": "sha256:5a1a7fbe3112e5dd88f36b73406e8274444b1833cf330cfa6ad4c0ff0b678d5f",
+        "domain": "computer_science",
+        "elapsed_ms": 1457.621,
+        "expected_identity": {
+          "doi": "10.1109/cvpr.2016.90"
+        },
+        "ground_truth_locator": "https://doi.org/10.1109/cvpr.2016.90",
+        "identity_match": false,
+        "lang": "en",
+        "outage_limited": false,
+        "query_fields": {
+          "authors": [
+            "Kaiming He",
+            "Xiangyu Zhang",
+            "Shaoqing Ren",
+            "Jian Sun"
+          ],
+          "doi": "10.1109/cvpr.2016.90",
+          "title": "Deep Residual Learning for Image Recognition",
+          "venue": "2016 IEEE Conference on Computer Vision and Pattern Recognition (CVPR)",
+          "year": 2016
+        },
+        "query_kind": "doi",
+        "rate_limited": false,
+        "rights_basis": "public_metadata",
+        "source": "arxiv",
+        "source_failure_details": [],
+        "source_failure_mode": "none",
+        "source_limited": false,
+        "sources_checked": [
+          "arxiv"
+        ],
+        "sources_failed": [],
+        "sources_responded": [
+          "arxiv"
+        ],
+        "status": "not_found",
+        "verdict": "not_found"
+      },
+      {
+        "canonical_record": null,
+        "case_id": "pilot-doi-transformer-arxiv-doi",
+        "case_sha256": "sha256:1e04417d6cf4dd6cceb30ffc9a0f3477e88f2acf121cf294297ff3589b4001a4",
+        "domain": "computer_science",
+        "elapsed_ms": 6845.624,
+        "expected_identity": {
+          "doi": "10.1145/3528223.3530127"
+        },
+        "ground_truth_locator": "https://doi.org/10.1145/3528223.3530127",
+        "identity_match": false,
+        "lang": "en",
+        "outage_limited": false,
+        "query_fields": {
+          "authors": [
+            "Thomas Müller",
+            "Alex Evans",
+            "Christoph Schied",
+            "Alexander Keller"
+          ],
+          "doi": "10.1145/3528223.3530127",
+          "title": "Instant neural graphics primitives with a multiresolution hash encoding",
+          "venue": "ACM Transactions on Graphics",
+          "year": 2022
+        },
+        "query_kind": "doi",
+        "rate_limited": false,
+        "rights_basis": "public_metadata",
+        "source": "arxiv",
+        "source_failure_details": [],
+        "source_failure_mode": "none",
+        "source_limited": false,
+        "sources_checked": [
+          "arxiv"
+        ],
+        "sources_failed": [],
+        "sources_responded": [
+          "arxiv"
+        ],
+        "status": "not_found",
+        "verdict": "not_found"
+      },
+      {
+        "canonical_record": null,
+        "case_id": "pilot-title-alphafold",
+        "case_sha256": "sha256:df7fbdf65d3c59c381c94db14a16e825bfed956315f4cd9d825e12d7f6b150dc",
+        "domain": "biomedicine",
+        "elapsed_ms": 0.9,
+        "expected_identity": {
+          "doi": "10.1038/s41586-021-03819-2"
+        },
+        "ground_truth_locator": "https://doi.org/10.1038/s41586-021-03819-2",
+        "identity_match": false,
+        "lang": "en",
+        "outage_limited": false,
+        "query_fields": {
+          "authors": [
+            "John Jumper",
+            "Richard Evans",
+            "Alexander Pritzel",
+            "Tim Green",
+            "Michael Figurnov",
+            "Olaf Ronneberger",
+            "Kathryn Tunyasuvunakool",
+            "Russ Bates",
+            "Augustin Žídek",
+            "Anna Potapenko",
+            "Alex Bridgland",
+            "Clemens Meyer",
+            "Simon Köhl",
+            "Andrew J. Ballard",
+            "Andrew Cowie",
+            "Bernardino Romera‐Paredes",
+            "Stanislav Nikolov",
+            "Rishub Jain",
+            "Jonas Adler",
+            "Trevor Back",
+            "Stig Petersen",
+            "David Reiman",
+            "Ellen Clancy",
+            "Michał Zieliński",
+            "Martin Steinegger",
+            "Michalina Pacholska",
+            "Tamas Berghammer",
+            "Sebastian W. Bodenstein",
+            "David Silver",
+            "Oriol Vinyals",
+            "Andrew Senior",
+            "Koray Kavukcuoglu",
+            "Pushmeet Kohli",
+            "Demis Hassabis"
+          ],
+          "title": "Highly accurate protein structure prediction with AlphaFold",
+          "venue": "Nature",
+          "year": 2021
+        },
+        "query_kind": "title",
+        "rate_limited": false,
+        "rights_basis": "public_metadata",
+        "source": "arxiv",
+        "source_failure_details": [],
+        "source_failure_mode": "none",
+        "source_limited": false,
+        "sources_checked": [
+          "arxiv"
+        ],
+        "sources_failed": [],
+        "sources_responded": [
+          "arxiv"
+        ],
+        "status": "not_found",
+        "verdict": "not_found"
+      },
+      {
+        "canonical_record": {
+          "abstract": "We introduce a new language representation model called BERT, which stands for Bidirectional Encoder Representations from Transformers. Unlike recent language representation models, BERT is designed to pre-train deep bidirectional representations from unlabeled text by jointly conditioning on both left and right context in all layers. As a result, the pre-trained BERT model can be fine-tuned with just one additional output layer to create state-of-the-art models for a wide range of tasks, such as question answering and language inference, without substantial task-specific architecture modifications. BERT is conceptually simple and empirically powerful. It obtains new state-of-the-art results on eleven natural language processing tasks, including pushing the GLUE score to 80.5% (7.7% point absolute improvement), MultiNLI accuracy to 86.7% (4.6% absolute improvement), SQuAD v1.1 question answering Test F1 to 93.2 (1.5 point absolute improvement) and SQuAD v2.0 Test F1 to 83.1 (5.1 point absolute improvement).",
+          "arxiv_id": "1810.04805v2",
+          "authors": [
+            "Jacob Devlin",
+            "Ming-Wei Chang",
+            "Kenton Lee",
+            "Kristina Toutanova"
+          ],
+          "citation_id": "arxiv:1842c8f292de",
+          "doi": "",
+          "metadata": {
+            "metadata_quality": {
+              "completeness": 1.0,
+              "confidence_effect": "none",
+              "identifiers": {
+                "arxiv_id": true,
+                "doi": false
+              },
+              "missing_fields": [],
+              "present_fields": [
+                "title",
+                "authors",
+                "year",
+                "venue",
+                "abstract",
+                "identifier",
+                "url"
+              ],
+              "schema_version": 1
+            },
+            "open_access": {
+              "is_oa": true,
+              "landing_page_url": "https://arxiv.org/abs/1810.04805v2",
+              "license": "arxiv",
+              "pdf_url": "https://arxiv.org/pdf/1810.04805v2",
+              "version": "submittedVersion"
+            },
+            "source_score": 0.0
+          },
+          "source": "arxiv",
+          "title": "BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding",
+          "url": "http://arxiv.org/abs/1810.04805v2",
+          "venue": "arXiv",
+          "year": 2018
+        },
+        "case_id": "pilot-title-bert",
+        "case_sha256": "sha256:e1ba17fde9a741e8bc7fbd884456ffe8a6081758873e131921f70b30cf42ba49",
+        "domain": "computer_science",
+        "elapsed_ms": 0.759,
+        "expected_identity": {
+          "arxiv_id": "1810.04805"
+        },
+        "ground_truth_locator": "https://arxiv.org/abs/1810.04805",
+        "identity_match": true,
+        "lang": "en",
+        "outage_limited": false,
+        "query_fields": {
+          "authors": [
+            "Jacob Devlin",
+            "Ming-Wei Chang",
+            "Kenton Lee",
+            "Kristina Toutanova"
+          ],
+          "title": "BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding",
+          "venue": "arXiv",
+          "year": 2018
+        },
+        "query_kind": "title",
+        "rate_limited": false,
+        "rights_basis": "public_metadata",
+        "source": "arxiv",
+        "source_failure_details": [],
+        "source_failure_mode": "none",
+        "source_limited": false,
+        "sources_checked": [
+          "arxiv"
+        ],
+        "sources_failed": [],
+        "sources_responded": [
+          "arxiv"
+        ],
+        "status": "resolved_correct",
+        "verdict": "verified"
+      },
+      {
+        "canonical_record": null,
+        "case_id": "pilot-title-resnet",
+        "case_sha256": "sha256:04cd38a42f79be6bd608e2dbd515f771e92da31574bc8e0ae254fd1a83cb7420",
+        "domain": "computer_science",
+        "elapsed_ms": 0.544,
+        "expected_identity": {
+          "doi": "10.1109/cvpr.2016.90"
+        },
+        "ground_truth_locator": "https://doi.org/10.1109/cvpr.2016.90",
+        "identity_match": false,
+        "lang": "en",
+        "outage_limited": false,
+        "query_fields": {
+          "authors": [
+            "Kaiming He",
+            "Xiangyu Zhang",
+            "Shaoqing Ren",
+            "Jian Sun"
+          ],
+          "title": "Deep Residual Learning for Image Recognition",
+          "year": 2016
+        },
+        "query_kind": "title",
+        "rate_limited": false,
+        "rights_basis": "public_metadata",
+        "source": "arxiv",
+        "source_failure_details": [],
+        "source_failure_mode": "none",
+        "source_limited": false,
+        "sources_checked": [
+          "arxiv"
+        ],
+        "sources_failed": [],
+        "sources_responded": [
+          "arxiv"
+        ],
+        "status": "not_found",
+        "verdict": "not_found"
+      },
+      {
+        "canonical_record": null,
+        "case_id": "pilot-title-transformer",
+        "case_sha256": "sha256:45f4a5c4fd39937258c53c9c74e0bda94e7cc2503e905117070ec735f41f11c5",
+        "domain": "computer_science",
+        "elapsed_ms": 0.518,
+        "expected_identity": {
+          "arxiv_id": "1706.03762"
+        },
+        "ground_truth_locator": "https://arxiv.org/abs/1706.03762",
+        "identity_match": false,
+        "lang": "en",
+        "outage_limited": false,
+        "query_fields": {
+          "authors": [
+            "Ashish Vaswani",
+            "Noam Shazeer",
+            "Niki Parmar",
+            "Jakob Uszkoreit",
+            "Llion Jones",
+            "Aidan N. Gomez",
+            "Lukasz Kaiser",
+            "Illia Polosukhin"
+          ],
+          "title": "Attention Is All You Need",
+          "venue": "arXiv",
+          "year": 2017
+        },
+        "query_kind": "title",
+        "rate_limited": false,
+        "rights_basis": "public_metadata",
+        "source": "arxiv",
+        "source_failure_details": [],
+        "source_failure_mode": "none",
+        "source_limited": false,
+        "sources_checked": [
+          "arxiv"
+        ],
+        "sources_failed": [],
+        "sources_responded": [
+          "arxiv"
+        ],
+        "status": "not_found",
+        "verdict": "not_found"
+      }
+    ],
+    "schema_version": 1,
+    "summary": {
+      "attempt_count": 36,
+      "failure_kind_counts": {},
+      "identity_accuracy": 0.4444,
+      "identity_accuracy_eligible_count": 36,
+      "identity_correct_count": 16,
+      "latency_ms": {
+        "count": 36,
+        "max": 6845.624,
+        "mean": 1994.008,
+        "p50": 2373.767,
+        "p95": 4741.37
+      },
+      "not_found_count": 13,
+      "outage_limited_count": 0,
+      "rate_limited_count": 0,
+      "source_limited_count": 0
+    }
+  },
+  "policy": "one observation is not a permanent source ranking or a fabrication decision",
+  "schema_version": 1
+}

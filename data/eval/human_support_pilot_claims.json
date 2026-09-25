@@ -1,0 +1,152 @@
+{
+  "schema_version": 1,
+  "campaign_id": "citeguard-human-support-v1",
+  "source_dataset": "data/eval/live_retrieval_benchmark.json",
+  "description": "Operator-authored claim prompts over public abstracts. These are unlabeled candidates, not a human benchmark.",
+  "claims": [
+    {
+      "id": "candidate-transformer-direct",
+      "source_case_id": "pilot-arxiv-transformer",
+      "claim": "The Transformer is based solely on attention mechanisms and dispenses with recurrence and convolutions.",
+      "lang": "en",
+      "domain": "computer_science",
+      "writing_context": "research_article",
+      "evidence_scope": "abstract",
+      "rights_basis": "public_abstract",
+      "case_type": "direct_support",
+      "split": "train"
+    },
+    {
+      "id": "candidate-transformer-overclaim",
+      "source_case_id": "pilot-title-transformer",
+      "claim": "The Transformer always improves performance on every machine translation task.",
+      "lang": "en",
+      "domain": "computer_science",
+      "writing_context": "literature_review",
+      "evidence_scope": "abstract",
+      "rights_basis": "public_abstract",
+      "case_type": "hard_negative",
+      "split": "dev"
+    },
+    {
+      "id": "candidate-bert-direct",
+      "source_case_id": "pilot-arxiv-bert",
+      "claim": "BERT can be fine-tuned with one additional output layer for a wide range of tasks.",
+      "lang": "en",
+      "domain": "computer_science",
+      "writing_context": "research_article",
+      "evidence_scope": "abstract",
+      "rights_basis": "public_abstract",
+      "case_type": "direct_support",
+      "split": "train"
+    },
+    {
+      "id": "candidate-bert-contradiction",
+      "source_case_id": "pilot-title-bert",
+      "claim": "BERT requires substantial task-specific architecture modifications before it can be used.",
+      "lang": "en",
+      "domain": "computer_science",
+      "writing_context": "literature_review",
+      "evidence_scope": "abstract",
+      "rights_basis": "public_abstract",
+      "case_type": "contradiction",
+      "split": "test"
+    },
+    {
+      "id": "candidate-gpt3-direct",
+      "source_case_id": "pilot-arxiv-gpt3",
+      "claim": "Scaling up language models improves task-agnostic few-shot performance.",
+      "lang": "en",
+      "domain": "computer_science",
+      "writing_context": "research_article",
+      "evidence_scope": "abstract",
+      "rights_basis": "public_abstract",
+      "case_type": "direct_support",
+      "split": "train"
+    },
+    {
+      "id": "candidate-gpt3-overclaim",
+      "source_case_id": "pilot-arxiv-gpt3",
+      "claim": "GPT-3 achieves state-of-the-art performance on every language task without exceptions.",
+      "lang": "en",
+      "domain": "computer_science",
+      "writing_context": "literature_review",
+      "evidence_scope": "abstract",
+      "rights_basis": "public_abstract",
+      "case_type": "hard_negative",
+      "split": "dev"
+    },
+    {
+      "id": "candidate-resnet-direct",
+      "source_case_id": "pilot-arxiv-resnet",
+      "claim": "Residual networks can gain accuracy from considerably increased depth.",
+      "lang": "en",
+      "domain": "computer_science",
+      "writing_context": "research_article",
+      "evidence_scope": "abstract",
+      "rights_basis": "public_abstract",
+      "case_type": "direct_support",
+      "split": "test"
+    },
+    {
+      "id": "candidate-resnet-scope",
+      "source_case_id": "pilot-title-resnet",
+      "claim": "Residual networks are the easiest models to train in every application domain.",
+      "lang": "en",
+      "domain": "computer_science",
+      "writing_context": "literature_review",
+      "evidence_scope": "abstract",
+      "rights_basis": "public_abstract",
+      "case_type": "full_text_required",
+      "split": "test"
+    },
+    {
+      "id": "candidate-alphafold-boundary",
+      "source_case_id": "pilot-title-alphafold",
+      "claim": "Accurate computational approaches are needed to address the gap in protein structural coverage.",
+      "lang": "en",
+      "domain": "biomedicine",
+      "writing_context": "literature_review",
+      "evidence_scope": "abstract",
+      "rights_basis": "public_abstract",
+      "case_type": "weak_support",
+      "split": "dev"
+    },
+    {
+      "id": "candidate-alphafold-overclaim",
+      "source_case_id": "pilot-title-alphafold",
+      "claim": "AlphaFold determines the structure of every known protein with experimental certainty.",
+      "lang": "en",
+      "domain": "biomedicine",
+      "writing_context": "research_article",
+      "evidence_scope": "abstract",
+      "rights_basis": "public_abstract",
+      "case_type": "hard_negative",
+      "split": "train"
+    },
+    {
+      "id": "candidate-transformer-longitudinal",
+      "source_case_id": "pilot-arxiv-transformer",
+      "claim": "The abstract proves that Transformer gains persist unchanged for ten years.",
+      "lang": "en",
+      "domain": "computer_science",
+      "writing_context": "research_article",
+      "evidence_scope": "abstract",
+      "rights_basis": "public_abstract",
+      "case_type": "full_text_required",
+      "split": "test"
+    },
+    {
+      "id": "candidate-bert-title-boundary",
+      "source_case_id": "pilot-title-bert",
+      "claim": "The BERT paper title alone proves that the model improves every downstream metric.",
+      "lang": "en",
+      "domain": "computer_science",
+      "writing_context": "literature_review",
+      "evidence_scope": "abstract",
+      "rights_basis": "public_abstract",
+      "case_type": "unrelated_negative",
+      "split": "dev"
+    }
+  ]
+}

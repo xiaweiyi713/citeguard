@@ -18,9 +18,9 @@ python -m pip install -e ".[mcp]"
 
 The MCP server requires Python 3.10 or newer because the upstream MCP SDK does.
 The core CLI/library still supports Python 3.9.
-CiteGuard currently uses the v1 FastMCP API and installs `mcp>=1.28,<2`;
-do not override that upper bound with MCP SDK v2 until the server and its
-stdio acceptance suite have been deliberately migrated.
+CiteGuard currently uses the v1 FastMCP API and installs
+`mcp>=1.28,<2`; do not override that upper bound with MCP SDK v2 until the
+server and its stdio acceptance suite have been deliberately migrated.
 
 ## Run
 
@@ -53,6 +53,21 @@ For local source checkout testing without an editable install:
 }
 ```
 
+## Agent Skill
+
+For Codex, Claude Code, or Cursor, install the bundled user Skill after the
+stdio server is configured:
+
+```bash
+citeguard skill install --client codex
+citeguard skill check --client codex
+```
+
+Use `citeguard skill status --client codex` to inspect a local install. When a
+new package version ships, review any local Skill customization before running
+`citeguard skill upgrade --client codex --force`; upgrades do not overwrite a
+different tree without that explicit flag.
+
 ## First Call
 
 Call `citeguard_status_tool` before verification. It reports:
@@ -75,6 +90,7 @@ Call `citeguard_status_tool` before verification. It reports:
 | `citeguard_status_tool` | configuration and dependency readiness; optionally run source probes |
 | `verify_citation_tool` | one citation existence/metadata check |
 | `audit_citations_tool` | batch existence/metadata checks |
+| `audit_document_tool` | bounded manuscript or bibliography audit with exact locators and a suggestion-only review queue |
 | `check_claim_support_tool` | one claim against one cited paper |
 | `check_claim_support_set_tool` | one claim against a set of cited papers |
 | `search_counterevidence_tool` | possible counter-evidence candidates; review leads only |
@@ -89,18 +105,27 @@ on claim-support tools. Only `full_text` / `full_text_file` inputs are tagged as
 full-text evidence; CiteGuard will not fetch or bypass gated full text for the
 agent.
 
+Claim-support responses retain their existing `evidence` fields and add
+`evidence.evidence_object`: versioned source, returned fragment and SHA-256,
+locator, retrieval method/time, and license status. Preserve this object with
+the verdict. A missing retrieval time is intentional, and a
+`user_provided_not_verified` license status does not prove redistribution rights.
+
 `search_counterevidence_tool` can be used after weak, insufficient, or
 contradicted support results to find papers worth reviewing. It does not prove a
 claim is contradicted, and an empty candidate list does not prove that no
 counter-evidence exists. The response includes `query_plan`, `query_results`,
 stable `next_action`, `review_summary`, and per-candidate
-`matched_query_roles` so agents can explain why a candidate was surfaced
+`matched_query_roles` / `sources` so agents can explain why a candidate was surfaced
 without treating the retrieval signal as a verdict. `review_summary` includes
 `signal_counts`, `matched_query_role_counts`, `top_candidate`, and
 `recommended_next_steps` queues such as
 `explicit_contradiction_candidate_indexes`,
 `source_outage_safety_candidate_indexes`, and `related_candidate_indexes`, plus
 `policy=review_leads_not_contradiction_verdicts` for compact agent triage.
+Each `query_results` row reports `sources_responded` / `sources_failed`, while
+top-level `sources_responded` covers the complete retrieved pool before `top_k`
+truncation and keeps every source represented by a merged record.
 Claims that overinterpret source outages, timeouts, or `not_found` as
 fabrication evidence, including Chinese source-outage/not-found overclaims, add
 a `source_outage_safety` query role; candidates may use
@@ -154,6 +179,27 @@ supporting/contradicting counts, and per-citation child results.
 `contradictions_dominate; multiple_weak_citations_remain_tentative;
 no_unstated_multi_hop_or_full_text_support`, so agents can branch without
 parsing explanation text.
+
+`audit_document_tool` accepts one local Markdown, LaTeX, BibTeX, BBL, or DOCX
+file. Its path, LaTeX `\\input` / `\\include` files, and referenced `.bib`
+files must remain under `CITEGUARD_ALLOWED_FILE_ROOTS` (or the server working
+directory when unset). The audit resolves symlinks before the boundary check and
+reopens only regular files without following a replacement leaf symlink. It
+returns `document_locator` values as exact line or
+paragraph locations plus a risk-sorted `review_queue`. The tool is
+suggestion-only: `edit_policy.document_modified=false` and
+`automatic_apply_allowed=false`; it never edits the document. `not_found`
+means the extracted reference needs identity review, not that it was fabricated.
+The `document.snapshot.digest` and `document.snapshot.files[]` fields identify
+the exact resolved file version read by the call. Before applying or proposing a
+queued change, compare that digest with the current audit; if an included or
+`.bib` file changed, run the audit again. The digest is an input-integrity handle,
+not a license or publication hash.
+The additive `review_status` block exposes `state`, `review_required`, a stable
+`next_action`, `queue_count`, and the matching `snapshot_digest` so an agent can
+branch without counting or interpreting queue prose.
+Check `document.dependencies.missing` as well: an absent in-root LaTeX include
+or bibliography is an incomplete audit and produces `next_action=repair_input`.
 
 `citeguard_status_tool` defaults to no live source queries. Pass
 `check_sources=true` to run a lightweight per-source health probe, and optionally
@@ -242,7 +288,8 @@ return the structured error contract (`ok=false`, `error.code`,
 `error.recovery`, `error.next_action`, `error.details.tool`, and batch shape
 `details.expected` / `details.received`) plus `full_text_file` read failures
 with `details.filename` and OS-level missing-file `details.errno`. It sets
-`CITEGUARD_FIXTURE_CITATIONS` so no live scholarly source is contacted.
+`CITEGUARD_FIXTURE_CITATIONS` and `CITEGUARD_SUPPORT_ENGINE=heuristic`, so no
+live scholarly source is contacted and no model weights are loaded.
 
 If the MCP SDK is not installed, the default command prints a skip message and
 exits 0 for local developer convenience. With `--require-sdk`, missing MCP dependencies are a failure.
@@ -272,6 +319,7 @@ an integer or digit string. Errors include `details.tool`, `details.field`, and
 | `CITEGUARD_MAILTO` | empty | Real contact email for polite OpenAlex/Crossref usage; unset or placeholder values are not sent as `mailto`. |
 | `SEMANTIC_SCHOLAR_API_KEY` | empty | Optional Semantic Scholar key. |
 | `CITEGUARD_CACHE` | OS user cache directory | SQLite cache path; use `:memory:` for ephemeral runs. |
+| `CITEGUARD_METRICS_PATH` | empty (disabled) | Optional local JSONL aggregate metrics; no network telemetry, request text, file paths, or evidence are recorded. |
 | `CITEGUARD_CACHE_TTL` | `86400` | Positive-result cache TTL in seconds. |
 | `CITEGUARD_NEGATIVE_CACHE_TTL` | `900` | Empty-result cache TTL in seconds. |
 | `CITEGUARD_FIXTURE_CITATIONS` | empty | JSON/JSONL citation fixture for offline deterministic runs. |
@@ -283,19 +331,23 @@ an integer or digit string. Errors include `details.tool`, `details.field`, and
 | `CITEGUARD_SUSPECT_DOI_PREFIXES` | empty | Comma-separated DOI prefixes appended to the built-in hijacked/mirror-record greylist. |
 | `CITEGUARD_REMOTE_EVIDENCE` | `0` | Enable slower landing-page snippet harvesting. |
 | `CITEGUARD_EVIDENCE_TIMEOUT` | `2` | Landing-page evidence timeout in seconds. |
-| `CITEGUARD_ALLOWED_FILE_ROOTS` | server working directory | Allowed roots for local `full_text_file` evidence. |
+| `CITEGUARD_ALLOWED_FILE_ROOTS` | server working directory | Allowed roots for local `full_text_file` evidence and `audit_document_tool` files, including local LaTeX includes and BibTeX files. |
+| `CITEGUARD_SUPPORT_ENGINE` | `auto` | `auto`, `heuristic`, or `production`; `heuristic` keeps offline and low-resource checks from loading model weights. |
 | `CITEGUARD_RERANKER_MODEL` | built-in default | Claim-support reranker model. |
 | `CITEGUARD_NLI_MODEL` | built-in default | Claim-support NLI model. |
 
 `citeguard_status_tool` exposes `support_models.engine`,
+`support_models.requested_engine`, `support_models.model_loading_enabled`,
 `support_models.deep_models_available`, `support_models.missing_dependencies`,
 and `support_models.next_action`. If `next_action=install_or_configure_dependency`,
 tell the user that claim-support checks are running in `heuristic_fallback`
 mode and suggest installing `citationguard[models]` first. For local development,
 use `.[models]` from a source checkout, then run
 `citeguard models warmup` before relying on deep reranker/NLI
-support. If `support_models.install_hint` is present, quote that package-first
-hint instead of inventing a local install command.
+support. If `requested_engine=heuristic`, the fallback is deliberate: keep the
+lower-confidence label but do not recommend installation unless the user asks for
+deep support checks. If `support_models.install_hint` is present, quote that
+package-first hint instead of inventing a local install command.
 
 ## Offline Replay
 

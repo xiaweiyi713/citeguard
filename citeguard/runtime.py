@@ -15,6 +15,7 @@ from citeguard.retrieval.scholarly_clients import InMemoryMetadataSource
 from citeguard.retrieval.scholarly_clients.evidence import BLOCKED_EVIDENCE_HOST_SUFFIXES
 from citeguard.retrieval.scholarly_clients.factory import polite_user_agent
 from citeguard.runtime_health import polite_access_status, source_health_status
+from citeguard.runtime_metrics import metrics_status
 from citeguard.runtime_config import (
     CONTACT_REQUIRED_SOURCES,
     DEFAULT_MAILTO,
@@ -52,6 +53,7 @@ __all__ = [
     "http_retry_backoff",
     "http_timeout",
     "load_fixture_records",
+    "metrics_status",
     "negative_cache_ttl",
     "polite_access_status",
     "remote_evidence_enabled",
@@ -395,6 +397,7 @@ def environment_status(
         "cache_parent_exists": cache_parent_exists,
         "cache_parent_writable": cache_parent_writable,
         "cache_status": cache_status,
+        "runtime_metrics": metrics_status(active_env),
         "http_timeout_seconds": configured_http_timeout,
         "http_retries": configured_http_retries,
         "http_retry_backoff_seconds": configured_http_retry_backoff,

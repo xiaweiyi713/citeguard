@@ -424,8 +424,10 @@ class CheckClaimSupportTests(unittest.TestCase):
         self.assertEqual(payload["query_plan"][0]["role"], "claim_similarity")
         self.assertIn("improvement_negation", {item["role"] for item in payload["query_plan"]})
         self.assertEqual(len(payload["query_results"]), len(payload["queries"]))
+        self.assertTrue(all(item["sources_responded"] == ["memory"] for item in payload["query_results"]))
         self.assertIn("improvement_negation", payload["candidates"][0]["matched_query_roles"])
         self.assertTrue(payload["candidates"][0]["matched_queries"])
+        self.assertEqual(payload["candidates"][0]["sources"], ["memory"])
         self.assertEqual(payload["review_summary"]["candidate_count"], payload["candidate_count"])
         self.assertEqual(payload["review_summary"]["signal_counts"]["explicit_contradiction_cue"], 1)
         self.assertGreaterEqual(payload["review_summary"]["matched_query_role_counts"]["improvement_negation"], 1)
@@ -449,8 +451,33 @@ class CheckClaimSupportTests(unittest.TestCase):
         self.assertEqual(payload["review_summary"]["policy"], "review_leads_not_contradiction_verdicts")
         self.assertIn("review leads", payload["interpretation"])
         self.assertEqual(payload["source_failure_mode"], "none")
+        self.assertEqual(payload["sources_responded"], ["memory"])
         self.assertEqual(payload["sources_available"], ["metadata_source"])
         self.assertEqual(payload["next_action"], "review_counterevidence_leads")
+
+    def test_counterevidence_response_provenance_is_not_lost_when_top_k_is_zero(self):
+        source = InMemoryMetadataSource(
+            [
+                CitationRecord(
+                    citation_id="retrieved-but-not-returned",
+                    title="Method M Does Not Improve Task T",
+                    abstract="Method M does not improve task T accuracy.",
+                    source="memory",
+                )
+            ]
+        )
+
+        payload = search_counterevidence_candidates(
+            "Method M improves task T.",
+            source,
+            top_k=0,
+        ).to_dict()
+
+        self.assertEqual(payload["candidate_count"], 0)
+        self.assertEqual(payload["sources_responded"], ["memory"])
+        self.assertTrue(all(item["sources_responded"] == ["memory"] for item in payload["query_results"]))
+        self.assertEqual(payload["source_failure_mode"], "none")
+        self.assertFalse(payload["outage_limited"])
 
     def test_search_counterevidence_candidates_flags_source_outage_safety_leads(self):
         safety_record = CitationRecord(

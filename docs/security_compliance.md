@@ -84,6 +84,41 @@ integrity tribunal, or substitute for human review.
 - Do not place private manuscripts, reviewer notes, or unpublished bibliographies
   in public examples or fixtures.
 
+## Optional Local Metrics
+
+- Runtime metrics are disabled unless `CITEGUARD_METRICS_PATH` is set. They are
+  written only to that local JSONL file and are never transmitted over the
+  network.
+- Each event has only a fixed tool/command name, success or failure outcome,
+  duration bucket, and timestamp. CiteGuard never records citation metadata,
+  DOI/arXiv identifiers, claim text, evidence, document paths, URLs, cache
+  values, source responses, user identity, or environment values.
+- `citeguard status` reports whether metrics are enabled but deliberately does
+  not expose the configured metrics path. Any metrics write failure is ignored
+  so it cannot affect a CLI result or MCP tool response.
+- Metrics reject symbolic-link and non-regular destinations. On platforms with
+  POSIX file modes, CiteGuard restricts the metrics file to owner read/write
+  permissions before appending an event.
+
+## Supply Chain
+
+- Release SBOMs are generated with `scripts/generate_sbom.py` as deterministic
+  CycloneDX 1.5 documents. They describe only declared package dependencies and
+  contain no user queries, document text, cache values, local paths, or runtime
+  telemetry.
+- CI separately resolves the default runtime dependency set and runs
+  `pip-audit` with strict failure behavior. The `Publish` build installs the
+  supported model and PDF extras and runs the same strict audit before it can
+  publish. A vulnerability database lookup is a CI/release operation, not a
+  normal CLI or MCP request.
+- The published dependency floors currently keep the MCP v1 integration below
+  SDK v2, require `cryptography>=50` on Python 3.10+, and require
+  `pypdf>=6.14.2,<7` for the PDF extra. These floors are checked in the SBOM
+  and release metadata gates and should move only with a fresh audit.
+- GitHub Actions used by CI and publishing are pinned to full commit SHAs.
+  Dependabot opens scheduled updates for both workflow actions and Python
+  dependencies, so those pins are reviewed changes rather than mutable tags.
+
 ## Responsible Use Statement
 
 CiteGuard is designed to help writers and agents become more skeptical about

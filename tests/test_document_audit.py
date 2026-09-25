@@ -9,6 +9,7 @@ import os
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 import zipfile
 
 from jsonschema import Draft202012Validator
@@ -383,6 +384,164 @@ class DocumentAuditTests(unittest.TestCase):
         self.assertIn("Insufficient evidence", html)
         self.assertIn('lang="en"', html)
         self.assertIn("outperform recurrence on all tasks", html_text)
+
+    def test_html_keeps_unreferenced_bibliography_findings_beside_claim_reviews(self):
+        from citeguard.verification.document_report import render_document_audit_html
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            document = root / "paper.md"
+            document.write_text(
+                "The Transformer uses attention [1].\n\n"
+                "## References\n\n"
+                "1. Vaswani, A. Attention Is All You Need. NeurIPS, 2017. arXiv:1706.03762.\n"
+                "2. Unknown, U. Ghost Citation. Imaginary Journal, 2026. DOI: 10.9999/ghost-citation.\n",
+                encoding="utf-8",
+            )
+            payload = audit_document(str(document), source=_source(), allowed_roots=[str(root)])
+            html_path = root / "audit.html"
+            code = run(
+                ["audit-document", str(document), "--allowed-root", str(root), "--html", str(html_path)],
+                source=_source(),
+                stdout=io.StringIO(),
+            )
+            html_text = html_path.read_text(encoding="utf-8")
+
+        self.assertTrue(payload["claim_reviews"])
+        self.assertTrue(any("Ghost Citation" in item.get("raw_text", "") for item in payload["extraction"]["candidates"]))
+        self.assertEqual(payload["manuscript_summary"]["incomplete_count"], payload["review_queue_summary"]["count"])
+        self.assertGreater(
+            payload["manuscript_summary"]["category_counts"]["metadata"], 0,
+            (payload["review_queue"], payload["manuscript_summary"]),
+        )
+        self.assertIn("Ghost Citation", render_document_audit_html(payload))
+        self.assertIn("The Transformer uses attention", render_document_audit_html(payload))
+        self.assertEqual(code, 0)
+        self.assertIn("Ghost Citation", html_text)
+
+    def test_high_risk_filter_does_not_reassign_bibliography_results_to_claims(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            document = root / "paper.md"
+            document.write_text(
+                "The Transformer uses attention [1]. A missing paper is cited here [2].\n\n"
+                "## References\n\n"
+                "1. Vaswani, A. Attention Is All You Need. NeurIPS, 2017. arXiv:1706.03762.\n"
+                "2. Unknown, U. Ghost Citation. Imaginary Journal, 2026. DOI: 10.9999/ghost-citation.\n",
+                encoding="utf-8",
+            )
+            full = audit_document(str(document), source=_source(), allowed_roots=[str(root)])
+            filtered = audit_document(
+                str(document), source=_source(), allowed_roots=[str(root)], high_risk_only=True
+            )
+
+        self.assertEqual(len(full["audit"]["results"]), 2)
+        self.assertEqual(filtered["audit"]["filtered"]["returned_indexes"], [1])
+        self.assertEqual(len(filtered["audit"]["results"]), 1)
+        self.assertEqual(filtered["claim_reviews"], full["claim_reviews"])
+        self.assertEqual(filtered["review_queue"], full["review_queue"])
+        self.assertEqual(filtered["manuscript_summary"], full["manuscript_summary"])
+        self.assertNotEqual(full["claim_reviews"][0]["identity_verdict"], "not_found")
+        from citeguard.verification.document_report import render_document_audit_html
+
+        self.assertIn("<strong>Verification:</strong> not_found", render_document_audit_html(filtered))
+
+    def test_html_output_cannot_overwrite_document_or_its_aliases(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            document = root / "paper.md"
+            original = "## References\n\n1. Vaswani, A. Attention Is All You Need. arXiv:1706.03762.\n"
+            document.write_text(original, encoding="utf-8")
+            aliases = [document]
+            hardlink = root / "hardlink.html"
+            os.link(document, hardlink)
+            aliases.append(hardlink)
+            if os.name != "nt":
+                symlink = root / "symlink.html"
+                symlink.symlink_to(document)
+                aliases.append(symlink)
+
+            for output in aliases:
+                with self.subTest(output=output.name):
+                    stderr = io.StringIO()
+                    code = run(
+                        ["audit-document", str(document), "--allowed-root", str(root), "--html", str(output)],
+                        source=_source(), stdout=io.StringIO(), stderr=stderr,
+                    )
+                    self.assertEqual(code, 2)
+                    error = json.loads(stderr.getvalue())["error"]
+                    self.assertEqual(error["code"], "invalid_input")
+                    self.assertEqual(error["details"]["field"], "html")
+                    self.assertEqual(document.read_text(encoding="utf-8"), original)
+                    self.assertEqual(output.read_text(encoding="utf-8"), original)
+
+            existing_report = root / "report.html"
+            existing_report.write_text("stale", encoding="utf-8")
+            code = run(
+                ["audit-document", str(document), "--allowed-root", str(root), "--html", str(existing_report)],
+                source=_source(), stdout=io.StringIO(), stderr=io.StringIO(),
+            )
+            self.assertEqual(code, 0)
+            self.assertIn("CiteGuard manuscript audit", existing_report.read_text(encoding="utf-8"))
+            self.assertFalse(list(root.glob(".report.html.*.tmp")))
+
+    def test_html_output_cannot_overwrite_bibtex_dependency(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            document = root / "paper.tex"
+            bibliography = root / "refs.bib"
+            document.write_text("Citation \\cite{attention}.\n\\bibliography{refs}\n", encoding="utf-8")
+            original = "@article{attention, title={Attention Is All You Need}, year={2017}, eprint={1706.03762}}\n"
+            bibliography.write_text(original, encoding="utf-8")
+            stderr = io.StringIO()
+
+            code = run(
+                ["audit-document", str(document), "--allowed-root", str(root), "--html", str(bibliography)],
+                source=_source(), stdout=io.StringIO(), stderr=stderr,
+            )
+
+            self.assertEqual(code, 2)
+            self.assertEqual(json.loads(stderr.getvalue())["error"]["code"], "invalid_input")
+            self.assertEqual(bibliography.read_text(encoding="utf-8"), original)
+
+    def test_html_output_cannot_fill_a_missing_bibtex_dependency(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            document = root / "paper.tex"
+            bibliography = root / "refs.bib"
+            document.write_text("Citation \\cite{missing}.\n\\bibliography{refs}\n", encoding="utf-8")
+            payload = audit_document(str(document), source=_source(), allowed_roots=[str(root)])
+            self.assertTrue(payload["document"]["dependencies"]["missing"])
+            stderr = io.StringIO()
+
+            code = run(
+                ["audit-document", str(document), "--allowed-root", str(root), "--html", str(bibliography)],
+                source=_source(), stdout=io.StringIO(), stderr=stderr,
+            )
+
+            self.assertEqual(code, 2)
+            self.assertEqual(json.loads(stderr.getvalue())["error"]["code"], "invalid_input")
+            self.assertFalse(bibliography.exists())
+
+    def test_failed_html_replace_preserves_existing_report(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            document = root / "paper.md"
+            report = root / "report.html"
+            document.write_text("## References\n\n1. Vaswani, A. Attention Is All You Need. arXiv:1706.03762.\n", encoding="utf-8")
+            report.write_text("previous report", encoding="utf-8")
+            stderr = io.StringIO()
+
+            with patch("citeguard.cli.os.replace", side_effect=OSError("replace failed")):
+                code = run(
+                    ["audit-document", str(document), "--allowed-root", str(root), "--html", str(report)],
+                    source=_source(), stdout=io.StringIO(), stderr=stderr,
+                )
+
+            self.assertEqual(code, 2)
+            self.assertEqual(json.loads(stderr.getvalue())["error"]["code"], "file_error")
+            self.assertEqual(report.read_text(encoding="utf-8"), "previous report")
+            self.assertFalse(list(root.glob(".report.html.*.tmp")))
 
     def test_semicolon_clauses_are_reviewed_separately(self):
         source = InMemoryMetadataSource(

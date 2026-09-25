@@ -11,14 +11,31 @@ Keep repository-only evaluation and release work separate from the installed
 ## Evaluation workflow
 
 1. Validate the user-skill trigger set, then score decisions captured from the
-   target agent/client:
+   target agent/client. Before collecting a run, inspect the exact installed
+   Skill directory and carry its digest into the artifact:
 
    ```bash
    python scripts/eval_skill_trigger.py --validate-only
-   python scripts/eval_skill_trigger.py --write-template /tmp/citeguard-trigger-predictions.json
-   # Fill each triggered value after running the request through the target agent.
-   python scripts/eval_skill_trigger.py --predictions /tmp/citeguard-trigger-predictions.json
+   python -m citeguard skill status --client codex --scope user
+   python scripts/eval_skill_trigger.py --client codex \
+     --skill-path /absolute/path/to/.codex/skills/citeguard-verify \
+     --write-template /tmp/citeguard-trigger-codex.json
+   # Fill each triggered value after running every request through Codex.
+   python scripts/eval_skill_trigger.py --client codex \
+     --skill-path /absolute/path/to/.codex/skills/citeguard-verify \
+     --require-run-metadata \
+     --predictions /tmp/citeguard-trigger-codex.json
    ```
+
+   Repeat the capture independently for Claude and Cursor. `--skill-path`
+   must point to the installed bundle that the client actually loaded, not the
+   source checkout. When the installed directory is unavailable, record its
+   `sha256:` value from the target environment and use
+   `--expected-skill-digest` instead. Keep every prediction row's
+   `request_digest` unchanged; the evaluator rejects altered request text or
+   request digests and binds `dataset_digest` to the checked-in suite bytes.
+   Record the actual client version, suite id, and timezone-aware collection
+   timestamp in the run metadata before scoring.
 
 2. Audit label maturity:
 
@@ -34,6 +51,15 @@ Keep repository-only evaluation and release work separate from the installed
 5. Resolve dual-review disagreements before raising release thresholds.
 6. Run deterministic reports on the test split only after calibration choices
    are frozen.
+
+Keep the checked-in real-source candidate packet intact with:
+
+```bash
+python scripts/audit_human_support_candidates.py --strict
+```
+
+`release_package_gate.py` repeats this packet digest and gold-free policy check;
+do not bypass it by substituting flattened JSONL rows.
 
 For the strict publish-gate packet sizes and independent first/second-review
 commands, follow `docs/support_labeling_guidelines.md`; do not invent or copy

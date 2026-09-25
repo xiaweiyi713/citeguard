@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "campaign_id": "citeguard-human-support-v1",
+  "status": "collection",
+  "description": "First real human-reviewed support benchmark campaign. Synthetic seed cases, model outputs, and unreviewed candidates never count toward these targets.",
+  "targets": {
+    "minimum_case_count": 250,
+    "maximum_case_count": 300,
+    "minimum_by_language": {
+      "en": 100,
+      "zh": 100
+    },
+    "minimum_by_domain": {
+      "biomedicine": 75,
+      "computer_science": 75
+    },
+    "minimum_by_writing_context": {
+      "literature_review": 50
+    },
+    "minimum_by_evidence_scope": {
+      "abstract": 75,
+      "full_text": 75
+    }
+  },
+  "test_split": {
+    "minimum_case_count": 50,
+    "freeze_required_for_readiness": true
+  },
+  "allowed_values": {
+    "benchmark_origin": [
+      "real_source"
+    ],
+    "domain": [
+      "computer_science",
+      "biomedicine",
+      "other"
+    ],
+    "writing_context": [
+      "research_article",
+      "literature_review"
+    ],
+    "rights_basis": [
+      "public_abstract",
+      "open_access",
+      "user_provided",
+      "licensed"
+    ]
+  }
+}

@@ -113,7 +113,9 @@ line/paragraph locations plus a risk-sorted review queue. Markdown/LaTeX bodies
 also link in-text markers to bibliography entries and emit claim-level
 suggestions (sentence, evidence, rewrite hint); unmatched markers stay listed.
 `--html report.html` writes a local human-readable report from the same JSON
-model. It is suggestion-only
+model, including both claim reviews and flagged bibliography entries that are
+not cited in the body. The output path cannot be the manuscript or an included
+dependency. It is suggestion-only
 and never modifies the document; `not_found` still means "check the identity,"
 not "fabricated." `document.snapshot.digest` identifies the resolved input
 version read by the call; re-run the audit when the manuscript or an included

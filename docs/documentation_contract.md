@@ -37,12 +37,13 @@ Gate: `test_error_code_documentation_matches_public_registry`.
 
 ### 2. Bumping the version
 
-The version lives in **five** places and all must agree:
+The package version has one build source, with release metadata copies validated
+against it:
 
 | file | field |
 |---|---|
-| `pyproject.toml` | `version = "X.Y.Z"` |
-| `citeguard/version.py` | `__version__ = "X.Y.Z"` |
+| `citeguard/version.py` | `__version__ = "X.Y.Z"` (build source of truth) |
+| `pyproject.toml` | dynamic `citeguard.version.__version__` binding |
 | `server.json` | `"version"` (two occurrences) |
 | `CITATION.cff` | `version: "X.Y.Z"` |
 

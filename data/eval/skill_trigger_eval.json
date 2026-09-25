@@ -1,14 +1,936 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
+  "suite_id": "citeguard-skill-trigger-v2",
+  "minimum_case_count": 100,
+  "target_clients": [
+    "codex",
+    "claude",
+    "cursor"
+  ],
   "cases": [
-    {"id": "positive_check", "request": "Please check my citations before I submit.", "should_trigger": true},
-    {"id": "positive_bibliography", "request": "Audit this bibliography and flag references that do not resolve.", "should_trigger": true},
-    {"id": "positive_doi", "request": "Verify whether this DOI matches the title and year.", "should_trigger": true},
-    {"id": "positive_claim", "request": "Does this paper support this claim?", "should_trigger": true},
-    {"id": "positive_zh", "request": "帮我核验这些参考文献是否真实存在。", "should_trigger": true},
-    {"id": "negative_format", "request": "Convert these references to APA style only; do not verify them.", "should_trigger": false},
-    {"id": "negative_zh_format", "request": "只做格式转换，不要核验引用。", "should_trigger": false},
-    {"id": "negative_prose", "request": "Polish the prose in my introduction.", "should_trigger": false},
-    {"id": "negative_discussion", "request": "Explain the transformer architecture at a high level.", "should_trigger": false}
+    {
+      "id": "en-trigger-citation_identity-01",
+      "request": "Verify whether this paper title and DOI refer to the same publication.",
+      "should_trigger": true,
+      "language": "en",
+      "category": "citation_identity"
+    },
+    {
+      "id": "en-trigger-citation_identity-02",
+      "request": "Check if this arXiv identifier resolves to a real paper.",
+      "should_trigger": true,
+      "language": "en",
+      "category": "citation_identity"
+    },
+    {
+      "id": "en-trigger-citation_identity-03",
+      "request": "Can you verify these citations exist before I submit the manuscript?",
+      "should_trigger": true,
+      "language": "en",
+      "category": "citation_identity"
+    },
+    {
+      "id": "en-trigger-citation_identity-04",
+      "request": "Confirm whether the cited article is real or unresolved in scholarly sources.",
+      "should_trigger": true,
+      "language": "en",
+      "category": "citation_identity"
+    },
+    {
+      "id": "en-trigger-citation_identity-05",
+      "request": "Validate the DOI in this reference against its title and authors.",
+      "should_trigger": true,
+      "language": "en",
+      "category": "citation_identity"
+    },
+    {
+      "id": "en-trigger-citation_identity-06",
+      "request": "Please check these references for invented or mismatched papers.",
+      "should_trigger": true,
+      "language": "en",
+      "category": "citation_identity"
+    },
+    {
+      "id": "en-trigger-metadata_audit-01",
+      "request": "Audit this bibliography for title, author, year, and venue mismatches.",
+      "should_trigger": true,
+      "language": "en",
+      "category": "metadata_audit"
+    },
+    {
+      "id": "en-trigger-metadata_audit-02",
+      "request": "Check my reference list and flag metadata that does not match the source record.",
+      "should_trigger": true,
+      "language": "en",
+      "category": "metadata_audit"
+    },
+    {
+      "id": "en-trigger-metadata_audit-03",
+      "request": "Compare these citation details against the canonical scholarly metadata.",
+      "should_trigger": true,
+      "language": "en",
+      "category": "metadata_audit"
+    },
+    {
+      "id": "en-trigger-metadata_audit-04",
+      "request": "Review the bibliography and identify references needing DOI or year correction.",
+      "should_trigger": true,
+      "language": "en",
+      "category": "metadata_audit"
+    },
+    {
+      "id": "en-trigger-metadata_audit-05",
+      "request": "Validate the author list and publication year for every cited paper.",
+      "should_trigger": true,
+      "language": "en",
+      "category": "metadata_audit"
+    },
+    {
+      "id": "en-trigger-metadata_audit-06",
+      "request": "Find inconsistent citation metadata in this JSONL reference export.",
+      "should_trigger": true,
+      "language": "en",
+      "category": "metadata_audit"
+    },
+    {
+      "id": "en-trigger-document_audit-01",
+      "request": "Audit this Markdown manuscript file and point to references that need review.",
+      "should_trigger": true,
+      "language": "en",
+      "category": "document_audit"
+    },
+    {
+      "id": "en-trigger-document_audit-02",
+      "request": "Inspect my LaTeX paper for citations with exact source locations.",
+      "should_trigger": true,
+      "language": "en",
+      "category": "document_audit"
+    },
+    {
+      "id": "en-trigger-document_audit-03",
+      "request": "Check the references in this DOCX without editing the document.",
+      "should_trigger": true,
+      "language": "en",
+      "category": "document_audit"
+    },
+    {
+      "id": "en-trigger-document_audit-04",
+      "request": "Run a bounded audit on the BibTeX file in this project.",
+      "should_trigger": true,
+      "language": "en",
+      "category": "document_audit"
+    },
+    {
+      "id": "en-trigger-document_audit-05",
+      "request": "Review this BBL bibliography and return a suggestion-only fix queue.",
+      "should_trigger": true,
+      "language": "en",
+      "category": "document_audit"
+    },
+    {
+      "id": "en-trigger-document_audit-06",
+      "request": "Verify citations in the supplied manuscript and preserve line locators.",
+      "should_trigger": true,
+      "language": "en",
+      "category": "document_audit"
+    },
+    {
+      "id": "en-trigger-claim_support-01",
+      "request": "Does this cited paper actually support this claim sentence?",
+      "should_trigger": true,
+      "language": "en",
+      "category": "claim_support"
+    },
+    {
+      "id": "en-trigger-claim_support-02",
+      "request": "Check whether the reference supports my statement about benchmark performance.",
+      "should_trigger": true,
+      "language": "en",
+      "category": "claim_support"
+    },
+    {
+      "id": "en-trigger-claim_support-03",
+      "request": "Assess claim support for this paragraph and its cited paper.",
+      "should_trigger": true,
+      "language": "en",
+      "category": "claim_support"
+    },
+    {
+      "id": "en-trigger-claim_support-04",
+      "request": "Verify that this study entails the causal claim I wrote.",
+      "should_trigger": true,
+      "language": "en",
+      "category": "claim_support"
+    },
+    {
+      "id": "en-trigger-claim_support-05",
+      "request": "Compare this claim with the supplied full-text excerpt from the citation.",
+      "should_trigger": true,
+      "language": "en",
+      "category": "claim_support"
+    },
+    {
+      "id": "en-trigger-claim_support-06",
+      "request": "Tell me whether these papers jointly support this scientific conclusion.",
+      "should_trigger": true,
+      "language": "en",
+      "category": "claim_support"
+    },
+    {
+      "id": "en-trigger-counterevidence-01",
+      "request": "Find literature that may contradict this cited claim and keep it as review leads.",
+      "should_trigger": true,
+      "language": "en",
+      "category": "counterevidence"
+    },
+    {
+      "id": "en-trigger-counterevidence-02",
+      "request": "Search for possible counter-evidence to this conclusion.",
+      "should_trigger": true,
+      "language": "en",
+      "category": "counterevidence"
+    },
+    {
+      "id": "en-trigger-counterevidence-03",
+      "request": "Look for studies with conflicting findings about this claim.",
+      "should_trigger": true,
+      "language": "en",
+      "category": "counterevidence"
+    },
+    {
+      "id": "en-trigger-counterevidence-04",
+      "request": "Can you surface contrary papers worth checking before I rely on this citation?",
+      "should_trigger": true,
+      "language": "en",
+      "category": "counterevidence"
+    },
+    {
+      "id": "en-trigger-counterevidence-05",
+      "request": "Investigate whether there is counterevidence for the manuscript's main assertion.",
+      "should_trigger": true,
+      "language": "en",
+      "category": "counterevidence"
+    },
+    {
+      "id": "en-trigger-counterevidence-06",
+      "request": "Find scholarly sources that challenge this claim without calling it disproved.",
+      "should_trigger": true,
+      "language": "en",
+      "category": "counterevidence"
+    },
+    {
+      "id": "zh-trigger-citation_identity-01",
+      "request": "请核验这篇论文和 DOI 是否对应同一条真实记录。",
+      "should_trigger": true,
+      "language": "zh",
+      "category": "citation_identity"
+    },
+    {
+      "id": "zh-trigger-citation_identity-02",
+      "request": "帮我检查这个 arXiv 编号能否解析到真实论文。",
+      "should_trigger": true,
+      "language": "zh",
+      "category": "citation_identity"
+    },
+    {
+      "id": "zh-trigger-citation_identity-03",
+      "request": "投稿前请核验这些参考文献是否真实存在。",
+      "should_trigger": true,
+      "language": "zh",
+      "category": "citation_identity"
+    },
+    {
+      "id": "zh-trigger-citation_identity-04",
+      "request": "请确认这些引用是否能在学术来源中解析到。",
+      "should_trigger": true,
+      "language": "zh",
+      "category": "citation_identity"
+    },
+    {
+      "id": "zh-trigger-citation_identity-05",
+      "request": "核对这条参考文献的 DOI、标题和作者是否一致。",
+      "should_trigger": true,
+      "language": "zh",
+      "category": "citation_identity"
+    },
+    {
+      "id": "zh-trigger-citation_identity-06",
+      "request": "帮我排查参考文献里是否有编造或错配的论文。",
+      "should_trigger": true,
+      "language": "zh",
+      "category": "citation_identity"
+    },
+    {
+      "id": "zh-trigger-metadata_audit-01",
+      "request": "请审计这份参考文献，标出标题、作者、年份或期刊不一致的条目。",
+      "should_trigger": true,
+      "language": "zh",
+      "category": "metadata_audit"
+    },
+    {
+      "id": "zh-trigger-metadata_audit-02",
+      "request": "检查我的文献表并核对元数据是否正确。",
+      "should_trigger": true,
+      "language": "zh",
+      "category": "metadata_audit"
+    },
+    {
+      "id": "zh-trigger-metadata_audit-03",
+      "request": "请把这些引用和权威学术记录逐字段比对。",
+      "should_trigger": true,
+      "language": "zh",
+      "category": "metadata_audit"
+    },
+    {
+      "id": "zh-trigger-metadata_audit-04",
+      "request": "找出需要补 DOI 或修正年份的参考文献。",
+      "should_trigger": true,
+      "language": "zh",
+      "category": "metadata_audit"
+    },
+    {
+      "id": "zh-trigger-metadata_audit-05",
+      "request": "核验每篇论文的作者列表和发表年份。",
+      "should_trigger": true,
+      "language": "zh",
+      "category": "metadata_audit"
+    },
+    {
+      "id": "zh-trigger-metadata_audit-06",
+      "request": "检查这个 JSONL 参考文献导出中的元数据错误。",
+      "should_trigger": true,
+      "language": "zh",
+      "category": "metadata_audit"
+    },
+    {
+      "id": "zh-trigger-document_audit-01",
+      "request": "请审计这个 Markdown 文稿文件中的引用，并给出精确位置。",
+      "should_trigger": true,
+      "language": "zh",
+      "category": "document_audit"
+    },
+    {
+      "id": "zh-trigger-document_audit-02",
+      "request": "检查我的 LaTeX 论文引用，保留原始行号。",
+      "should_trigger": true,
+      "language": "zh",
+      "category": "document_audit"
+    },
+    {
+      "id": "zh-trigger-document_audit-03",
+      "request": "核验这个 DOCX 里的参考文献，但不要自动修改文档。",
+      "should_trigger": true,
+      "language": "zh",
+      "category": "document_audit"
+    },
+    {
+      "id": "zh-trigger-document_audit-04",
+      "request": "对项目中的 BibTeX 文件做受限审计。",
+      "should_trigger": true,
+      "language": "zh",
+      "category": "document_audit"
+    },
+    {
+      "id": "zh-trigger-document_audit-05",
+      "request": "请检查这个 BBL 文献表，返回仅建议的复核队列。",
+      "should_trigger": true,
+      "language": "zh",
+      "category": "document_audit"
+    },
+    {
+      "id": "zh-trigger-document_audit-06",
+      "request": "核验我提供的文稿引用，并保留来源定位信息。",
+      "should_trigger": true,
+      "language": "zh",
+      "category": "document_audit"
+    },
+    {
+      "id": "zh-trigger-claim_support-01",
+      "request": "这篇被引论文真的支持这句话吗？",
+      "should_trigger": true,
+      "language": "zh",
+      "category": "claim_support"
+    },
+    {
+      "id": "zh-trigger-claim_support-02",
+      "request": "请判断这条引用是否支撑我关于性能提升的论点。",
+      "should_trigger": true,
+      "language": "zh",
+      "category": "claim_support"
+    },
+    {
+      "id": "zh-trigger-claim_support-03",
+      "request": "核验这一段论述和引用论文之间的支撑关系。",
+      "should_trigger": true,
+      "language": "zh",
+      "category": "claim_support"
+    },
+    {
+      "id": "zh-trigger-claim_support-04",
+      "request": "请检查该研究是否能推出我写的因果结论。",
+      "should_trigger": true,
+      "language": "zh",
+      "category": "claim_support"
+    },
+    {
+      "id": "zh-trigger-claim_support-05",
+      "request": "把这个论点和我提供的论文全文摘录进行比对。",
+      "should_trigger": true,
+      "language": "zh",
+      "category": "claim_support"
+    },
+    {
+      "id": "zh-trigger-claim_support-06",
+      "request": "判断这组论文是否共同支持这个科学结论。",
+      "should_trigger": true,
+      "language": "zh",
+      "category": "claim_support"
+    },
+    {
+      "id": "zh-trigger-counterevidence-01",
+      "request": "请找可能反驳这个引用论点的文献，作为复核线索。",
+      "should_trigger": true,
+      "language": "zh",
+      "category": "counterevidence"
+    },
+    {
+      "id": "zh-trigger-counterevidence-02",
+      "request": "检索这项结论可能存在的反证。",
+      "should_trigger": true,
+      "language": "zh",
+      "category": "counterevidence"
+    },
+    {
+      "id": "zh-trigger-counterevidence-03",
+      "request": "找出对该论点有冲突发现的研究。",
+      "should_trigger": true,
+      "language": "zh",
+      "category": "counterevidence"
+    },
+    {
+      "id": "zh-trigger-counterevidence-04",
+      "request": "在我依赖这条引用前，帮我发现值得检查的相反论文。",
+      "should_trigger": true,
+      "language": "zh",
+      "category": "counterevidence"
+    },
+    {
+      "id": "zh-trigger-counterevidence-05",
+      "request": "调查文稿核心断言是否存在反证文献。",
+      "should_trigger": true,
+      "language": "zh",
+      "category": "counterevidence"
+    },
+    {
+      "id": "zh-trigger-counterevidence-06",
+      "request": "找挑战这个论点的学术来源，但不要直接判定它被证伪。",
+      "should_trigger": true,
+      "language": "zh",
+      "category": "counterevidence"
+    },
+    {
+      "id": "en-no-trigger-format_only-01",
+      "request": "Convert these references to APA style only; do not verify anything.",
+      "should_trigger": false,
+      "language": "en",
+      "category": "format_only"
+    },
+    {
+      "id": "en-no-trigger-format_only-02",
+      "request": "Reformat my bibliography as IEEE without checking whether papers exist.",
+      "should_trigger": false,
+      "language": "en",
+      "category": "format_only"
+    },
+    {
+      "id": "en-no-trigger-format_only-03",
+      "request": "Fix punctuation and capitalization in these citations only.",
+      "should_trigger": false,
+      "language": "en",
+      "category": "format_only"
+    },
+    {
+      "id": "en-no-trigger-format_only-04",
+      "request": "Change this reference list from MLA to Vancouver style.",
+      "should_trigger": false,
+      "language": "en",
+      "category": "format_only"
+    },
+    {
+      "id": "en-no-trigger-format_only-05",
+      "request": "Sort the bibliography alphabetically and leave factual checks out.",
+      "should_trigger": false,
+      "language": "en",
+      "category": "format_only"
+    },
+    {
+      "id": "en-no-trigger-format_only-06",
+      "request": "Normalize citation formatting but do not audit the sources.",
+      "should_trigger": false,
+      "language": "en",
+      "category": "format_only"
+    },
+    {
+      "id": "en-no-trigger-prose_edit-01",
+      "request": "Polish the prose in my introduction.",
+      "should_trigger": false,
+      "language": "en",
+      "category": "prose_edit"
+    },
+    {
+      "id": "en-no-trigger-prose_edit-02",
+      "request": "Make this literature review paragraph more concise.",
+      "should_trigger": false,
+      "language": "en",
+      "category": "prose_edit"
+    },
+    {
+      "id": "en-no-trigger-prose_edit-03",
+      "request": "Rewrite this abstract in a formal academic tone.",
+      "should_trigger": false,
+      "language": "en",
+      "category": "prose_edit"
+    },
+    {
+      "id": "en-no-trigger-prose_edit-04",
+      "request": "Correct grammar in this methods section.",
+      "should_trigger": false,
+      "language": "en",
+      "category": "prose_edit"
+    },
+    {
+      "id": "en-no-trigger-prose_edit-05",
+      "request": "Improve the transition between these two paragraphs.",
+      "should_trigger": false,
+      "language": "en",
+      "category": "prose_edit"
+    },
+    {
+      "id": "en-no-trigger-prose_edit-06",
+      "request": "Edit this conclusion for clarity without checking sources.",
+      "should_trigger": false,
+      "language": "en",
+      "category": "prose_edit"
+    },
+    {
+      "id": "en-no-trigger-general_discussion-01",
+      "request": "Explain the transformer architecture at a high level.",
+      "should_trigger": false,
+      "language": "en",
+      "category": "general_discussion"
+    },
+    {
+      "id": "en-no-trigger-general_discussion-02",
+      "request": "What is the difference between precision and recall?",
+      "should_trigger": false,
+      "language": "en",
+      "category": "general_discussion"
+    },
+    {
+      "id": "en-no-trigger-general_discussion-03",
+      "request": "Summarize the main ideas of causal inference.",
+      "should_trigger": false,
+      "language": "en",
+      "category": "general_discussion"
+    },
+    {
+      "id": "en-no-trigger-general_discussion-04",
+      "request": "Teach me how peer review works.",
+      "should_trigger": false,
+      "language": "en",
+      "category": "general_discussion"
+    },
+    {
+      "id": "en-no-trigger-general_discussion-05",
+      "request": "Discuss common limitations of randomized trials.",
+      "should_trigger": false,
+      "language": "en",
+      "category": "general_discussion"
+    },
+    {
+      "id": "en-no-trigger-general_discussion-06",
+      "request": "What makes a research question novel?",
+      "should_trigger": false,
+      "language": "en",
+      "category": "general_discussion"
+    },
+    {
+      "id": "en-no-trigger-citation_generation-01",
+      "request": "Suggest papers I could read about retrieval augmented generation.",
+      "should_trigger": false,
+      "language": "en",
+      "category": "citation_generation"
+    },
+    {
+      "id": "en-no-trigger-citation_generation-02",
+      "request": "Give me five references about climate adaptation.",
+      "should_trigger": false,
+      "language": "en",
+      "category": "citation_generation"
+    },
+    {
+      "id": "en-no-trigger-citation_generation-03",
+      "request": "Recommend recent books on qualitative research methods.",
+      "should_trigger": false,
+      "language": "en",
+      "category": "citation_generation"
+    },
+    {
+      "id": "en-no-trigger-citation_generation-04",
+      "request": "Find seminal papers for a new literature review topic.",
+      "should_trigger": false,
+      "language": "en",
+      "category": "citation_generation"
+    },
+    {
+      "id": "en-no-trigger-citation_generation-05",
+      "request": "Help me brainstorm search keywords for papers on fairness.",
+      "should_trigger": false,
+      "language": "en",
+      "category": "citation_generation"
+    },
+    {
+      "id": "en-no-trigger-citation_generation-06",
+      "request": "List influential studies in computational social science.",
+      "should_trigger": false,
+      "language": "en",
+      "category": "citation_generation"
+    },
+    {
+      "id": "en-no-trigger-research_planning-01",
+      "request": "Help me plan a user study for my thesis.",
+      "should_trigger": false,
+      "language": "en",
+      "category": "research_planning"
+    },
+    {
+      "id": "en-no-trigger-research_planning-02",
+      "request": "Design an experiment to compare two classifiers.",
+      "should_trigger": false,
+      "language": "en",
+      "category": "research_planning"
+    },
+    {
+      "id": "en-no-trigger-research_planning-03",
+      "request": "Outline a literature review structure for my dissertation.",
+      "should_trigger": false,
+      "language": "en",
+      "category": "research_planning"
+    },
+    {
+      "id": "en-no-trigger-research_planning-04",
+      "request": "Create a research timeline for the next semester.",
+      "should_trigger": false,
+      "language": "en",
+      "category": "research_planning"
+    },
+    {
+      "id": "en-no-trigger-research_planning-05",
+      "request": "Suggest interview questions for a field study.",
+      "should_trigger": false,
+      "language": "en",
+      "category": "research_planning"
+    },
+    {
+      "id": "en-no-trigger-research_planning-06",
+      "request": "Help me choose evaluation metrics for my model.",
+      "should_trigger": false,
+      "language": "en",
+      "category": "research_planning"
+    },
+    {
+      "id": "en-no-trigger-boundary_no_verification-01",
+      "request": "Quote this reference exactly as written; do not check it.",
+      "should_trigger": false,
+      "language": "en",
+      "category": "boundary_no_verification"
+    },
+    {
+      "id": "en-no-trigger-boundary_no_verification-02",
+      "request": "Translate these citations into Chinese but do not verify them.",
+      "should_trigger": false,
+      "language": "en",
+      "category": "boundary_no_verification"
+    },
+    {
+      "id": "en-no-trigger-boundary_no_verification-03",
+      "request": "Extract the references from this PDF for me, without auditing them.",
+      "should_trigger": false,
+      "language": "en",
+      "category": "boundary_no_verification"
+    },
+    {
+      "id": "en-no-trigger-boundary_no_verification-04",
+      "request": "Create BibTeX entries from these details as provided.",
+      "should_trigger": false,
+      "language": "en",
+      "category": "boundary_no_verification"
+    },
+    {
+      "id": "en-no-trigger-boundary_no_verification-05",
+      "request": "Explain what this paper title might mean without checking the record.",
+      "should_trigger": false,
+      "language": "en",
+      "category": "boundary_no_verification"
+    },
+    {
+      "id": "en-no-trigger-boundary_no_verification-06",
+      "request": "Keep these citations untouched while you rewrite the surrounding text.",
+      "should_trigger": false,
+      "language": "en",
+      "category": "boundary_no_verification"
+    },
+    {
+      "id": "zh-no-trigger-format_only-01",
+      "request": "只把这些参考文献转换成 APA 格式，不要核验。",
+      "should_trigger": false,
+      "language": "zh",
+      "category": "format_only"
+    },
+    {
+      "id": "zh-no-trigger-format_only-02",
+      "request": "请按 IEEE 格式重排文献表，不检查论文是否存在。",
+      "should_trigger": false,
+      "language": "zh",
+      "category": "format_only"
+    },
+    {
+      "id": "zh-no-trigger-format_only-03",
+      "request": "只修正引用里的标点和大小写。",
+      "should_trigger": false,
+      "language": "zh",
+      "category": "format_only"
+    },
+    {
+      "id": "zh-no-trigger-format_only-04",
+      "request": "把这份参考文献从 MLA 改成 Vancouver 格式。",
+      "should_trigger": false,
+      "language": "zh",
+      "category": "format_only"
+    },
+    {
+      "id": "zh-no-trigger-format_only-05",
+      "request": "按字母顺序排序文献表，不做事实核查。",
+      "should_trigger": false,
+      "language": "zh",
+      "category": "format_only"
+    },
+    {
+      "id": "zh-no-trigger-format_only-06",
+      "request": "统一引用格式，但不要审计来源。",
+      "should_trigger": false,
+      "language": "zh",
+      "category": "format_only"
+    },
+    {
+      "id": "zh-no-trigger-prose_edit-01",
+      "request": "润色我的引言文字。",
+      "should_trigger": false,
+      "language": "zh",
+      "category": "prose_edit"
+    },
+    {
+      "id": "zh-no-trigger-prose_edit-02",
+      "request": "把这段文献综述写得更简洁。",
+      "should_trigger": false,
+      "language": "zh",
+      "category": "prose_edit"
+    },
+    {
+      "id": "zh-no-trigger-prose_edit-03",
+      "request": "用正式学术语气改写这段摘要。",
+      "should_trigger": false,
+      "language": "zh",
+      "category": "prose_edit"
+    },
+    {
+      "id": "zh-no-trigger-prose_edit-04",
+      "request": "修改方法部分的语法错误。",
+      "should_trigger": false,
+      "language": "zh",
+      "category": "prose_edit"
+    },
+    {
+      "id": "zh-no-trigger-prose_edit-05",
+      "request": "改善这两段之间的过渡。",
+      "should_trigger": false,
+      "language": "zh",
+      "category": "prose_edit"
+    },
+    {
+      "id": "zh-no-trigger-prose_edit-06",
+      "request": "只提升结论表达的清晰度，不核验来源。",
+      "should_trigger": false,
+      "language": "zh",
+      "category": "prose_edit"
+    },
+    {
+      "id": "zh-no-trigger-general_discussion-01",
+      "request": "请用通俗语言解释 Transformer 架构。",
+      "should_trigger": false,
+      "language": "zh",
+      "category": "general_discussion"
+    },
+    {
+      "id": "zh-no-trigger-general_discussion-02",
+      "request": "precision 和 recall 有什么区别？",
+      "should_trigger": false,
+      "language": "zh",
+      "category": "general_discussion"
+    },
+    {
+      "id": "zh-no-trigger-general_discussion-03",
+      "request": "概述因果推断的核心思想。",
+      "should_trigger": false,
+      "language": "zh",
+      "category": "general_discussion"
+    },
+    {
+      "id": "zh-no-trigger-general_discussion-04",
+      "request": "同行评审通常是怎样进行的？",
+      "should_trigger": false,
+      "language": "zh",
+      "category": "general_discussion"
+    },
+    {
+      "id": "zh-no-trigger-general_discussion-05",
+      "request": "随机对照试验有哪些常见局限？",
+      "should_trigger": false,
+      "language": "zh",
+      "category": "general_discussion"
+    },
+    {
+      "id": "zh-no-trigger-general_discussion-06",
+      "request": "什么样的研究问题算有新意？",
+      "should_trigger": false,
+      "language": "zh",
+      "category": "general_discussion"
+    },
+    {
+      "id": "zh-no-trigger-citation_generation-01",
+      "request": "推荐一些关于检索增强生成的论文给我阅读。",
+      "should_trigger": false,
+      "language": "zh",
+      "category": "citation_generation"
+    },
+    {
+      "id": "zh-no-trigger-citation_generation-02",
+      "request": "给我五篇气候适应方向的参考文献。",
+      "should_trigger": false,
+      "language": "zh",
+      "category": "citation_generation"
+    },
+    {
+      "id": "zh-no-trigger-citation_generation-03",
+      "request": "推荐一些质性研究方法的经典书籍。",
+      "should_trigger": false,
+      "language": "zh",
+      "category": "citation_generation"
+    },
+    {
+      "id": "zh-no-trigger-citation_generation-04",
+      "request": "帮我找一个新综述主题的奠基论文。",
+      "should_trigger": false,
+      "language": "zh",
+      "category": "citation_generation"
+    },
+    {
+      "id": "zh-no-trigger-citation_generation-05",
+      "request": "帮我头脑风暴公平性研究的检索关键词。",
+      "should_trigger": false,
+      "language": "zh",
+      "category": "citation_generation"
+    },
+    {
+      "id": "zh-no-trigger-citation_generation-06",
+      "request": "列出计算社会科学领域有影响力的研究。",
+      "should_trigger": false,
+      "language": "zh",
+      "category": "citation_generation"
+    },
+    {
+      "id": "zh-no-trigger-research_planning-01",
+      "request": "帮我为论文规划一次用户研究。",
+      "should_trigger": false,
+      "language": "zh",
+      "category": "research_planning"
+    },
+    {
+      "id": "zh-no-trigger-research_planning-02",
+      "request": "设计一个比较两个分类器的实验。",
+      "should_trigger": false,
+      "language": "zh",
+      "category": "research_planning"
+    },
+    {
+      "id": "zh-no-trigger-research_planning-03",
+      "request": "给我的博士论文列一个文献综述大纲。",
+      "should_trigger": false,
+      "language": "zh",
+      "category": "research_planning"
+    },
+    {
+      "id": "zh-no-trigger-research_planning-04",
+      "request": "制定下学期的研究时间表。",
+      "should_trigger": false,
+      "language": "zh",
+      "category": "research_planning"
+    },
+    {
+      "id": "zh-no-trigger-research_planning-05",
+      "request": "为田野研究设计访谈问题。",
+      "should_trigger": false,
+      "language": "zh",
+      "category": "research_planning"
+    },
+    {
+      "id": "zh-no-trigger-research_planning-06",
+      "request": "帮我选择模型的评估指标。",
+      "should_trigger": false,
+      "language": "zh",
+      "category": "research_planning"
+    },
+    {
+      "id": "zh-no-trigger-boundary_no_verification-01",
+      "request": "请原样引用这条参考文献，不要检查它。",
+      "should_trigger": false,
+      "language": "zh",
+      "category": "boundary_no_verification"
+    },
+    {
+      "id": "zh-no-trigger-boundary_no_verification-02",
+      "request": "把这些引用翻译成中文，但不要核验。",
+      "should_trigger": false,
+      "language": "zh",
+      "category": "boundary_no_verification"
+    },
+    {
+      "id": "zh-no-trigger-boundary_no_verification-03",
+      "request": "从这个 PDF 提取参考文献，不需要审计。",
+      "should_trigger": false,
+      "language": "zh",
+      "category": "boundary_no_verification"
+    },
+    {
+      "id": "zh-no-trigger-boundary_no_verification-04",
+      "request": "按给定信息生成 BibTeX 条目。",
+      "should_trigger": false,
+      "language": "zh",
+      "category": "boundary_no_verification"
+    },
+    {
+      "id": "zh-no-trigger-boundary_no_verification-05",
+      "request": "不查询记录，解释一下这个论文标题可能是什么意思。",
+      "should_trigger": false,
+      "language": "zh",
+      "category": "boundary_no_verification"
+    },
+    {
+      "id": "zh-no-trigger-boundary_no_verification-06",
+      "request": "改写周围文字时请保持这些引用完全不动。",
+      "should_trigger": false,
+      "language": "zh",
+      "category": "boundary_no_verification"
+    }
   ]
 }

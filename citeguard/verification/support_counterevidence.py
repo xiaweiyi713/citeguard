@@ -8,6 +8,7 @@ from typing import Any, Dict, List, Optional
 from citeguard.citation import normalize_text, tokenize_text
 from citeguard.graph import CitationRecord
 from citeguard.retrieval.scholarly_clients.base import MetadataSource
+from citeguard.retrieval.scholarly_clients.utils import record_source_names
 
 from .models import classify_source_failure_mode
 from .resolve import source_names
@@ -93,6 +94,9 @@ def search_counterevidence_candidates(
                 match["roles"].append(query_item["role"])
             if query_item["rationale"] not in match["rationales"]:
                 match["rationales"].append(query_item["rationale"])
+        query_responded = sorted(
+            {source_name for record in query_records for source_name in record_source_names(record)}
+        )
         failures.extend(query_failures)
         failure_details.extend(query_failure_details)
         query_results.append(
@@ -101,22 +105,26 @@ def search_counterevidence_candidates(
                 "role": query_item["role"],
                 "rationale": query_item["rationale"],
                 "returned": len(query_records),
+                "sources_responded": query_responded,
                 "sources_failed": sorted(set(query_failures)),
                 "source_failure_mode": classify_source_failure_mode(
                     checked,
                     sorted(set(query_failures)),
-                    sorted({record.source for record in query_records if record.source}),
+                    query_responded,
                 ),
             }
         )
 
+    unique_records = _dedupe_counterevidence_records(records)
     scored = _rank_counterevidence_records(
         cleaned_claim,
-        _dedupe_counterevidence_records(records),
+        unique_records,
         record_query_matches=record_query_matches,
     )
     candidates = [item for item in scored[: max(0, int(top_k))]]
-    responded = sorted({str(item.get("source", "")) for item in candidates if item.get("source")})
+    responded = sorted(
+        {source_name for record in unique_records for source_name in record_source_names(record)}
+    )
     failed = sorted(set(failures))
     failure_details = _dedupe_failure_details(failure_details)
     failed = sorted(
@@ -335,6 +343,7 @@ def _rank_counterevidence_records(
                     "arxiv_id": record.arxiv_id,
                     "url": record.url,
                     "source": record.source,
+                    "sources": record_source_names(record),
                     "score": round(score, 4),
                     "signal": (
                         "source_outage_safety_cue"

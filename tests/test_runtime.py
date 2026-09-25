@@ -179,8 +179,10 @@ class RuntimeConfigTests(unittest.TestCase):
                 function({name: "invalid"})
 
     def test_remote_evidence_is_disabled_by_default(self):
-        self.assertFalse(remote_evidence_enabled(env={}))
-        status = environment_status(env={}, module_checker=lambda name: False)
+        with tempfile.TemporaryDirectory() as tmpdir:
+            env = {"CITEGUARD_CACHE": os.path.join(tmpdir, "verification_cache.sqlite")}
+            self.assertFalse(remote_evidence_enabled(env=env))
+            status = environment_status(env=env, module_checker=lambda name: False)
         self.assertFalse(status["remote_evidence_enabled"])
         self.assertEqual(status["schema_version"], 1)
         self.assertFalse(status["remote_evidence_policy"]["enabled"])
@@ -207,6 +209,9 @@ class RuntimeConfigTests(unittest.TestCase):
         self.assertGreaterEqual(status["cache_status"]["entries"], 0)
         self.assertIn("search", status["cache_status"]["entry_prefixes"])
         self.assertEqual(status["cache_status"]["next_action"], "continue")
+        self.assertFalse(status["runtime_metrics"]["enabled"])
+        self.assertEqual(status["runtime_metrics"]["transport"], "disabled")
+        self.assertFalse(status["runtime_metrics"]["network_transmission"])
         support_models = status["support_models"]
         self.assertFalse(support_models["deep_models_available"])
         self.assertEqual(support_models["engine"], "heuristic_fallback")

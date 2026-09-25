@@ -1,0 +1,25 @@
+{
+  "backend": "production",
+  "case_count": 19,
+  "dataset": "data/eval/support_eval.json",
+  "label_sidecar": "",
+  "quality_gate": false,
+  "report": true,
+  "script": "scripts/eval_support.py",
+  "split": "test",
+  "thresholds": {
+    "max_false_support_count": 0,
+    "max_false_support_rate": 0.0,
+    "max_supported_disagreements": null,
+    "max_unresolved_disagreements": 0,
+    "max_weak_false_support_count": 0,
+    "min_contradiction_recall": 1.0,
+    "min_dual_annotated": 0,
+    "min_high_risk_reviewed": 0,
+    "min_high_risk_reviewed_by_language": {},
+    "min_human_reviewed": 0,
+    "min_raw_dual_agreement_rate": null,
+    "min_sidecar_coverage": 1.0,
+    "min_supported_precision": 1.0
+  }
+}

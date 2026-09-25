@@ -76,6 +76,7 @@ def attach_manuscript_audit(
     documents: Sequence[Mapping[str, Any]],
     bibliography: Sequence[Mapping[str, Any]],
     *,
+    audit_results: Optional[Sequence[Mapping[str, Any]]] = None,
     support_backend: Any = None,
 ) -> Dict[str, Any]:
     """Add in-text links, claim reviews, and a first-screen summary to a document audit."""
@@ -84,7 +85,7 @@ def attach_manuscript_audit(
 
     linked = link_document_citations(documents, bibliography)
     audit = _as_mapping(payload.get("audit"))
-    results = list(audit.get("results") or [])
+    results = list(audit_results) if audit_results is not None else list(audit.get("results") or [])
     claim_reviews = build_claim_reviews(
         linked,
         results,
@@ -95,7 +96,7 @@ def attach_manuscript_audit(
     review_queue.extend(_claim_review_queue_items(claim_reviews, start_rank=len(review_queue) + 1))
     for index, item in enumerate(review_queue, start=1):
         item["rank"] = index
-    manuscript_summary = build_manuscript_summary(payload, linked, claim_reviews)
+    manuscript_summary = build_manuscript_summary(payload, linked, claim_reviews, review_queue)
     updated = dict(payload)
     updated["body_links"] = linked["body_links"]
     updated["unlinked_markers"] = linked["unlinked_markers"]
@@ -252,16 +253,18 @@ def build_manuscript_summary(
     payload: Mapping[str, Any],
     linked: Mapping[str, Any],
     claim_reviews: Sequence[Mapping[str, Any]],
+    review_queue: Sequence[Mapping[str, Any]],
 ) -> Dict[str, Any]:
     audit = _as_mapping(payload.get("audit"))
     summary = _as_mapping(audit.get("summary"))
-    incomplete = 0
     document = _as_mapping(payload.get("document"))
     dependencies = _as_mapping(document.get("dependencies"))
-    if not dependencies.get("complete", True):
-        incomplete += len(list(dependencies.get("missing") or []))
-    incomplete += len(linked.get("unlinked_markers") or [])
-    incomplete += sum(1 for item in claim_reviews if item.get("issue") != "supported")
+    missing_dependencies = len(list(dependencies.get("missing") or [])) if not dependencies.get("complete", True) else 0
+    incomplete = len(review_queue) + missing_dependencies
+    actionable = [
+        *(_bibliography_review_items(payload)),
+        *(item for item in claim_reviews if item.get("issue") != "supported" and item.get("risk") != "low"),
+    ]
     issue_counts: Dict[str, int] = {}
     category_counts = {
         "metadata": 0,
@@ -269,7 +272,7 @@ def build_manuscript_summary(
         "contradiction": 0,
         "source_unavailable": 0,
     }
-    for item in claim_reviews:
+    for item in actionable:
         issue = str(item.get("issue") or "other")
         issue_counts[issue] = issue_counts.get(issue, 0) + 1
         category = str(item.get("category") or ISSUE_CATEGORY.get(issue, "other"))
@@ -282,7 +285,7 @@ def build_manuscript_summary(
             "sentence": item.get("sentence", ""),
             "next_action": item.get("next_action", ""),
         }
-        for item in claim_reviews[:5]
+        for item in actionable[:5]
     ]
     return {
         "citation_count": int(summary.get("verified", 0) or 0)
@@ -304,7 +307,14 @@ def render_document_audit_html(payload: Mapping[str, Any]) -> str:
 
     summary = _as_mapping(payload.get("manuscript_summary"))
     document = _as_mapping(payload.get("document"))
-    reviews = list(payload.get("claim_reviews") or payload.get("review_queue") or [])
+    claim_reviews = list(payload.get("claim_reviews") or [])
+    if not claim_reviews:
+        claim_reviews = [
+            item for item in payload.get("review_queue") or []
+            if isinstance(item, Mapping) and "issue" in item
+        ]
+    bibliography_reviews = _bibliography_review_items(payload)
+    reviews = [*bibliography_reviews, *claim_reviews]
     path = html.escape(str(document.get("path") or ""))
     citation_count = int(summary.get("citation_count") or 0)
     in_text_count = int(summary.get("in_text_count") or 0)
@@ -313,7 +323,7 @@ def render_document_audit_html(payload: Mapping[str, Any]) -> str:
     lang = _html_lang(payload, reviews)
     copy = _HTML_COPY[lang]
     empty_evidence = html.escape(copy["no_evidence"])
-    grouped = _group_reviews_for_html(reviews)
+    grouped = _group_reviews_for_html(claim_reviews)
     metadata_n = int(categories.get("metadata") or 0)
     evidence_n = int(categories.get("insufficient_evidence") or 0)
     contradiction_n = int(categories.get("contradiction") or 0)
@@ -323,17 +333,25 @@ def render_document_audit_html(payload: Mapping[str, Any]) -> str:
         f"<li>{html.escape(str(item.get('issue') or ''))}: {html.escape(str(item.get('sentence') or item.get('locator') or ''))}</li>"
         for item in top
     ) or f"<li>{html.escape(copy['empty_queue'])}</li>"
-    metadata_body = _html_review_articles(grouped["metadata"], copy, empty_evidence) or (
+    metadata_body = (
+        _html_bibliography_articles(
+            [item for item in bibliography_reviews if item["family"] == "metadata"], copy
+        )
+        + _html_review_articles(grouped["metadata"], copy, empty_evidence)
+    ) or (
         "<p>" + html.escape(copy["empty_queue"]) + "</p>"
     )
     claim_body = _html_review_articles(grouped["claim"], copy, empty_evidence) or (
         "<p>" + html.escape(copy["empty_queue"]) + "</p>"
     )
     source_section = ""
-    if grouped["source"]:
+    source_body = _html_bibliography_articles(
+        [item for item in bibliography_reviews if item["family"] == "source"], copy
+    ) + _html_review_articles(grouped["source"], copy, empty_evidence)
+    if source_body:
         source_section = (
             f"<section>\n<h2>{html.escape(copy['source_reviews'])}</h2>\n"
-            f"{_html_review_articles(grouped['source'], copy, empty_evidence)}\n"
+            f"{source_body}\n"
             "</section>\n"
         )
     return (
@@ -343,7 +361,7 @@ def render_document_audit_html(payload: Mapping[str, Any]) -> str:
         "margin:1.5rem;max-width:52rem;color:#111}"
         "h1,h2,h3{line-height:1.2} .summary,.priority,.review{border:1px solid #ddd;"
         "padding:1rem;margin:1rem 0} pre.diff{white-space:pre-wrap;background:#f6f6f6;padding:.75rem}"
-        ".meta{color:#555;font-size:.9rem}\n</style>\n</head>\n<body>\n"
+        ".review{overflow-wrap:anywhere}.meta{color:#555;font-size:.9rem}\n</style>\n</head>\n<body>\n"
         f"<h1>{html.escape(copy['title'])}</h1>\n"
         f"<p class=\"meta\">{html.escape(copy['source'])}: {path}</p>\n"
         "<section class=\"summary\">\n"
@@ -455,10 +473,11 @@ _HTML_COPY = {
         "metadata_reviews": "Bibliography / identity",
         "claim_reviews": "Claim wording",
         "source_reviews": "Source unavailable",
-        "empty_queue": "No claim-level issues queued.",
+        "empty_queue": "No issues queued.",
         "no_links": "No in-text citations were linked in this file.",
         "locator": "locator",
         "next": "next",
+        "verdict": "Verification",
         "sentence": "Citing sentence",
         "problem": "Problem",
         "evidence": "Evidence",
@@ -481,10 +500,11 @@ _HTML_COPY = {
         "metadata_reviews": "文献元数据 / 身份",
         "claim_reviews": "论点改写",
         "source_reviews": "来源不可用",
-        "empty_queue": "没有待复核的论点。",
+        "empty_queue": "没有待复核项目。",
         "no_links": "这份文稿没有连上正文引用。",
         "locator": "位置",
         "next": "下一步",
+        "verdict": "核验结果",
         "sentence": "引用句",
         "problem": "问题",
         "evidence": "证据",
@@ -510,11 +530,64 @@ def _review_family(item: Mapping[str, Any]) -> str:
     return ISSUE_FAMILY.get(str(item.get("issue") or ""), "claim")
 
 
+def _bibliography_review_items(payload: Mapping[str, Any]) -> List[Dict[str, Any]]:
+    extraction = _as_mapping(payload.get("extraction"))
+    audit = _as_mapping(payload.get("audit"))
+    candidates = list(extraction.get("candidates") or [])
+    results = list(audit.get("results") or [])
+    filtered = _as_mapping(audit.get("filtered"))
+    returned_indexes = filtered.get("returned_indexes")
+    if isinstance(returned_indexes, list):
+        indexed_results = {
+            index: _as_mapping(result)
+            for index, result in zip(returned_indexes, results)
+            if isinstance(index, int)
+        }
+    else:
+        indexed_results = {index: _as_mapping(result) for index, result in enumerate(results)}
+    reviews: List[Dict[str, Any]] = []
+    for item in payload.get("review_queue") or []:
+        if not isinstance(item, Mapping) or "issue" in item:
+            continue
+        index = item.get("index")
+        candidate = _as_mapping(candidates[index]) if isinstance(index, int) and 0 <= index < len(candidates) else {}
+        result = indexed_results.get(index, {}) if isinstance(index, int) else {}
+        suggested_fix = _as_mapping(item.get("suggested_fix"))
+        family = "source" if suggested_fix.get("kind") == "retry_or_check_source_health" else "metadata"
+        title = str(candidate.get("title") or candidate.get("raw_text") or candidate.get("doi") or item.get("locator") or "")
+        reviews.append(
+            {
+                "family": family,
+                "category": ISSUE_CATEGORY[ISSUE_SOURCE_UNAVAILABLE if family == "source" else ISSUE_IDENTITY],
+                "issue": ISSUE_SOURCE_UNAVAILABLE if family == "source" else ISSUE_IDENTITY,
+                "sentence": title,
+                "locator": item.get("locator", ""),
+                "next_action": item.get("next_action", ""),
+                "verdict": result.get("verdict") or suggested_fix.get("kind") or "review_required",
+            }
+        )
+    return reviews
+
+
 def _group_reviews_for_html(reviews: Sequence[Mapping[str, Any]]) -> Dict[str, List[Mapping[str, Any]]]:
     grouped: Dict[str, List[Mapping[str, Any]]] = {"metadata": [], "claim": [], "source": []}
     for item in reviews:
         grouped[_review_family(item)].append(item)
     return grouped
+
+
+def _html_bibliography_articles(reviews: Sequence[Mapping[str, Any]], copy: Mapping[str, str]) -> str:
+    rows = []
+    for item in reviews:
+        rows.append(
+            '<article class="review">'
+            f"<h3>{html.escape(str(item.get('sentence') or ''))}</h3>"
+            f"<p class=\"meta\">{html.escape(copy['locator'])}: {html.escape(str(item.get('locator') or ''))} · "
+            f"{html.escape(copy['next'])}: {html.escape(str(item.get('next_action') or ''))}</p>"
+            f"<p><strong>{html.escape(copy['verdict'])}:</strong> {html.escape(str(item.get('verdict') or ''))}</p>"
+            "</article>"
+        )
+    return "".join(rows)
 
 
 def _html_review_articles(
@@ -528,7 +601,8 @@ def _html_review_articles(
         evidence = html.escape(str(item.get("evidence_text") or ""))
         problem = html.escape(str(item.get("problem") or item.get("issue") or ""))
         suggestion = html.escape(str(item.get("suggestion") or ""))
-        rewritten = item.get("rewritten") if isinstance(item.get("rewritten"), Mapping) else {}
+        rewritten_value = item.get("rewritten")
+        rewritten = rewritten_value if isinstance(rewritten_value, Mapping) else {}
         before = html.escape(str(rewritten.get("before") or item.get("sentence") or ""))
         after = html.escape(str(rewritten.get("after") or ""))
         article = (

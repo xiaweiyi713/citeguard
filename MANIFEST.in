@@ -11,6 +11,7 @@ recursive-include data/eval *.json
 recursive-include skills *.md *.yaml
 recursive-include scripts *.py
 recursive-include configs *.yaml
+recursive-include citeguard/contracts *.json
 prune docs/superpowers
 prune docs/issues
 prune docs/plans

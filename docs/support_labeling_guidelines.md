@@ -112,12 +112,17 @@ the compact benchmark cases. Each sidecar entry should include:
   `published_benchmark`.
 - `annotator_count`: number of independent labels recorded.
 - `annotator_labels`: labels before discussion or adjudication.
+- `annotator_ids`: stable pseudonymous reviewer IDs, one distinct ID per independent label.
 - `adjudicated_label`: final label; it must match the dataset `gold`.
 - `disagreement`: `none`, `resolved`, `unresolved`, or `not_applicable`.
 - `adjudicator`: required when `adjudication_status` is
   `dual_annotator_adjudicated`.
 - `source_locator`: DOI, URL, corpus id, or blank for synthetic examples.
 - `notes`: provenance or disagreement details.
+
+Missing reviewer IDs remain visible as legacy/incomplete provenance. They must
+not count toward the independently double-annotated total used for a real
+benchmark claim.
 
 Seed sidecar entries also copy read-only dataset context fields
 (`label_source`, `case_type`, `evidence_scope`, `split`, and `lang`) so review
@@ -130,7 +135,7 @@ sidecar coverage from missing per-field provenance on otherwise present cases.
 such examples as a human-reviewed benchmark. Use `dual_annotator_adjudicated`
 for high-stakes final benchmark cases with resolved reviewer disagreement.
 Sidecar validation reports a `label_maturity` block with `reviewed_fraction`,
-`dual_annotated_count`, `raw_dual_agreement_rate`, `adjudicated_count`,
+`dual_annotated_count`, `dual_independent_count`, `raw_dual_agreement_rate`, `adjudicated_count`,
 `resolved_disagreement_count`, `unresolved_disagreement_count`,
 `disagreement_case_ids`, `unresolved_disagreement_case_ids`,
 `dual_label_pair_counts`, `dual_disagreement_label_pair_counts`, and

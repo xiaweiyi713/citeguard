@@ -294,7 +294,10 @@ disappearing. `--html PATH` writes a local HTML report from the same JSON
 model; stdout remains JSON. Each candidate and queue item
 has a `document_locator`: `path#line-N` or `path#lines-N-M` for text files, and
 `path#paragraph-N` or `path#paragraphs-N-M` for DOCX. `--high-risk-only`
-filters the nested audit rows but preserves the full review queue.
+filters the nested audit rows but preserves the full review queue. Claim
+reviews and HTML findings still use the complete identity results by original
+bibliography index, so filtering cannot reassign a paper's verdict to a
+different citing sentence.
 
 `document.snapshot.digest` is a content-addressed snapshot of the resolved files
 read during this call. `document.snapshot.files[]` exposes each file's byte count,

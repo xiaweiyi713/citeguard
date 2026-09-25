@@ -27,6 +27,7 @@ def load_support_label_sidecar(path: str, cases: List[SupportCase]) -> List[Supp
             adjudication_status=str(item["adjudication_status"]),
             annotator_count=int(item.get("annotator_count", 0)),
             annotator_labels=[str(label) for label in item.get("annotator_labels", [])],
+            annotator_ids=[str(annotator_id) for annotator_id in item.get("annotator_ids", [])],
             adjudicated_label=str(item.get("adjudicated_label", "")),
             disagreement=str(item.get("disagreement", "none")),
             adjudicator=str(item.get("adjudicator", "")),
@@ -64,6 +65,9 @@ def build_support_label_sidecar_template(
     for case in cases:
         item = dict(existing_by_id.get(case.case_id, _sidecar_placeholder_for_case(case)))
         item.update(_sidecar_case_provenance_fields(case))
+        item.setdefault("annotator_ids", [])
+        if case.source_locator and not str(item.get("source_locator", "")).strip():
+            item["source_locator"] = case.source_locator
         if include_context:
             item.update(
                 {
@@ -94,6 +98,7 @@ def _sidecar_placeholder_for_case(case: SupportCase) -> Dict[str, Any]:
         "adjudication_status": "not_human_reviewed",
         "annotator_count": 0,
         "annotator_labels": [],
+        "annotator_ids": [],
         "adjudicated_label": case.gold,
         "disagreement": "not_applicable",
         "adjudicator": "",
@@ -145,6 +150,7 @@ def validate_support_label_sidecar(data: Dict[str, Any], cases: List[SupportCase
         case_id = str(item.get("case_id", "")).strip()
         status = str(item.get("adjudication_status", "")).strip()
         annotator_labels = item.get("annotator_labels", [])
+        annotator_ids = item.get("annotator_ids", [])
         adjudicated_label = str(item.get("adjudicated_label", "")).strip()
         disagreement = str(item.get("disagreement", "none")).strip()
         annotator_count = item.get("annotator_count", 0)
@@ -177,8 +183,18 @@ def validate_support_label_sidecar(data: Dict[str, Any], cases: List[SupportCase
         if not isinstance(annotator_labels, list):
             errors.append(f"sidecar case {case_id or index} annotator_labels must be a list")
             annotator_labels = []
+        if not isinstance(annotator_ids, list):
+            errors.append(f"sidecar case {case_id or index} annotator_ids must be a list")
+            annotator_ids = []
+        normalized_annotator_ids = [str(annotator_id).strip() for annotator_id in annotator_ids]
+        if any(not annotator_id for annotator_id in normalized_annotator_ids):
+            errors.append(f"sidecar case {case_id or index} annotator_ids must not contain empty values")
+        if len(set(normalized_annotator_ids)) != len(normalized_annotator_ids):
+            errors.append(f"sidecar case {case_id or index} annotator_ids must be unique")
         if annotator_count and len(annotator_labels) != annotator_count:
             errors.append(f"sidecar case {case_id or index} annotator_labels length must match annotator_count")
+        if annotator_ids and len(annotator_ids) != annotator_count:
+            errors.append(f"sidecar case {case_id or index} annotator_ids length must match annotator_count")
         for label in annotator_labels:
             if label not in ALLOWED_SUPPORT_LABELS:
                 errors.append(f"sidecar case {case_id or index} has unsupported annotator label {label!r}")
@@ -192,6 +208,8 @@ def validate_support_label_sidecar(data: Dict[str, Any], cases: List[SupportCase
             errors.append(f"sidecar case {case_id or index} single_annotator requires annotator_count 1")
         if status.startswith("dual_annotator") and annotator_count < 2:
             errors.append(f"sidecar case {case_id or index} dual annotation requires annotator_count >= 2")
+        if status.startswith("dual_annotator") and annotator_ids and len(normalized_annotator_ids) < 2:
+            errors.append(f"sidecar case {case_id or index} dual annotation requires two distinct annotator_ids")
         if status == "dual_annotator_adjudicated" and not str(item.get("adjudicator", "")).strip():
             errors.append(f"sidecar case {case_id or index} adjudicated disagreements require adjudicator")
         if disagreement not in {"none", "resolved", "unresolved", "not_applicable"}:
@@ -557,8 +575,11 @@ def summarize_support_label_maturity(raw_items: List[Any], dataset_case_count: i
     reviewed_count = 0
     single_annotator_count = 0
     dual_annotated_count = 0
+    dual_independent_count = 0
     dual_agreed_count = 0
     dual_disagreed_count = 0
+    dual_independent_case_ids: List[str] = []
+    dual_annotation_missing_independent_ids_case_ids: List[str] = []
     adjudicated_count = 0
     published_benchmark_count = 0
     resolved_disagreement_count = 0
@@ -577,10 +598,13 @@ def summarize_support_label_maturity(raw_items: List[Any], dataset_case_count: i
         disagreement = str(item.get("disagreement", "none")).strip()
         annotator_count = item.get("annotator_count", 0)
         annotator_labels = item.get("annotator_labels", [])
+        annotator_ids = item.get("annotator_ids", [])
         if not isinstance(annotator_count, int) or annotator_count < 0:
             annotator_count = 0
         if not isinstance(annotator_labels, list):
             annotator_labels = []
+        if not isinstance(annotator_ids, list):
+            annotator_ids = []
 
         if status != "not_human_reviewed":
             reviewed_count += 1
@@ -593,6 +617,13 @@ def summarize_support_label_maturity(raw_items: List[Any], dataset_case_count: i
 
         if annotator_count >= 2 and len(annotator_labels) >= 2:
             normalized_labels = [str(label) for label in annotator_labels]
+            normalized_annotator_ids = [str(annotator_id).strip() for annotator_id in annotator_ids]
+            independently_annotated = (
+                len(normalized_annotator_ids) == annotator_count
+                and len(normalized_annotator_ids) >= 2
+                and all(normalized_annotator_ids)
+                and len(set(normalized_annotator_ids)) == len(normalized_annotator_ids)
+            )
             for left_index in range(len(normalized_labels)):
                 for right_index in range(left_index + 1, len(normalized_labels)):
                     pair_key = _label_pair_key(normalized_labels[left_index], normalized_labels[right_index])
@@ -603,6 +634,12 @@ def summarize_support_label_maturity(raw_items: List[Any], dataset_case_count: i
                         )
 
             dual_annotated_count += 1
+            if independently_annotated:
+                dual_independent_count += 1
+                if case_id:
+                    dual_independent_case_ids.append(case_id)
+            elif case_id:
+                dual_annotation_missing_independent_ids_case_ids.append(case_id)
             if len(set(normalized_labels)) == 1:
                 dual_agreed_count += 1
             else:
@@ -624,6 +661,9 @@ def summarize_support_label_maturity(raw_items: List[Any], dataset_case_count: i
         "reviewed_fraction": round(reviewed_count / dataset_case_count, 4) if dataset_case_count else 0.0,
         "single_annotator_count": single_annotator_count,
         "dual_annotated_count": dual_annotated_count,
+        "dual_independent_count": dual_independent_count,
+        "dual_independent_case_ids": dual_independent_case_ids,
+        "dual_annotation_missing_independent_ids_case_ids": dual_annotation_missing_independent_ids_case_ids,
         "dual_agreed_count": dual_agreed_count,
         "dual_disagreed_count": dual_disagreed_count,
         "raw_dual_agreement_rate": (

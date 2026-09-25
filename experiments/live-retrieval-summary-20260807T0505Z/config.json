@@ -1,0 +1,9 @@
+{
+  "artifact_paths": [
+    "experiments/live-retrieval-observation-20260807T0505Z"
+  ],
+  "artifact_roots": [],
+  "campaign": "data/eval/live_retrieval_benchmark_campaign.json",
+  "dataset": "data/eval/live_retrieval_benchmark.json",
+  "script": "scripts/summarize_live_retrieval_observations.py"
+}

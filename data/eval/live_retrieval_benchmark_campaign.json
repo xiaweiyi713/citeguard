@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "campaign_id": "citeguard-live-retrieval-v1",
+  "status": "collection",
+  "description": "Real known-record retrieval observation campaign. Deterministic adapter fixtures and canary rows do not count toward these quotas or source-quality claims.",
+  "targets": {
+    "minimum_case_count": 200,
+    "minimum_by_query_kind": {
+      "doi": 50,
+      "arxiv_id": 50,
+      "title": 100
+    },
+    "minimum_observations_per_case": 3
+  },
+  "allowed_values": {
+    "benchmark_origin": [
+      "real_source"
+    ],
+    "rights_basis": [
+      "public_metadata",
+      "open_access",
+      "user_provided",
+      "licensed"
+    ]
+  }
+}

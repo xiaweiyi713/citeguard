@@ -757,6 +757,48 @@ class ScholarlySourceTests(unittest.TestCase):
         self.assertEqual(report["detail"], "URLError")
         self.assertNotIn("evidence_chunks", enriched.metadata)
 
+    def test_oa_fulltext_fetcher_rejects_oversized_body_instead_of_truncating_it(self):
+        from citeguard.retrieval.scholarly_clients.oa_fulltext import OaFulltextFetcher
+
+        class Response:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc_value, traceback):
+                return False
+
+            def read(self, size):
+                self.read_size = size
+                return b"x" * size
+
+        fetcher = OaFulltextFetcher(max_bytes=16)
+        response = Response()
+        with mock.patch("citeguard.retrieval.scholarly_clients.oa_fulltext.open_validated_request", return_value=response):
+            payload, detail = fetcher._fetch_bytes("https://example.org/oversized")
+
+        self.assertIsNone(payload)
+        self.assertEqual(detail, "payload_too_large")
+        self.assertEqual(response.read_size, 17)
+
+        fetcher._fetch_bytes = lambda url: (None, "payload_too_large")
+        record = CitationRecord(
+            citation_id="oa-large",
+            title="Oversized Open Access Paper",
+            source="openalex",
+            metadata={
+                "open_access": {
+                    "is_oa": True,
+                    "pdf_url": "",
+                    "landing_page_url": "https://example.org/oversized",
+                }
+            },
+        )
+        enriched = fetcher.attach(record)
+
+        self.assertEqual(enriched.metadata["oa_fulltext"]["status"], "unavailable")
+        self.assertEqual(enriched.metadata["oa_fulltext"]["detail"], "payload_too_large")
+        self.assertNotIn("evidence_chunks", enriched.metadata)
+
     def test_doi_registry_probe_reports_registered_doi_with_resolution_url(self):
         class HandleHTTPClient(FakeHTTPClient):
             def get_json(self, url, params=None, headers=None, use_cache=True, timeout=None):

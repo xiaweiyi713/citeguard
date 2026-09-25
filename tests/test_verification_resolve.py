@@ -58,6 +58,12 @@ class LookupFailureThenSearchSuccessSource:
         return [self.record]
 
 
+class NamedMemorySource(InMemoryMetadataSource):
+    def __init__(self, records, name):
+        super().__init__(records)
+        self.name = name
+
+
 class ResolveTests(unittest.TestCase):
     def setUp(self):
         self.openscholar = CitationRecord(
@@ -108,6 +114,37 @@ class ResolveTests(unittest.TestCase):
     def test_source_names_unwraps_multi_source(self):
         multi = MultiSourceMetadataSource([self.source])
         self.assertIsInstance(source_names(multi), list)
+
+    def test_resolve_reports_every_source_represented_by_merged_records(self):
+        openalex_record = CitationRecord(
+            citation_id="openalex-record",
+            title="Merged Source Provenance for Citation Auditing",
+            authors=["A. Author"],
+            year=2026,
+            doi="10.1000/merged-provenance",
+            source="openalex",
+        )
+        crossref_record = CitationRecord(
+            citation_id="crossref-record",
+            title=openalex_record.title,
+            authors=["A. Author"],
+            year=2026,
+            venue="Journal of Auditable Retrieval",
+            doi=openalex_record.doi,
+            source="crossref",
+        )
+        source = MultiSourceMetadataSource(
+            [
+                NamedMemorySource([openalex_record], "openalex"),
+                NamedMemorySource([crossref_record], "crossref"),
+            ]
+        )
+
+        outcome = resolve_citation(parse_citation(title=openalex_record.title, year=2026), source)
+
+        self.assertIsNotNone(outcome.best)
+        self.assertEqual(outcome.sources_responded, ["crossref", "openalex"])
+        self.assertEqual(outcome.best.metadata["merged_sources"], ["crossref", "openalex"])
 
     def test_resolve_preserves_lookup_failure_diagnostics_after_successful_search(self):
         source = LookupFailureThenSearchSuccessSource(self.openscholar)

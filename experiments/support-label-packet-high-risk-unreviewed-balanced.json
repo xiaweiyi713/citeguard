@@ -1,0 +1,161 @@
+{
+  "ok": true,
+  "schema_version": 1,
+  "packet_type": "support_label_annotation_packet",
+  "packet_id": "support-packet-aff8707c70f09028",
+  "dataset": "support_eval.json",
+  "filters": {
+    "priority": [
+      "high"
+    ],
+    "unreviewed_only": true,
+    "limit_per_language": 1,
+    "limit_per_case_type": 1,
+    "limit_per_evidence_scope": 1
+  },
+  "n": 2,
+  "review_protocol": {
+    "schema_version": 1,
+    "packet_role": "first_review",
+    "independent_labeling_required": true,
+    "reviewer_must_not_see_hidden_labels": true,
+    "packet_target_annotator_count": 1,
+    "benchmark_target_annotator_count": 2,
+    "cases_already_single_annotated": 0,
+    "second_review_required_after_first_review": true,
+    "adjudication_required_on_disagreement": true,
+    "merge_policy": "single_annotator_until_second_review; dual_annotator_agreed_or_adjudicated_before_benchmark_claims"
+  },
+  "packet_summary": {
+    "case_ids": [
+      "s04",
+      "s35"
+    ],
+    "case_count_by_language": {
+      "en": 1,
+      "zh": 1
+    },
+    "case_count_by_case_type": {
+      "contradiction": 1,
+      "hard_negative": 1
+    },
+    "case_count_by_evidence_scope": {
+      "abstract": 1,
+      "metadata_snippet": 1
+    },
+    "case_count_by_split": {
+      "dev": 1,
+      "train": 1
+    },
+    "case_count_by_priority": {
+      "high": 2
+    },
+    "case_count_by_review_status": {
+      "not_human_reviewed": 2
+    }
+  },
+  "label_options": [
+    "supported",
+    "weakly_supported",
+    "insufficient_evidence",
+    "contradicted"
+  ],
+  "hidden_fields": [
+    "gold",
+    "predicted",
+    "adjudicated_label",
+    "annotator_labels",
+    "label_notes"
+  ],
+  "instructions": [
+    "Label independently before discussion.",
+    "Use only the evidence text and evidence_scope shown in this packet.",
+    "Prefer conservative labels when support is uncertain.",
+    "Record whether the packet evidence_scope was sufficient, and whether lawful full text is needed.",
+    "Do not infer support from citation fame, source outage, or topical similarity alone.",
+    "Use review_focus as non-gold guidance about the boundary to inspect; it is not a label hint."
+  ],
+  "cases": [
+    {
+      "case_id": "s04",
+      "priority": "high",
+      "claim": "Model M increases accuracy on task T.",
+      "evidence": "We find that model M does not improve, and in fact reduces, accuracy on task T.",
+      "evidence_scope": "abstract",
+      "case_type": "contradiction",
+      "split": "train",
+      "lang": "en",
+      "review_focus": "Check whether the evidence directly conflicts with the claim. Do not infer methods or full-text details from the abstract.",
+      "review_status": "not_human_reviewed",
+      "source_locator": "",
+      "annotation": {
+        "annotator_id": "",
+        "annotator_label": "",
+        "rationale": "",
+        "confidence": "",
+        "evidence_scope_assessed": "",
+        "full_text_needed": "",
+        "notes": ""
+      },
+      "review_phase": "first_review_high_risk",
+      "packet_purpose": "Assign a balanced first-review packet for unreviewed high-risk support cases.",
+      "review_protocol": {
+        "schema_version": 1,
+        "packet_role": "first_review",
+        "independent_labeling_required": true,
+        "reviewer_must_not_see_hidden_labels": true,
+        "packet_target_annotator_count": 1,
+        "benchmark_target_annotator_count": 2,
+        "cases_already_single_annotated": 0,
+        "second_review_required_after_first_review": true,
+        "adjudication_required_on_disagreement": true,
+        "merge_policy": "single_annotator_until_second_review; dual_annotator_agreed_or_adjudicated_before_benchmark_claims"
+      },
+      "packet_id": "support-packet-aff8707c70f09028",
+      "packet_case_index": 1,
+      "packet_digest": "sha256:c6b492b0ae95cc0bbf81769dfe50735aac5ae88ca6f27ab99db1c7ca238569c3"
+    },
+    {
+      "case_id": "s35",
+      "priority": "high",
+      "claim": "这条引用已经被证实为伪造，因为 Crossref 查询超时。",
+      "evidence": "Crossref 查询超时只说明该来源暂时不可用；当前记录没有来自其他来源的匹配结果或人工复核结论。",
+      "evidence_scope": "metadata_snippet",
+      "case_type": "hard_negative",
+      "split": "dev",
+      "lang": "zh",
+      "review_focus": "Check whether related evidence actually supports the stronger claim or only discusses a nearby topic. Treat source snippets as evidence only for the exact fact they state.",
+      "review_status": "not_human_reviewed",
+      "source_locator": "",
+      "annotation": {
+        "annotator_id": "",
+        "annotator_label": "",
+        "rationale": "",
+        "confidence": "",
+        "evidence_scope_assessed": "",
+        "full_text_needed": "",
+        "notes": ""
+      },
+      "review_phase": "first_review_high_risk",
+      "packet_purpose": "Assign a balanced first-review packet for unreviewed high-risk support cases.",
+      "review_protocol": {
+        "schema_version": 1,
+        "packet_role": "first_review",
+        "independent_labeling_required": true,
+        "reviewer_must_not_see_hidden_labels": true,
+        "packet_target_annotator_count": 1,
+        "benchmark_target_annotator_count": 2,
+        "cases_already_single_annotated": 0,
+        "second_review_required_after_first_review": true,
+        "adjudication_required_on_disagreement": true,
+        "merge_policy": "single_annotator_until_second_review; dual_annotator_agreed_or_adjudicated_before_benchmark_claims"
+      },
+      "packet_id": "support-packet-aff8707c70f09028",
+      "packet_case_index": 2,
+      "packet_digest": "sha256:c6b492b0ae95cc0bbf81769dfe50735aac5ae88ca6f27ab99db1c7ca238569c3"
+    }
+  ],
+  "review_phase": "first_review_high_risk",
+  "packet_purpose": "Assign a balanced first-review packet for unreviewed high-risk support cases.",
+  "packet_digest": "sha256:c6b492b0ae95cc0bbf81769dfe50735aac5ae88ca6f27ab99db1c7ca238569c3"
+}

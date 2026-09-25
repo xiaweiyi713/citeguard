@@ -53,7 +53,8 @@ def validate_support_hard_cases(data: Dict[str, Any]) -> Dict[str, Any]:
     if not isinstance(cases, list) or not cases:
         errors.append("cases must be a non-empty list")
         cases = []
-    set_cases = data.get("set_cases") if isinstance(data.get("set_cases"), list) else []
+    raw_set_cases = data.get("set_cases")
+    set_cases = raw_set_cases if isinstance(raw_set_cases, list) else []
 
     seen_ids = set()
     paper_splits: Dict[str, set] = defaultdict(set)

@@ -480,6 +480,11 @@ def _compact_label_sidecar_metrics(metrics: object) -> Dict[str, object]:
             metrics.get("policy_boundary_unreviewed_case_ids", []) or []
         ),
         "dual_annotated": metrics.get("dual_annotated"),
+        "dual_independent": metrics.get("dual_independent"),
+        "dual_independent_case_ids": list(metrics.get("dual_independent_case_ids", []) or []),
+        "dual_annotation_missing_independent_ids_case_ids": list(
+            metrics.get("dual_annotation_missing_independent_ids_case_ids", []) or []
+        ),
         "raw_dual_agreement_rate": metrics.get("raw_dual_agreement_rate"),
         "unresolved_disagreements": metrics.get("unresolved_disagreements"),
         "unresolved_disagreement_case_ids": list(
